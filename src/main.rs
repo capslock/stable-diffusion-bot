@@ -6,6 +6,7 @@ use figment::{
     Figment,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use teloxide::{
     dispatching::dialogue::{
         self, serializer::Json, ErasedStorage, InMemStorage, SqliteStorage, Storage,
@@ -13,7 +14,7 @@ use teloxide::{
     dptree::case,
     payloads::setters::*,
     prelude::*,
-    types::{InputFile, InputMedia, InputMediaPhoto, MediaPhoto, Update, UserId},
+    types::{ChatAction, InputFile, InputMedia, InputMediaPhoto, MediaPhoto, Update, UserId},
     utils::command::BotCommands,
 };
 use tracing::{metadata::LevelFilter, warn};
@@ -198,11 +199,21 @@ async fn handle_prompt(
     _dialogue: DiffusionDialogue,
     msg: Message,
 ) -> anyhow::Result<()> {
-    let req = HashMap::from([
-        ("prompt", msg.text().unwrap_or("a corgi wearing a tophat")),
-        ("steps", "20"),
-        ("batch_size", "2"),
-    ]);
+    let prompt = if let Some(message) = msg.text() {
+        message
+    } else {
+        return Ok(());
+    };
+
+    let req = json!({
+        "prompt": prompt,
+        "steps": 20,
+        "batch_size": 1,
+    });
+
+    bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
+        .await?;
+
     let res = cfg.client.post(cfg.sd_api_url).json(&req).send().await?;
     let resp: Resp = res.json().await?;
     use base64::{engine::general_purpose, Engine as _};
@@ -221,7 +232,7 @@ async fn handle_prompt(
                 InputMedia::Photo(
                     InputMediaPhoto::new(InputFile::memory(i))
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                        .caption("prompt"),
+                        .caption(format!("`{prompt}`")),
                 )
             } else {
                 InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(i)))
@@ -232,7 +243,7 @@ async fn handle_prompt(
         if let Some(image) = images.next() {
             bot.send_photo(msg.chat.id, image.into())
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .caption("prompt")
+                .caption(format!("`{prompt}`"))
                 .await?;
         }
     } else {
