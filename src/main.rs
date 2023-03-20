@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use figment::{
@@ -12,7 +12,7 @@ use teloxide::{
     },
     dptree::case,
     prelude::*,
-    types::{MediaPhoto, Update, UserId},
+    types::{InputFile, MediaPhoto, Update, UserId},
     utils::command::BotCommands,
 };
 use tracing::{metadata::LevelFilter, warn};
@@ -24,6 +24,7 @@ struct Config {
     api_key: String,
     allowed_users: Vec<u64>,
     db_path: Option<String>,
+    sd_api_url: String,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
@@ -71,7 +72,18 @@ async fn main() -> anyhow::Result<()> {
 
     let allowed_users = config.allowed_users.into_iter().map(UserId).collect();
 
-    let parameters = ConfigParameters { allowed_users };
+    let parameters = ConfigParameters {
+        allowed_users,
+        client: reqwest::Client::new(),
+        sd_api_url: config.sd_api_url,
+    };
+
+    #[derive(Deserialize)]
+    struct Resp {
+        images: Vec<String>,
+        parameters: HashMap<String, serde_json::Value>,
+        info: String,
+    };
 
     let handler = Update::filter_message()
         .branch(
@@ -106,14 +118,20 @@ async fn main() -> anyhow::Result<()> {
             },
         ))
         .branch(case![State::Start].endpoint(
-            |bot: Bot, dialogue: DiffusionDialogue, msg: Message| async move {
+            |bot: Bot, cfg: ConfigParameters, dialogue: DiffusionDialogue, msg: Message| async move {
                 dialogue
                     .update(State::Next)
                     .await
                     .expect("Failed to update state");
+                let req = HashMap::from([
+                    ("prompt", "a corgi wearing a tophat"),
+                    ("steps", "20"),
+                ]);
+                let res = cfg.client.post(cfg.sd_api_url).json(&req).send().await?;
+                let resp: Resp = res.json().await?;
                 bot.send_message(
                     msg.chat.id,
-                    format!("{:?}", dialogue.get_or_default().await.unwrap_or_default()),
+                    format!("{:?}", resp.info),
                 )
                 .reply_to_message_id(msg.id)
                 .await?;
@@ -121,15 +139,20 @@ async fn main() -> anyhow::Result<()> {
             },
         ))
         .branch(case![State::Next].endpoint(
-            |bot: Bot, dialogue: DiffusionDialogue, msg: Message| async move {
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "next: {:?}",
-                        dialogue.get_or_default().await.unwrap_or_default()
-                    ),
-                )
-                .await?;
+            |bot: Bot, cfg: ConfigParameters, _dialogue: DiffusionDialogue, msg: Message| async move {
+                let req = HashMap::from([
+                    ("prompt", msg.text().unwrap_or("a corgi wearing a tophat")),
+                    ("steps", "20"),
+                ]);
+                let res = cfg.client.post(cfg.sd_api_url).json(&req).send().await?;
+                let resp: Resp = res.json().await?;
+                use base64::{Engine as _, engine::general_purpose};
+
+                for image in resp.images {
+                    let decoded = general_purpose::STANDARD_NO_PAD.decode(image).expect("failed to decode!");
+                    bot.send_photo(msg.chat.id, InputFile::memory(decoded)).await?;
+                }
+
                 Ok(())
             },
         ));
@@ -155,6 +178,8 @@ async fn main() -> anyhow::Result<()> {
 #[derive(Clone, Debug)]
 struct ConfigParameters {
     allowed_users: HashSet<UserId>,
+    sd_api_url: String,
+    client: reqwest::Client,
 }
 
 #[derive(BotCommands, Clone)]

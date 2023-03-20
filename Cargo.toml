@@ -7,8 +7,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.70"
+base64 = "0.21.0"
 figment = { version = "0.10.8", features = ["toml", "env"] }
+reqwest = { version = "0.11.14", features = ["json"] }
 serde = "1.0.157"
+serde_json = "1.0.94"
 teloxide = { version = "0.12", features = ["macros", "sqlite-storage"] }
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1.37"

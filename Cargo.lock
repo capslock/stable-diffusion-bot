@@ -1408,8 +1408,11 @@ name = "stable-diffusion-bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "figment",
+ "reqwest",
  "serde",
+ "serde_json",
  "teloxide",
  "tokio",
  "tracing",
