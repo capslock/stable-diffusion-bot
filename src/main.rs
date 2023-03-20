@@ -11,8 +11,9 @@ use teloxide::{
         self, serializer::Json, ErasedStorage, InMemStorage, SqliteStorage, Storage,
     },
     dptree::case,
+    payloads::setters::*,
     prelude::*,
-    types::{InputFile, MediaPhoto, Update, UserId},
+    types::{InputFile, InputMedia, InputMediaPhoto, MediaPhoto, Update, UserId},
     utils::command::BotCommands,
 };
 use tracing::{metadata::LevelFilter, warn};
@@ -37,8 +38,6 @@ pub enum State {
 type DialogueStorage = std::sync::Arc<ErasedStorage<State>>;
 
 type DiffusionDialogue = Dialogue<State, ErasedStorage<State>>;
-
-type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -78,13 +77,6 @@ async fn main() -> anyhow::Result<()> {
         sd_api_url: config.sd_api_url,
     };
 
-    #[derive(Deserialize)]
-    struct Resp {
-        images: Vec<String>,
-        parameters: HashMap<String, serde_json::Value>,
-        info: String,
-    };
-
     let handler = Update::filter_message()
         .branch(
             dptree::entry()
@@ -109,53 +101,9 @@ async fn main() -> anyhow::Result<()> {
                 },
             ),
         )
-        .branch(Message::filter_photo().endpoint(
-            |bot: Bot, msg: Message, photo: MediaPhoto| async move {
-                bot.send_message(msg.chat.id, format!("got image {}", photo.photo[0].file.id))
-                    .reply_to_message_id(msg.id)
-                    .await?;
-                Ok(())
-            },
-        ))
-        .branch(case![State::Start].endpoint(
-            |bot: Bot, cfg: ConfigParameters, dialogue: DiffusionDialogue, msg: Message| async move {
-                dialogue
-                    .update(State::Next)
-                    .await
-                    .expect("Failed to update state");
-                let req = HashMap::from([
-                    ("prompt", "a corgi wearing a tophat"),
-                    ("steps", "20"),
-                ]);
-                let res = cfg.client.post(cfg.sd_api_url).json(&req).send().await?;
-                let resp: Resp = res.json().await?;
-                bot.send_message(
-                    msg.chat.id,
-                    format!("{:?}", resp.info),
-                )
-                .reply_to_message_id(msg.id)
-                .await?;
-                Ok(())
-            },
-        ))
-        .branch(case![State::Next].endpoint(
-            |bot: Bot, cfg: ConfigParameters, _dialogue: DiffusionDialogue, msg: Message| async move {
-                let req = HashMap::from([
-                    ("prompt", msg.text().unwrap_or("a corgi wearing a tophat")),
-                    ("steps", "20"),
-                ]);
-                let res = cfg.client.post(cfg.sd_api_url).json(&req).send().await?;
-                let resp: Resp = res.json().await?;
-                use base64::{Engine as _, engine::general_purpose};
-
-                for image in resp.images {
-                    let decoded = general_purpose::STANDARD_NO_PAD.decode(image).expect("failed to decode!");
-                    bot.send_photo(msg.chat.id, InputFile::memory(decoded)).await?;
-                }
-
-                Ok(())
-            },
-        ));
+        .branch(Message::filter_photo().endpoint(handle_image))
+        .branch(case![State::Start].endpoint(handle_prompt))
+        .branch(case![State::Next].endpoint(handle_prompt));
 
     let dialogue = dialogue::enter::<Update, ErasedStorage<State>, State, _>().branch(handler);
 
@@ -202,7 +150,7 @@ async fn unauthenticated_commands_handler(
     me: teloxide::types::Me,
     msg: Message,
     cmd: UnauthenticatedCommands,
-) -> Result<(), teloxide::RequestError> {
+) -> anyhow::Result<()> {
     let text = match cmd {
         UnauthenticatedCommands::Help => {
             if cfg.allowed_users.contains(&msg.from().unwrap().id) {
@@ -222,6 +170,74 @@ async fn unauthenticated_commands_handler(
     };
 
     bot.send_message(msg.chat.id, text).await?;
+
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct Resp {
+    images: Vec<String>,
+    parameters: HashMap<String, serde_json::Value>,
+    info: String,
+}
+
+async fn handle_image(
+    _bot: Bot,
+    _cfg: ConfigParameters,
+    _dialogue: DiffusionDialogue,
+    _msg: Message,
+    _photo: MediaPhoto,
+) -> anyhow::Result<()> {
+    unimplemented!()
+}
+
+async fn handle_prompt(
+    bot: Bot,
+    cfg: ConfigParameters,
+    _dialogue: DiffusionDialogue,
+    msg: Message,
+) -> anyhow::Result<()> {
+    let req = HashMap::from([
+        ("prompt", msg.text().unwrap_or("a corgi wearing a tophat")),
+        ("steps", "20"),
+        ("batch_size", "2"),
+    ]);
+    let res = cfg.client.post(cfg.sd_api_url).json(&req).send().await?;
+    let resp: Resp = res.json().await?;
+    use base64::{engine::general_purpose, Engine as _};
+
+    let mut images = resp
+        .images
+        .iter()
+        .map(|i| {
+            general_purpose::STANDARD
+                .decode(i)
+                .expect("failed to decode!")
+        })
+        .enumerate()
+        .map(|(n, i)| {
+            if n == 0 {
+                InputMedia::Photo(
+                    InputMediaPhoto::new(InputFile::memory(i))
+                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                        .caption("prompt"),
+                )
+            } else {
+                InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(i)))
+            }
+        });
+
+    if resp.images.len() == 1 {
+        if let Some(image) = images.next() {
+            bot.send_photo(msg.chat.id, image.into())
+                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                .caption("prompt")
+                .await?;
+        }
+    } else {
+        bot.send_media_group(msg.chat.id, images).await?;
+    }
 
     Ok(())
 }
