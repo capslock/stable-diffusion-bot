@@ -12,7 +12,7 @@ use teloxide::{
     types::{ChatAction, InputFile, InputMedia, InputMediaPhoto, MediaPhoto, Update, UserId},
     utils::command::BotCommands,
 };
-use tracing_log::log::warn;
+use tracing::warn;
 
 use crate::api::{Api, Txt2ImgRequest};
 
@@ -30,8 +30,7 @@ type DiffusionDialogue = Dialogue<State, ErasedStorage<State>>;
 #[derive(Clone, Debug)]
 struct ConfigParameters {
     allowed_users: HashSet<UserId>,
-    sd_api_url: String,
-    client: reqwest::Client,
+    api: Api,
 }
 
 #[derive(BotCommands, Clone)]
@@ -97,11 +96,9 @@ pub async fn run_bot(
 
     let allowed_users = allowed_users.into_iter().map(UserId).collect();
 
-    let parameters = ConfigParameters {
-        allowed_users,
-        client: reqwest::Client::new(),
-        sd_api_url,
-    };
+    let api = Api::new_with_url(sd_api_url).context("Failed to initialize sd api")?;
+
+    let parameters = ConfigParameters { allowed_users, api };
 
     let handler = Update::filter_message()
         .branch(
@@ -174,7 +171,8 @@ async fn handle_prompt(
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
-    let resp = Api::new_with_client_and_url(cfg.client, cfg.sd_api_url)?
+    let resp = cfg
+        .api
         .txt2img()?
         .send(
             Txt2ImgRequest::default()
@@ -185,6 +183,19 @@ async fn handle_prompt(
         .await?;
 
     use base64::{engine::general_purpose, Engine as _};
+
+    let info = if let Some(infos) = resp.info()?.infotexts {
+        if let Some(info) = infos.get(0) {
+            info.strip_prefix(&prompt)
+                .unwrap_or(info)
+                .trim()
+                .to_string()
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
 
     let mut images = resp
         .images
@@ -200,7 +211,10 @@ async fn handle_prompt(
                 InputMedia::Photo(
                     InputMediaPhoto::new(InputFile::memory(i))
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                        .caption(format!("`{prompt}`")),
+                        .caption(format!(
+                            "`{prompt}`\n{}",
+                            teloxide::utils::markdown::escape(&info)
+                        )),
                 )
             } else {
                 InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(i)))
@@ -211,7 +225,10 @@ async fn handle_prompt(
         if let Some(image) = images.next() {
             bot.send_photo(msg.chat.id, image.into())
                 .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .caption(format!("`{prompt}`"))
+                .caption(format!(
+                    "`{prompt}`\n{}",
+                    teloxide::utils::markdown::escape(&info)
+                ))
                 .await?;
         }
     } else {
