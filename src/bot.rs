@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use teloxide::{
     dispatching::dialogue::{
         self, serializer::Json, ErasedStorage, InMemStorage, SqliteStorage, Storage,
@@ -10,14 +9,12 @@ use teloxide::{
     dptree::case,
     payloads::setters::*,
     prelude::*,
-    types::{
-        ChatAction, InputFile, InputMedia, InputMediaPhoto, MediaPhoto, MediaText, Update, UserId,
-    },
+    types::{ChatAction, InputFile, InputMedia, InputMediaPhoto, MediaPhoto, Update, UserId},
     utils::command::BotCommands,
 };
 use tracing_log::log::warn;
 
-use crate::api::{Txt2Img, Txt2ImgRequest, Txt2ImgResponse};
+use crate::api::{Txt2Img, Txt2ImgRequest};
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub enum State {
@@ -179,7 +176,7 @@ async fn handle_prompt(
 
     let resp = Txt2Img::new(cfg.client, cfg.sd_api_url)
         .send(
-            &Txt2ImgRequest::default()
+            Txt2ImgRequest::default()
                 .with_prompt(prompt.clone())
                 .with_steps(20)
                 .with_batch_size(1),

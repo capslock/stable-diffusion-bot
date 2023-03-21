@@ -59,22 +59,18 @@ pub struct Txt2ImgRequest {
 }
 
 impl Txt2ImgRequest {
-    pub fn with_prompt(self, prompt: String) -> Self {
-        Self {
-            prompt: Some(prompt),
-            ..self
-        }
+    pub fn with_prompt(&mut self, prompt: String) -> &mut Self {
+        self.prompt = Some(prompt);
+        self
     }
 
-    pub fn with_styles(self, styles: Vec<String>) -> Self {
-        Self {
-            styles: Some(styles),
-            ..self
-        }
+    pub fn with_styles(&mut self, styles: Vec<String>) -> &mut Self {
+        self.styles = Some(styles);
+        self
     }
 
-    pub fn with_style(mut self, style: String) -> Self {
-        if let Some(ref mut styles) = &mut self.styles {
+    pub fn with_style(&mut self, style: String) -> &mut Self {
+        if let Some(ref mut styles) = self.styles {
             styles.push(style);
             self
         } else {
@@ -82,95 +78,69 @@ impl Txt2ImgRequest {
         }
     }
 
-    pub fn with_seed(self, seed: i32) -> Self {
-        Self {
-            seed: Some(seed),
-            ..self
-        }
+    pub fn with_seed(&mut self, seed: i32) -> &mut Self {
+        self.seed = Some(seed);
+        self
     }
 
-    pub fn with_subseed(self, subseed: i32) -> Self {
-        Self {
-            subseed: Some(subseed),
-            ..self
-        }
+    pub fn with_subseed(&mut self, subseed: i32) -> &mut Self {
+        self.subseed = Some(subseed);
+        self
     }
 
-    pub fn with_subseed_strength(self, subseed_strength: u32) -> Self {
-        Self {
-            subseed_strength: Some(subseed_strength),
-            ..self
-        }
+    pub fn with_subseed_strength(&mut self, subseed_strength: u32) -> &mut Self {
+        self.subseed_strength = Some(subseed_strength);
+        self
     }
 
-    pub fn with_sampler_name(self, sampler_name: String) -> Self {
-        Self {
-            sampler_name: Some(sampler_name),
-            ..self
-        }
+    pub fn with_sampler_name(&mut self, sampler_name: String) -> &mut Self {
+        self.sampler_name = Some(sampler_name);
+        self
     }
 
-    pub fn with_batch_size(self, batch_size: u32) -> Self {
-        Self {
-            batch_size: Some(batch_size),
-            ..self
-        }
+    pub fn with_batch_size(&mut self, batch_size: u32) -> &mut Self {
+        self.batch_size = Some(batch_size);
+        self
     }
 
-    pub fn with_n_iter(self, n_iter: u32) -> Self {
-        Self {
-            n_iter: Some(n_iter),
-            ..self
-        }
+    pub fn with_n_iter(&mut self, n_iter: u32) -> &mut Self {
+        self.n_iter = Some(n_iter);
+        self
     }
 
-    pub fn with_steps(self, steps: u32) -> Self {
-        Self {
-            steps: Some(steps),
-            ..self
-        }
+    pub fn with_steps(&mut self, steps: u32) -> &mut Self {
+        self.steps = Some(steps);
+        self
     }
 
-    pub fn with_cfg_scale(self, cfg_scale: u32) -> Self {
-        Self {
-            cfg_scale: Some(cfg_scale),
-            ..self
-        }
+    pub fn with_cfg_scale(&mut self, cfg_scale: u32) -> &mut Self {
+        self.cfg_scale = Some(cfg_scale);
+        self
     }
 
-    pub fn with_width(self, width: u32) -> Self {
-        Self {
-            width: Some(width),
-            ..self
-        }
+    pub fn with_width(&mut self, width: u32) -> &mut Self {
+        self.width = Some(width);
+        self
     }
 
-    pub fn with_height(self, height: u32) -> Self {
-        Self {
-            height: Some(height),
-            ..self
-        }
+    pub fn with_height(&mut self, height: u32) -> &mut Self {
+        self.height = Some(height);
+        self
     }
 
-    pub fn with_restore_faces(self, restore_faces: bool) -> Self {
-        Self {
-            restore_faces: Some(restore_faces),
-            ..self
-        }
+    pub fn with_restore_faces(&mut self, restore_faces: bool) -> &mut Self {
+        self.restore_faces = Some(restore_faces);
+        self
     }
 
-    pub fn with_tiling(self, tiling: bool) -> Self {
-        Self {
-            tiling: Some(tiling),
-            ..self
-        }
+    pub fn with_tiling(&mut self, tiling: bool) -> &mut Self {
+        self.tiling = Some(tiling);
+        self
     }
 
-    pub fn with_negative_prompt(self, negative_prompt: String) -> Self {
-        Self {
-            negative_prompt: Some(negative_prompt),
-            ..self
-        }
+    pub fn with_negative_prompt(&mut self, negative_prompt: String) -> &mut Self {
+        self.negative_prompt = Some(negative_prompt);
+        self
     }
 }
 

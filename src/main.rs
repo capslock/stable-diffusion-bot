@@ -9,8 +9,8 @@ use tracing::metadata::LevelFilter;
 use tracing_log::LogTracer;
 use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, EnvFilter, FmtSubscriber};
 
-mod api;
-mod bot;
+pub mod api;
+pub mod bot;
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct Config {
