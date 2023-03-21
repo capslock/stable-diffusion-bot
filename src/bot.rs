@@ -12,9 +12,9 @@ use teloxide::{
     types::{ChatAction, InputFile, InputMedia, InputMediaPhoto, MediaPhoto, Update, UserId},
     utils::command::BotCommands,
 };
-use tracing::warn;
+use tracing::{error, warn};
 
-use crate::api::{Api, Txt2ImgRequest};
+use crate::api::{Api, Txt2ImgRequest, Txt2ImgResponse};
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub enum State {
@@ -159,6 +159,19 @@ async fn handle_image(
     unimplemented!()
 }
 
+fn message_from_resp(prompt: &str, resp: &Txt2ImgResponse) -> anyhow::Result<String> {
+    let mut message = format!("`{prompt}`");
+    if let Some(infos) = resp.info()?.infotexts {
+        if let Some(info) = infos.get(0) {
+            message = format!(
+                "{message}\n{}",
+                info.strip_prefix(prompt).unwrap_or(info).trim()
+            )
+        }
+    }
+    Ok(message)
+}
+
 async fn handle_prompt(
     bot: Bot,
     cfg: ConfigParameters,
@@ -184,55 +197,42 @@ async fn handle_prompt(
 
     use base64::{engine::general_purpose, Engine as _};
 
-    let info = if let Some(infos) = resp.info()?.infotexts {
-        if let Some(info) = infos.get(0) {
-            info.strip_prefix(&prompt)
-                .unwrap_or(info)
-                .trim()
-                .to_string()
-        } else {
-            String::new()
-        }
-    } else {
-        String::new()
-    };
-
-    let mut images = resp
+    let mut images: Vec<_> = resp
         .images
         .iter()
         .map(|i| {
-            general_purpose::STANDARD
-                .decode(i)
-                .expect("failed to decode!")
+            InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(
+                general_purpose::STANDARD
+                    .decode(i)
+                    .expect("failed to decode!"),
+            )))
         })
-        .enumerate()
-        .map(|(n, i)| {
-            if n == 0 {
-                InputMedia::Photo(
-                    InputMediaPhoto::new(InputFile::memory(i))
-                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                        .caption(format!(
-                            "`{prompt}`\n{}",
-                            teloxide::utils::markdown::escape(&info)
-                        )),
-                )
-            } else {
-                InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(i)))
-            }
-        });
+        .collect();
 
-    if resp.images.len() == 1 {
-        if let Some(image) = images.next() {
-            bot.send_photo(msg.chat.id, image.into())
-                .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                .caption(format!(
-                    "`{prompt}`\n{}",
-                    teloxide::utils::markdown::escape(&info)
-                ))
-                .await?;
+    match images.len() {
+        1 => {
+            if let Some(image) = images.pop() {
+                bot.send_photo(msg.chat.id, image.into())
+                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                    .caption(
+                        message_from_resp(&prompt, &resp)
+                            .context("Failed to build message from response")?,
+                    )
+                    .await?;
+            }
         }
-    } else {
-        bot.send_media_group(msg.chat.id, images).await?;
+        2.. => {
+            if let Some(InputMedia::Photo(image)) = images.get_mut(0) {
+                image.caption = Some(
+                    message_from_resp(&prompt, &resp)
+                        .context("Failed to build message from response")?,
+                );
+            }
+            bot.send_media_group(msg.chat.id, images).await?;
+        }
+        _ => {
+            error!("Did not get any images from the API.")
+        }
     }
 
     Ok(())
