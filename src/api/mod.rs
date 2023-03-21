@@ -6,6 +6,7 @@ pub use txt2img::*;
 mod img2img;
 pub use img2img::*;
 
+#[derive(Clone, Debug)]
 pub struct Api {
     client: reqwest::Client,
     url: Url,

@@ -12,6 +12,45 @@ pub struct Img2ImgResponse {
     pub info: String,
 }
 
+impl Img2ImgResponse {
+    pub fn info(&self) -> anyhow::Result<Img2ImgInfo> {
+        serde_json::from_str(&self.info).context("failed to parse info")
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Default, Serialize, Deserialize, Debug)]
+pub struct Img2ImgInfo {
+    pub batch_size: Option<u32>,
+    pub all_prompts: Option<Vec<String>>,
+    pub styles: Option<Vec<String>>,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+    pub extra_generation_params: Option<serde_json::Value>,
+    pub sampler_name: Option<String>,
+    pub restore_faces: Option<bool>,
+    pub seed_resize_from_w: Option<i32>,
+    pub all_negative_prompts: Option<Vec<String>>,
+    pub cfg_scale: Option<f64>,
+    pub index_of_first_image: Option<u32>,
+    pub seed_resize_from_h: Option<i32>,
+    pub infotexts: Option<Vec<String>>,
+    pub negative_prompt: Option<String>,
+    pub seed: Option<i64>,
+    pub denoising_strength: Option<f64>,
+    pub is_using_inpainting_conditioning: Option<bool>,
+    pub subseed: Option<i64>,
+    pub prompt: Option<String>,
+    pub subseed_strength: Option<u32>,
+    pub all_subseeds: Option<Vec<i64>>,
+    pub steps: Option<u32>,
+    pub face_restoration_model: Option<serde_json::Value>,
+    pub job_timestamp: Option<String>,
+    pub clip_skip: Option<u32>,
+    pub sd_model_hash: Option<String>,
+    pub all_seeds: Option<Vec<i64>>,
+}
+
 #[skip_serializing_none]
 #[derive(Default, Serialize, Deserialize)]
 pub struct Img2ImgRequest {
@@ -28,8 +67,8 @@ pub struct Img2ImgRequest {
     pub initial_noise_multiplier: Option<u32>,
     pub prompt: Option<String>,
     pub styles: Option<Vec<String>>,
-    pub seed: Option<i32>,
-    pub subseed: Option<i32>,
+    pub seed: Option<i64>,
+    pub subseed: Option<i64>,
     pub subseed_strength: Option<u32>,
     pub seed_resize_from_h: Option<i32>,
     pub seed_resize_from_w: Option<i32>,
@@ -37,7 +76,7 @@ pub struct Img2ImgRequest {
     pub batch_size: Option<u32>,
     pub n_iter: Option<u32>,
     pub steps: Option<u32>,
-    pub cfg_scale: Option<u32>,
+    pub cfg_scale: Option<f64>,
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub restore_faces: Option<bool>,
@@ -46,10 +85,10 @@ pub struct Img2ImgRequest {
     pub do_not_save_grid: Option<bool>,
     pub negative_prompt: Option<String>,
     pub eta: Option<u32>,
-    pub s_churn: Option<u32>,
-    pub s_tmax: Option<u32>,
-    pub s_tmin: Option<u32>,
-    pub s_noise: Option<u32>,
+    pub s_churn: Option<f64>,
+    pub s_tmax: Option<f64>,
+    pub s_tmin: Option<f64>,
+    pub s_noise: Option<f64>,
     pub override_settings: Option<HashMap<String, serde_json::Value>>,
     pub override_settings_restore_afterwards: Option<bool>,
     pub script_args: Option<Vec<serde_json::Value>>,
@@ -86,12 +125,12 @@ impl Img2ImgRequest {
         self
     }
 
-    pub fn with_seed(&mut self, seed: i32) -> &mut Self {
+    pub fn with_seed(&mut self, seed: i64) -> &mut Self {
         self.seed = Some(seed);
         self
     }
 
-    pub fn with_subseed(&mut self, subseed: i32) -> &mut Self {
+    pub fn with_subseed(&mut self, subseed: i64) -> &mut Self {
         self.subseed = Some(subseed);
         self
     }
@@ -121,7 +160,7 @@ impl Img2ImgRequest {
         self
     }
 
-    pub fn with_cfg_scale(&mut self, cfg_scale: u32) -> &mut Self {
+    pub fn with_cfg_scale(&mut self, cfg_scale: f64) -> &mut Self {
         self.cfg_scale = Some(cfg_scale);
         self
     }
