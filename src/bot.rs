@@ -9,12 +9,12 @@ use teloxide::{
     dptree::case,
     payloads::setters::*,
     prelude::*,
-    types::{ChatAction, InputFile, InputMedia, InputMediaPhoto, MediaPhoto, Update, UserId},
+    types::{ChatAction, InputFile, InputMedia, InputMediaPhoto, PhotoSize, Update, UserId},
     utils::command::BotCommands,
 };
 use tracing::{error, warn};
 
-use crate::api::{Api, Img2ImgRequest, Txt2ImgRequest, Txt2ImgResponse};
+use crate::api::{Api, Img2ImgRequest, Img2ImgResponse, Txt2ImgRequest, Txt2ImgResponse};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum State {
@@ -41,6 +41,7 @@ type DiffusionDialogue = Dialogue<State, ErasedStorage<State>>;
 #[derive(Clone, Debug)]
 struct ConfigParameters {
     allowed_users: HashSet<UserId>,
+    client: reqwest::Client,
     api: Api,
 }
 
@@ -107,9 +108,16 @@ pub async fn run_bot(
 
     let allowed_users = allowed_users.into_iter().map(UserId).collect();
 
-    let api = Api::new_with_url(sd_api_url).context("Failed to initialize sd api")?;
+    let client = reqwest::Client::new();
 
-    let parameters = ConfigParameters { allowed_users, api };
+    let api = Api::new_with_client_and_url(client.clone(), sd_api_url)
+        .context("Failed to initialize sd api")?;
+
+    let parameters = ConfigParameters {
+        allowed_users,
+        client,
+        api,
+    };
 
     let handler = Update::filter_message()
         .branch(
@@ -135,7 +143,11 @@ pub async fn run_bot(
                 },
             ),
         )
-        .branch(Message::filter_photo().endpoint(handle_image))
+        .branch(
+            Message::filter_photo()
+                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_image))
+                .branch(case![State::Next].endpoint(handle_image)),
+        )
         .branch(
             Message::filter_text()
                 .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt))
@@ -161,18 +173,116 @@ pub async fn run_bot(
 }
 
 async fn handle_image(
-    _bot: Bot,
-    _cfg: ConfigParameters,
-    _dialogue: DiffusionDialogue,
-    _msg: Message,
-    _photo: MediaPhoto,
+    bot: Bot,
+    cfg: ConfigParameters,
+    dialogue: DiffusionDialogue,
+    (txt2img, mut img2img): (Txt2ImgRequest, Img2ImgRequest),
+    msg: Message,
+    photo: Vec<PhotoSize>,
 ) -> anyhow::Result<()> {
-    unimplemented!()
+    let prompt = if let Some(caption) = msg.caption() {
+        caption
+    } else {
+        return Ok(());
+    };
+
+    bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
+        .await?;
+
+    img2img.prompt = Some(prompt.to_owned());
+    let photo = if let Some(photo) = photo
+        .iter()
+        .reduce(|a, p| if a.height > p.height { a } else { p })
+    {
+        photo
+    } else {
+        return Ok(());
+    };
+    let file = bot.get_file(&photo.file.id).send().await?;
+
+    let photo = cfg
+        .client
+        .get(format!(
+            "https://api.telegram.org/file/bot{}/{}",
+            bot.token(),
+            file.path
+        ))
+        .send()
+        .await?;
+
+    use base64::{engine::general_purpose, Engine as _};
+
+    let photo = general_purpose::STANDARD.encode(photo.bytes().await?);
+
+    img2img.init_images = Some(vec![photo]);
+
+    let resp = cfg.api.img2img()?.send(&img2img).await?;
+
+    let mut images: Vec<_> = resp
+        .images
+        .iter()
+        .map(|i| {
+            InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(
+                general_purpose::STANDARD
+                    .decode(i)
+                    .expect("failed to decode!"),
+            )))
+        })
+        .collect();
+
+    match images.len() {
+        1 => {
+            if let Some(image) = images.pop() {
+                bot.send_photo(msg.chat.id, image.into())
+                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                    .caption(
+                        message_from_resp(prompt, &resp)
+                            .context("Failed to build message from response")?,
+                    )
+                    .await?;
+            }
+        }
+        2.. => {
+            if let Some(InputMedia::Photo(image)) = images.get_mut(0) {
+                image.caption = Some(
+                    message_from_resp(prompt, &resp)
+                        .context("Failed to build message from response")?,
+                );
+            }
+            bot.send_media_group(msg.chat.id, images).await?;
+        }
+        _ => {
+            error!("Did not get any images from the API.")
+        }
+    }
+
+    dialogue
+        .update(State::Ready { txt2img, img2img })
+        .await
+        .map_err(|e| anyhow!(e))?;
+
+    Ok(())
 }
 
-fn message_from_resp(prompt: &str, resp: &Txt2ImgResponse) -> anyhow::Result<String> {
+trait Response {
+    fn info_text(&self) -> anyhow::Result<Option<Vec<String>>>;
+}
+
+impl Response for Txt2ImgResponse {
+    fn info_text(&self) -> anyhow::Result<Option<Vec<String>>> {
+        Ok(self.info()?.infotexts)
+    }
+}
+
+impl Response for Img2ImgResponse {
+    fn info_text(&self) -> anyhow::Result<Option<Vec<String>>> {
+        Ok(self.info()?.infotexts)
+    }
+}
+
+fn message_from_resp<T: Response>(prompt: &str, resp: &T) -> anyhow::Result<String> {
     let mut message = format!("`{prompt}`");
-    if let Some(infos) = resp.info()?.infotexts {
+    if let Some(infos) = resp.info_text()? {
         if let Some(info) = infos.get(0) {
             message = format!(
                 "{message}\n{}",
