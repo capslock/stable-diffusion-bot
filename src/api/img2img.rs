@@ -4,6 +4,13 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+#[derive(Deserialize)]
+pub struct Img2ImgResponse {
+    pub images: Vec<String>,
+    pub parameters: HashMap<String, serde_json::Value>,
+    pub info: String,
+}
+
 #[skip_serializing_none]
 #[derive(Default, Serialize, Deserialize)]
 pub struct Img2ImgRequest {
@@ -141,5 +148,28 @@ impl Img2ImgRequest {
     pub fn with_negative_prompt(&mut self, negative_prompt: String) -> &mut Self {
         self.negative_prompt = Some(negative_prompt);
         self
+    }
+}
+
+pub struct Img2Img {
+    client: reqwest::Client,
+    endpoint: String,
+}
+
+impl Img2Img {
+    pub fn new(client: reqwest::Client, endpoint: String) -> Self {
+        Self { client, endpoint }
+    }
+
+    pub async fn send(&self, request: &Img2ImgRequest) -> anyhow::Result<Img2ImgResponse> {
+        self.client
+            .post(&self.endpoint)
+            .json(&request)
+            .send()
+            .await
+            .context("failed to send request")?
+            .json()
+            .await
+            .context("failed to parse json")
     }
 }

@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 #[derive(Deserialize)]
-#[allow(dead_code)]
 pub struct Txt2ImgResponse {
     pub images: Vec<String>,
     pub parameters: HashMap<String, serde_json::Value>,
@@ -155,13 +154,14 @@ impl Txt2Img {
     }
 
     pub async fn send(&self, request: &Txt2ImgRequest) -> anyhow::Result<Txt2ImgResponse> {
-        let res = self
-            .client
+        self.client
             .post(&self.endpoint)
             .json(&request)
             .send()
             .await
-            .context("failed to send request")?;
-        res.json().await.context("failed to parse json")
+            .context("failed to send request")?
+            .json()
+            .await
+            .context("failed to parse json")
     }
 }
