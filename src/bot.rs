@@ -17,7 +17,7 @@ use teloxide::{
 };
 use tracing_log::log::warn;
 
-use crate::api::Resp;
+use crate::api::{Txt2Img, Txt2ImgRequest, Txt2ImgResponse};
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub enum State {
@@ -170,21 +170,22 @@ async fn handle_prompt(
     cfg: ConfigParameters,
     _dialogue: DiffusionDialogue,
     msg: Message,
-    text: MediaText,
+    text: String,
 ) -> anyhow::Result<()> {
-    let prompt = text.text;
-
-    let req = json!({
-        "prompt": prompt,
-        "steps": 20,
-        "batch_size": 1,
-    });
+    let prompt = text;
 
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
-    let res = cfg.client.post(cfg.sd_api_url).json(&req).send().await?;
-    let resp: Resp = res.json().await?;
+    let resp = Txt2Img::new(cfg.client, cfg.sd_api_url)
+        .send(
+            &Txt2ImgRequest::default()
+                .with_prompt(prompt.clone())
+                .with_steps(20)
+                .with_batch_size(1),
+        )
+        .await?;
+
     use base64::{engine::general_purpose, Engine as _};
 
     let mut images = resp
