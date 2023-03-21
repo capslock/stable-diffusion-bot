@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::dialogue::{
@@ -14,13 +14,24 @@ use teloxide::{
 };
 use tracing::{error, warn};
 
-use crate::api::{Api, Txt2ImgRequest, Txt2ImgResponse};
+use crate::api::{Api, Img2ImgRequest, Txt2ImgRequest, Txt2ImgResponse};
 
-#[derive(Clone, Default, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum State {
-    #[default]
-    Start,
+    Ready {
+        txt2img: Txt2ImgRequest,
+        img2img: Img2ImgRequest,
+    },
     Next,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::Ready {
+            txt2img: Default::default(),
+            img2img: Default::default(),
+        }
+    }
 }
 
 type DialogueStorage = std::sync::Arc<ErasedStorage<State>>;
@@ -127,7 +138,7 @@ pub async fn run_bot(
         .branch(Message::filter_photo().endpoint(handle_image))
         .branch(
             Message::filter_text()
-                .branch(case![State::Start].endpoint(handle_prompt))
+                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt))
                 .branch(case![State::Next].endpoint(handle_prompt)),
         );
 
@@ -165,7 +176,7 @@ fn message_from_resp(prompt: &str, resp: &Txt2ImgResponse) -> anyhow::Result<Str
         if let Some(info) = infos.get(0) {
             message = format!(
                 "{message}\n{}",
-                info.strip_prefix(prompt).unwrap_or(info).trim()
+                teloxide::utils::markdown::escape(info.strip_prefix(prompt).unwrap_or(info).trim())
             )
         }
     }
@@ -175,7 +186,8 @@ fn message_from_resp(prompt: &str, resp: &Txt2ImgResponse) -> anyhow::Result<Str
 async fn handle_prompt(
     bot: Bot,
     cfg: ConfigParameters,
-    _dialogue: DiffusionDialogue,
+    dialogue: DiffusionDialogue,
+    (mut txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
     msg: Message,
     text: String,
 ) -> anyhow::Result<()> {
@@ -184,16 +196,9 @@ async fn handle_prompt(
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
-    let resp = cfg
-        .api
-        .txt2img()?
-        .send(
-            Txt2ImgRequest::default()
-                .with_prompt(prompt.clone())
-                .with_steps(20)
-                .with_batch_size(1),
-        )
-        .await?;
+    txt2img.prompt = Some(prompt.clone());
+
+    let resp = cfg.api.txt2img()?.send(&txt2img).await?;
 
     use base64::{engine::general_purpose, Engine as _};
 
@@ -234,6 +239,11 @@ async fn handle_prompt(
             error!("Did not get any images from the API.")
         }
     }
+
+    dialogue
+        .update(State::Ready { txt2img, img2img })
+        .await
+        .map_err(|e| anyhow!(e))?;
 
     Ok(())
 }

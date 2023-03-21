@@ -52,7 +52,7 @@ pub struct Img2ImgInfo {
 }
 
 #[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct Img2ImgRequest {
     pub init_images: Option<Vec<String>>,
     pub resize_mode: Option<u32>,

@@ -53,7 +53,7 @@ pub struct Txt2ImgInfo {
 }
 
 #[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct Txt2ImgRequest {
     pub enable_hr: Option<bool>,
     pub denoising_strength: Option<u32>,
