@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -145,17 +146,25 @@ impl Txt2ImgRequest {
 
 pub struct Txt2Img {
     client: reqwest::Client,
-    endpoint: String,
+    endpoint: Url,
 }
 
 impl Txt2Img {
-    pub fn new(client: reqwest::Client, endpoint: String) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
+        Ok(Self {
+            client,
+            endpoint: Url::parse(&endpoint).context("failed to parse endpoint url")?,
+        })
+    }
+
+    pub(crate) fn new_with_url(client: reqwest::Client, endpoint: Url) -> Self {
         Self { client, endpoint }
     }
 
     pub async fn send(&self, request: &Txt2ImgRequest) -> anyhow::Result<Txt2ImgResponse> {
         self.client
-            .post(&self.endpoint)
+            .post(self.endpoint.clone())
             .json(&request)
             .send()
             .await

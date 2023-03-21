@@ -14,7 +14,7 @@ use teloxide::{
 };
 use tracing_log::log::warn;
 
-use crate::api::{Txt2Img, Txt2ImgRequest};
+use crate::api::{Api, Txt2ImgRequest};
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub enum State {
@@ -174,7 +174,8 @@ async fn handle_prompt(
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
-    let resp = Txt2Img::new(cfg.client, cfg.sd_api_url)
+    let resp = Api::new_with_client_and_url(cfg.client, cfg.sd_api_url)?
+        .txt2img()?
         .send(
             Txt2ImgRequest::default()
                 .with_prompt(prompt.clone())
