@@ -9,7 +9,7 @@ use teloxide::{
     dptree::case,
     payloads::setters::*,
     prelude::*,
-    types::{ChatAction, InputFile, InputMedia, InputMediaPhoto, PhotoSize, Update, UserId},
+    types::{ChatAction, File, InputFile, InputMedia, InputMediaPhoto, PhotoSize, Update, UserId},
     utils::command::BotCommands,
 };
 use tracing::{error, warn};
@@ -172,6 +172,67 @@ pub async fn run_bot(
     Ok(())
 }
 
+async fn get_file(client: reqwest::Client, bot: &Bot, file: &File) -> anyhow::Result<bytes::Bytes> {
+    client
+        .get(format!(
+            "https://api.telegram.org/file/bot{}/{}",
+            bot.token(),
+            file.path
+        ))
+        .send()
+        .await
+        .context("Failed to get file")?
+        .bytes()
+        .await
+        .context("Failed to get bytes")
+}
+
+async fn send_response(
+    bot: &Bot,
+    chat_id: ChatId,
+    caption: String,
+    images: Vec<String>,
+) -> anyhow::Result<()> {
+    use base64::{engine::general_purpose, Engine as _};
+
+    let mut caption = Some(caption);
+
+    let mut imgs = images
+        .iter()
+        .map(|i| {
+            let mut photo = InputMediaPhoto::new(InputFile::memory(
+                general_purpose::STANDARD
+                    .decode(i)
+                    .context("Failed to decode image")?,
+            ))
+            .parse_mode(teloxide::types::ParseMode::MarkdownV2);
+            photo.caption = caption.take();
+            Ok(InputMedia::Photo(photo))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    match imgs.len() {
+        1 => {
+            if let Some(InputMedia::Photo(image)) = imgs.pop() {
+                if let Some(caption) = image.caption {
+                    bot.send_photo(chat_id, image.media)
+                        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+                        .caption(caption)
+                        .await?;
+                }
+            }
+        }
+        2.. => {
+            bot.send_media_group(chat_id, imgs).await?;
+        }
+        _ => {
+            error!("Did not get any images from the API.")
+        }
+    }
+
+    Ok(())
+}
+
 async fn handle_image(
     bot: Bot,
     cfg: ConfigParameters,
@@ -200,61 +261,20 @@ async fn handle_image(
     };
     let file = bot.get_file(&photo.file.id).send().await?;
 
-    let photo = cfg
-        .client
-        .get(format!(
-            "https://api.telegram.org/file/bot{}/{}",
-            bot.token(),
-            file.path
-        ))
-        .send()
-        .await?;
+    let photo = get_file(cfg.client, &bot, &file).await?;
 
     use base64::{engine::general_purpose, Engine as _};
 
-    let photo = general_purpose::STANDARD.encode(photo.bytes().await?);
+    let photo = general_purpose::STANDARD.encode(photo);
 
     img2img.init_images = Some(vec![photo]);
 
     let resp = cfg.api.img2img()?.send(&img2img).await?;
 
-    let mut images: Vec<_> = resp
-        .images
-        .iter()
-        .map(|i| {
-            InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(
-                general_purpose::STANDARD
-                    .decode(i)
-                    .expect("failed to decode!"),
-            )))
-        })
-        .collect();
+    let caption =
+        message_from_resp(prompt, &resp).context("Failed to build caption from response")?;
 
-    match images.len() {
-        1 => {
-            if let Some(image) = images.pop() {
-                bot.send_photo(msg.chat.id, image.into())
-                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                    .caption(
-                        message_from_resp(prompt, &resp)
-                            .context("Failed to build message from response")?,
-                    )
-                    .await?;
-            }
-        }
-        2.. => {
-            if let Some(InputMedia::Photo(image)) = images.get_mut(0) {
-                image.caption = Some(
-                    message_from_resp(prompt, &resp)
-                        .context("Failed to build message from response")?,
-                );
-            }
-            bot.send_media_group(msg.chat.id, images).await?;
-        }
-        _ => {
-            error!("Did not get any images from the API.")
-        }
-    }
+    send_response(&bot, msg.chat.id, caption, resp.images).await?;
 
     dialogue
         .update(State::Ready { txt2img, img2img })
@@ -310,45 +330,10 @@ async fn handle_prompt(
 
     let resp = cfg.api.txt2img()?.send(&txt2img).await?;
 
-    use base64::{engine::general_purpose, Engine as _};
+    let caption =
+        message_from_resp(&prompt, &resp).context("Failed to build caption from response")?;
 
-    let mut images: Vec<_> = resp
-        .images
-        .iter()
-        .map(|i| {
-            InputMedia::Photo(InputMediaPhoto::new(InputFile::memory(
-                general_purpose::STANDARD
-                    .decode(i)
-                    .expect("failed to decode!"),
-            )))
-        })
-        .collect();
-
-    match images.len() {
-        1 => {
-            if let Some(image) = images.pop() {
-                bot.send_photo(msg.chat.id, image.into())
-                    .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                    .caption(
-                        message_from_resp(&prompt, &resp)
-                            .context("Failed to build message from response")?,
-                    )
-                    .await?;
-            }
-        }
-        2.. => {
-            if let Some(InputMedia::Photo(image)) = images.get_mut(0) {
-                image.caption = Some(
-                    message_from_resp(&prompt, &resp)
-                        .context("Failed to build message from response")?,
-                );
-            }
-            bot.send_media_group(msg.chat.id, images).await?;
-        }
-        _ => {
-            error!("Did not get any images from the API.")
-        }
-    }
+    send_response(&bot, msg.chat.id, caption, resp.images).await?;
 
     dialogue
         .update(State::Ready { txt2img, img2img })
