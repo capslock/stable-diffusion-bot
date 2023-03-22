@@ -209,17 +209,12 @@ async fn get_file(client: reqwest::Client, bot: &Bot, file: &File) -> anyhow::Re
         .context("Failed to get bytes")
 }
 
-enum Source {
-    Photo(MessageId),
-    Text(MessageId),
-}
-
 async fn send_response(
     bot: &Bot,
     chat_id: ChatId,
     caption: String,
     images: Vec<String>,
-    source: Source,
+    source: MessageId,
 ) -> anyhow::Result<()> {
     use base64::{engine::general_purpose, Engine as _};
 
@@ -243,40 +238,25 @@ async fn send_response(
         1 => {
             if let Some(InputMedia::Photo(image)) = imgs.pop() {
                 if let Some(caption) = image.caption {
-                    let req = bot
-                        .send_photo(chat_id, image.media)
+                    bot.send_photo(chat_id, image.media)
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                        .caption(caption);
-                    match source {
-                        Source::Photo(source) => {
-                            req.reply_to_message_id(source).reply_markup(keyboard_img())
-                        }
-                        Source::Text(source) => {
-                            req.reply_to_message_id(source).reply_markup(keyboard_txt())
-                        }
-                    }
-                    .await?;
+                        .caption(caption)
+                        .reply_markup(keyboard())
+                        .reply_to_message_id(source)
+                        .await?;
                 }
             }
         }
         2.. => {
-            let req = bot.send_media_group(chat_id, imgs);
-            match source {
-                Source::Photo(source) | Source::Text(source) => req.reply_to_message_id(source),
-            }
-            .await?;
-            let req = bot.send_message(
+            bot.send_media_group(chat_id, imgs)
+                .reply_to_message_id(source)
+                .await?;
+            bot.send_message(
                 chat_id,
                 "What would you like to do? Select below, or enter a new prompt.",
-            );
-            match source {
-                Source::Photo(source) => {
-                    req.reply_to_message_id(source).reply_markup(keyboard_img())
-                }
-                Source::Text(source) => {
-                    req.reply_to_message_id(source).reply_markup(keyboard_txt())
-                }
-            }
+            )
+            .reply_markup(keyboard())
+            .reply_to_message_id(source)
             .await?;
         }
         _ => {
@@ -329,14 +309,7 @@ async fn handle_image(
     let caption =
         message_from_resp(prompt, &resp).context("Failed to build caption from response")?;
 
-    send_response(
-        &bot,
-        msg.chat.id,
-        caption,
-        resp.images,
-        Source::Photo(msg.id),
-    )
-    .await?;
+    send_response(&bot, msg.chat.id, caption, resp.images, msg.id).await?;
 
     _ = img2img.init_images.take();
 
@@ -381,14 +354,7 @@ async fn handle_prompt(
     let caption =
         message_from_resp(&prompt, &resp).context("Failed to build caption from response")?;
 
-    send_response(
-        &bot,
-        msg.chat.id,
-        caption,
-        resp.images,
-        Source::Text(msg.id),
-    )
-    .await?;
+    send_response(&bot, msg.chat.id, caption, resp.images, msg.id).await?;
 
     dialogue
         .update(State::Ready { txt2img, img2img })
@@ -398,16 +364,9 @@ async fn handle_prompt(
     Ok(())
 }
 
-fn keyboard_img() -> InlineKeyboardMarkup {
+fn keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new([[
-        InlineKeyboardButton::callback("Rerun", "rerun-img"),
-        InlineKeyboardButton::callback("Settings", "settings"),
-    ]])
-}
-
-fn keyboard_txt() -> InlineKeyboardMarkup {
-    InlineKeyboardMarkup::new([[
-        InlineKeyboardButton::callback("Rerun", "rerun-txt"),
+        InlineKeyboardButton::callback("Rerun", "rerun"),
         InlineKeyboardButton::callback("Settings", "settings"),
     ]])
 }
@@ -429,59 +388,50 @@ async fn handle_rerun(
         return Ok(());
     };
 
-    let data = if let Some(data) = q.data {
-        data
+    let id = message.id;
+    let chat_id = message.chat.id;
+
+    let parent = if let Some(parent) = message.reply_to_message().cloned() {
+        parent
     } else {
         bot.answer_callback_query(q.id)
             .cache_time(60)
-            .text("Something went wrong.")
+            .text("Oops, something went wrong.")
             .await?;
         return Ok(());
     };
 
-    let id = message.id;
-    let chat_id = message.chat.id;
-
-    match data.as_str() {
-        "rerun-txt" => {
-            let message = message.reply_to_message().cloned().unwrap_or(message);
-            bot.answer_callback_query(q.id).await?;
-            if let Some(caption) = message.text() {
-                let prompt = caption.to_owned();
-                handle_prompt(
-                    bot.clone(),
-                    cfg,
-                    dialogue,
-                    (txt2img, img2img),
-                    message,
-                    prompt,
-                )
-                .await?;
-            }
-        }
-        "rerun-img" => {
-            bot.answer_callback_query(q.id).await?;
-            let parent = message.reply_to_message().cloned().unwrap_or(message);
-            if let Some(photo) = parent.photo().map(|p| p.to_vec()) {
-                handle_image(
-                    bot.clone(),
-                    cfg,
-                    dialogue,
-                    (txt2img, img2img),
-                    parent,
-                    photo.to_vec(),
-                )
-                .await?;
-            }
-        }
-        _ => {
-            bot.answer_callback_query(q.id)
-                .cache_time(60)
-                .text("Oops, something went wrong.")
-                .await?;
-            return Ok(());
-        }
+    if let Some(photo) = parent.photo().map(|p| p.to_vec()) {
+        bot.answer_callback_query(q.id).await?;
+        handle_image(
+            bot.clone(),
+            cfg,
+            dialogue,
+            (txt2img, img2img),
+            parent,
+            photo.to_vec(),
+        )
+        .await?;
+    } else if let Some(caption) = parent.text() {
+        bot.answer_callback_query(q.id).await?;
+        let prompt = caption.to_owned();
+        handle_prompt(
+            bot.clone(),
+            cfg,
+            dialogue,
+            (txt2img, img2img),
+            parent,
+            prompt,
+        )
+        .await?;
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Oops, something went wrong.")
+            .await?;
+        return Ok(());
     }
+
     bot.edit_message_reply_markup(chat_id, id)
         .reply_markup(InlineKeyboardMarkup::new([[]]))
         .send()
