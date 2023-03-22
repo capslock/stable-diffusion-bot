@@ -95,8 +95,40 @@ impl Img2ImgRequest {
         self
     }
 
+    pub fn with_image<T>(&mut self, image: T) -> &mut Self
+    where
+        T: AsRef<[u8]>,
+    {
+        use base64::{engine::general_purpose, Engine as _};
+
+        if let Some(ref mut images) = self.init_images {
+            images.push(general_purpose::STANDARD.encode(image));
+            self
+        } else {
+            self.with_images(vec![image])
+        }
+    }
+
+    pub fn with_images<T>(&mut self, images: Vec<T>) -> &mut Self
+    where
+        T: AsRef<[u8]>,
+    {
+        use base64::{engine::general_purpose, Engine as _};
+        let images = images.iter().map(|i| general_purpose::STANDARD.encode(i));
+        if let Some(ref mut i) = self.init_images {
+            i.extend(images);
+        } else {
+            self.init_images = Some(images.collect())
+        }
+        self
+    }
+
     pub fn with_styles(&mut self, styles: Vec<String>) -> &mut Self {
-        self.styles = Some(styles);
+        if let Some(ref mut s) = self.styles {
+            s.extend(styles);
+        } else {
+            self.styles = Some(styles);
+        }
         self
     }
 

@@ -2,7 +2,7 @@ use anyhow::Context;
 use teloxide::{types::File, Bot};
 
 pub(crate) async fn get_file(
-    client: reqwest::Client,
+    client: &reqwest::Client,
     bot: &Bot,
     file: &File,
 ) -> anyhow::Result<bytes::Bytes> {
