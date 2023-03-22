@@ -5,18 +5,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-#[derive(Deserialize)]
-pub struct Img2ImgResponse {
-    pub images: Vec<String>,
-    pub parameters: HashMap<String, serde_json::Value>,
-    pub info: String,
-}
-
-impl Img2ImgResponse {
-    pub fn info(&self) -> anyhow::Result<Img2ImgInfo> {
-        serde_json::from_str(&self.info).context("failed to parse info")
-    }
-}
+use super::ImgResponse;
 
 #[skip_serializing_none]
 #[derive(Default, Serialize, Deserialize, Debug)]
@@ -209,7 +198,10 @@ impl Img2Img {
         Self { client, endpoint }
     }
 
-    pub async fn send(&self, request: &Img2ImgRequest) -> anyhow::Result<Img2ImgResponse> {
+    pub async fn send(
+        &self,
+        request: &Img2ImgRequest,
+    ) -> anyhow::Result<ImgResponse<Img2ImgRequest>> {
         self.client
             .post(self.endpoint.clone())
             .json(&request)

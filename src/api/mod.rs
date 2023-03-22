@@ -1,6 +1,8 @@
 mod txt2img;
 use anyhow::Context;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 pub use txt2img::*;
 
 mod img2img;
@@ -62,5 +64,19 @@ impl Api {
                 .join("sdapi/v1/img2img")
                 .context("Failed to parse img2img endpoint")?,
         ))
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Default, Serialize, Deserialize, Debug)]
+pub struct ImgResponse<T> {
+    pub images: Vec<String>,
+    pub parameters: T,
+    pub info: String,
+}
+
+impl<T> ImgResponse<T> {
+    pub fn info(&self) -> anyhow::Result<ImgInfo> {
+        serde_json::from_str(&self.info).context("failed to parse info")
     }
 }

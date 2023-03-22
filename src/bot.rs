@@ -3,8 +3,9 @@ use std::collections::HashSet;
 use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 use teloxide::{
-    dispatching::dialogue::{
-        self, serializer::Json, ErasedStorage, InMemStorage, SqliteStorage, Storage,
+    dispatching::{
+        dialogue::{self, serializer::Json, ErasedStorage, InMemStorage, SqliteStorage, Storage},
+        UpdateHandler,
     },
     dptree::case,
     payloads::setters::*,
@@ -14,7 +15,7 @@ use teloxide::{
 };
 use tracing::{error, warn};
 
-use crate::api::{Api, Img2ImgRequest, Img2ImgResponse, Txt2ImgRequest, Txt2ImgResponse};
+use crate::api::{Api, Img2ImgRequest, ImgResponse, Txt2ImgRequest};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum State {
@@ -119,44 +120,7 @@ pub async fn run_bot(
         api,
     };
 
-    let handler = Update::filter_message()
-        .branch(
-            dptree::entry()
-                .filter_command::<UnauthenticatedCommands>()
-                .endpoint(unauthenticated_commands_handler),
-        )
-        .branch(
-            dptree::filter(|cfg: ConfigParameters, msg: Message| {
-                msg.from()
-                    .map(|user| cfg.allowed_users.contains(&user.id))
-                    .unwrap_or_default()
-            })
-            .filter_command::<AuthenticatedCommands>()
-            .endpoint(
-                |msg: Message, bot: Bot, cmd: AuthenticatedCommands| async move {
-                    match cmd {
-                        AuthenticatedCommands::Set { value } => {
-                            bot.send_message(msg.chat.id, format!("{value}")).await?;
-                            Ok(())
-                        }
-                    }
-                },
-            ),
-        )
-        .branch(
-            Message::filter_photo()
-                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_image))
-                .branch(case![State::Next].endpoint(handle_image)),
-        )
-        .branch(
-            Message::filter_text()
-                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt))
-                .branch(case![State::Next].endpoint(handle_prompt)),
-        );
-
-    let dialogue = dialogue::enter::<Update, ErasedStorage<State>, State, _>().branch(handler);
-
-    Dispatcher::builder(bot, dialogue)
+    Dispatcher::builder(bot, schema())
         .dependencies(dptree::deps![parameters, storage])
         .default_handler(|upd| async move {
             warn!("Unhandled update: {:?}", upd);
@@ -170,6 +134,48 @@ pub async fn run_bot(
         .await;
 
     Ok(())
+}
+
+fn schema() -> UpdateHandler<anyhow::Error> {
+    let auth_filter = dptree::filter(|cfg: ConfigParameters, msg: Message| {
+        msg.from()
+            .map(|user| cfg.allowed_users.contains(&user.id))
+            .unwrap_or_default()
+    });
+
+    let unauth_command_handler = teloxide::filter_command::<UnauthenticatedCommands, _>()
+        .endpoint(unauthenticated_commands_handler);
+
+    let auth_command_handler = auth_filter
+        .clone()
+        .filter_command::<AuthenticatedCommands>()
+        .endpoint(
+            |msg: Message, bot: Bot, cmd: AuthenticatedCommands| async move {
+                match cmd {
+                    AuthenticatedCommands::Set { value } => {
+                        bot.send_message(msg.chat.id, format!("{value}")).await?;
+                        Ok(())
+                    }
+                }
+            },
+        );
+
+    let message_handler = auth_filter
+        .branch(
+            Message::filter_photo()
+                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
+        )
+        .branch(
+            Message::filter_text()
+                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
+        );
+
+    let handler = Update::filter_message()
+        .branch(unauth_command_handler)
+        .branch(auth_command_handler)
+        .branch(message_handler);
+
+    dialogue::enter::<Update, ErasedStorage<State>, State, _>().branch(handler)
 }
 
 async fn get_file(client: reqwest::Client, bot: &Bot, file: &File) -> anyhow::Result<bytes::Bytes> {
@@ -276,6 +282,8 @@ async fn handle_image(
 
     send_response(&bot, msg.chat.id, caption, resp.images).await?;
 
+    _ = img2img.init_images.take();
+
     dialogue
         .update(State::Ready { txt2img, img2img })
         .await
@@ -284,25 +292,9 @@ async fn handle_image(
     Ok(())
 }
 
-trait Response {
-    fn info_text(&self) -> anyhow::Result<Option<Vec<String>>>;
-}
-
-impl Response for Txt2ImgResponse {
-    fn info_text(&self) -> anyhow::Result<Option<Vec<String>>> {
-        Ok(self.info()?.infotexts)
-    }
-}
-
-impl Response for Img2ImgResponse {
-    fn info_text(&self) -> anyhow::Result<Option<Vec<String>>> {
-        Ok(self.info()?.infotexts)
-    }
-}
-
-fn message_from_resp<T: Response>(prompt: &str, resp: &T) -> anyhow::Result<String> {
+fn message_from_resp<T>(prompt: &str, resp: &ImgResponse<T>) -> anyhow::Result<String> {
     let mut message = format!("`{prompt}`");
-    if let Some(infos) = resp.info_text()? {
+    if let Some(infos) = resp.info()?.infotexts {
         if let Some(info) = infos.get(0) {
             message = format!(
                 "{message}\n{}",

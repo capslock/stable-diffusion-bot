@@ -5,23 +5,11 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-#[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
-pub struct Txt2ImgResponse {
-    pub images: Vec<String>,
-    pub parameters: Txt2ImgRequest,
-    pub info: String,
-}
-
-impl Txt2ImgResponse {
-    pub fn info(&self) -> anyhow::Result<Txt2ImgInfo> {
-        serde_json::from_str(&self.info).context("failed to parse info")
-    }
-}
+use super::ImgResponse;
 
 #[skip_serializing_none]
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub struct Txt2ImgInfo {
+pub struct ImgInfo {
     pub batch_size: Option<u32>,
     pub all_prompts: Option<Vec<String>>,
     pub styles: Option<Vec<String>>,
@@ -202,7 +190,10 @@ impl Txt2Img {
         Self { client, endpoint }
     }
 
-    pub async fn send(&self, request: &Txt2ImgRequest) -> anyhow::Result<Txt2ImgResponse> {
+    pub async fn send(
+        &self,
+        request: &Txt2ImgRequest,
+    ) -> anyhow::Result<ImgResponse<Txt2ImgRequest>> {
         self.client
             .post(self.endpoint.clone())
             .json(&request)
