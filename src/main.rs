@@ -4,9 +4,7 @@ use figment::{
     Figment,
 };
 use serde::{Deserialize, Serialize};
-
 use tracing::metadata::LevelFilter;
-
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 pub mod api;
