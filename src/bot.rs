@@ -238,21 +238,44 @@ async fn send_response(
         1 => {
             if let Some(InputMedia::Photo(image)) = imgs.pop() {
                 if let Some(caption) = image.caption {
-                    bot.send_photo(chat_id, image.media)
+                    let req = bot
+                        .send_photo(chat_id, image.media)
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-                        .caption(caption)
-                        .reply_markup(keyboard(source))
-                        .await?;
+                        .caption(caption);
+                    if let Some(source) = source {
+                        req.reply_to_message_id(source).reply_markup(keyboard_img())
+                    } else {
+                        req.reply_markup(keyboard_txt())
+                    }
+                    .await?;
                 }
             }
         }
         2.. => {
-            let group = bot.send_media_group(chat_id, imgs).await?;
-            if let Some(message) = group.get(0) {
-                bot.send_message(chat_id, "What would you like to do?")
-                    .reply_to_message_id(message.id)
-                    .reply_markup(keyboard(source))
-                    .await?;
+            let req = bot.send_media_group(chat_id, imgs);
+            let group = if let Some(source) = source {
+                req.reply_to_message_id(source)
+            } else {
+                req
+            }
+            .await?;
+            if let Some(message) = group.iter().find(|m| {
+                m.reply_to_message().is_none() || m.reply_to_message().map(|m| m.id) == source
+            }) {
+                let id = if let Some(parent) = message.reply_to_message() {
+                    parent.id
+                } else {
+                    message.id
+                };
+                let req = bot
+                    .send_message(chat_id, "What would you like to do?")
+                    .reply_to_message_id(id);
+                if source.is_some() {
+                    req.reply_markup(keyboard_img())
+                } else {
+                    req.reply_markup(keyboard_txt())
+                }
+                .await?;
             }
         }
         _ => {
@@ -359,14 +382,16 @@ async fn handle_prompt(
     Ok(())
 }
 
-fn keyboard(id: Option<MessageId>) -> InlineKeyboardMarkup {
-    let rerun = if let Some(id) = id {
-        InlineKeyboardButton::callback("Rerun", "rerun-img-".to_owned() + &id.to_string())
-    } else {
-        InlineKeyboardButton::callback("Rerun", "rerun-txt")
-    };
+fn keyboard_img() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new([[
-        rerun,
+        InlineKeyboardButton::callback("Rerun", "rerun-img"),
+        InlineKeyboardButton::callback("Settings", "settings"),
+    ]])
+}
+
+fn keyboard_txt() -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new([[
+        InlineKeyboardButton::callback("Rerun", "rerun-txt"),
         InlineKeyboardButton::callback("Settings", "settings"),
     ]])
 }
@@ -391,14 +416,16 @@ async fn handle_rerun(
     let data = if let Some(data) = q.data {
         data
     } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Something went wrong.")
+            .await?;
         return Ok(());
     };
 
-    let message = message.reply_to_message().cloned().unwrap_or(message);
-
-    let data: Vec<_> = data.split('-').collect();
-    match data.len() {
-        2 => {
+    match data.as_str() {
+        "rerun-txt" => {
+            let message = message.reply_to_message().cloned().unwrap_or(message);
             bot.answer_callback_query(q.id).await?;
             if let Some(entities) = message.parse_caption_entities() {
                 if let Some(range) = entities.get(0).map(MessageEntityRef::range) {
@@ -417,11 +444,23 @@ async fn handle_rerun(
                 }
             }
         }
-        3 => {
-            bot.answer_callback_query(q.id)
-                .cache_time(60)
-                .text("Sorry, not yet implemented.")
-                .await?;
+        "rerun-img" => {
+            bot.answer_callback_query(q.id).await?;
+            let mut parent = message.clone();
+            while let Some(p) = parent.reply_to_message().cloned() {
+                parent = p;
+            }
+            if let Some(photo) = parent.photo().map(|p| p.to_vec()) {
+                return handle_image(
+                    bot,
+                    cfg,
+                    dialogue,
+                    (txt2img, img2img),
+                    parent,
+                    photo.to_vec(),
+                )
+                .await;
+            }
         }
         _ => {
             bot.answer_callback_query(q.id)
