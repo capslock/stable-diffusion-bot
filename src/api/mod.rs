@@ -80,3 +80,36 @@ impl<T> ImgResponse<T> {
         serde_json::from_str(&self.info).context("failed to parse info")
     }
 }
+
+#[skip_serializing_none]
+#[derive(Default, Serialize, Deserialize, Debug)]
+pub struct ImgInfo {
+    pub batch_size: Option<u32>,
+    pub all_prompts: Option<Vec<String>>,
+    pub styles: Option<Vec<String>>,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+    pub extra_generation_params: Option<serde_json::Value>,
+    pub sampler_name: Option<String>,
+    pub restore_faces: Option<bool>,
+    pub seed_resize_from_w: Option<i32>,
+    pub all_negative_prompts: Option<Vec<String>>,
+    pub cfg_scale: Option<f64>,
+    pub index_of_first_image: Option<u32>,
+    pub seed_resize_from_h: Option<i32>,
+    pub infotexts: Option<Vec<String>>,
+    pub negative_prompt: Option<String>,
+    pub seed: Option<i64>,
+    pub denoising_strength: Option<f64>,
+    pub is_using_inpainting_conditioning: Option<bool>,
+    pub subseed: Option<i64>,
+    pub prompt: Option<String>,
+    pub subseed_strength: Option<u32>,
+    pub all_subseeds: Option<Vec<i64>>,
+    pub steps: Option<u32>,
+    pub face_restoration_model: Option<serde_json::Value>,
+    pub job_timestamp: Option<String>,
+    pub clip_skip: Option<u32>,
+    pub sd_model_hash: Option<String>,
+    pub all_seeds: Option<Vec<i64>>,
+}

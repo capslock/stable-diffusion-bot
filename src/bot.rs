@@ -10,7 +10,10 @@ use teloxide::{
     dptree::case,
     payloads::setters::*,
     prelude::*,
-    types::{ChatAction, File, InputFile, InputMedia, InputMediaPhoto, PhotoSize, Update, UserId},
+    types::{
+        ChatAction, File, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, InputMedia,
+        InputMediaPhoto, MessageEntityRef, MessageId, PhotoSize, Update, UserId,
+    },
     utils::command::BotCommands,
 };
 use tracing::{error, warn};
@@ -170,12 +173,25 @@ fn schema() -> UpdateHandler<anyhow::Error> {
                 .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
         );
 
+    let callback_handler = Update::filter_callback_query().branch(
+        dptree::filter(|q: CallbackQuery| {
+            if let Some(data) = q.data {
+                data.starts_with("rerun")
+            } else {
+                false
+            }
+        })
+        .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun)),
+    );
+
     let handler = Update::filter_message()
         .branch(unauth_command_handler)
         .branch(auth_command_handler)
         .branch(message_handler);
 
-    dialogue::enter::<Update, ErasedStorage<State>, State, _>().branch(handler)
+    dialogue::enter::<Update, ErasedStorage<State>, State, _>()
+        .branch(handler)
+        .branch(callback_handler)
 }
 
 async fn get_file(client: reqwest::Client, bot: &Bot, file: &File) -> anyhow::Result<bytes::Bytes> {
@@ -198,6 +214,7 @@ async fn send_response(
     chat_id: ChatId,
     caption: String,
     images: Vec<String>,
+    source: Option<MessageId>,
 ) -> anyhow::Result<()> {
     use base64::{engine::general_purpose, Engine as _};
 
@@ -224,12 +241,19 @@ async fn send_response(
                     bot.send_photo(chat_id, image.media)
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                         .caption(caption)
+                        .reply_markup(keyboard(source))
                         .await?;
                 }
             }
         }
         2.. => {
-            bot.send_media_group(chat_id, imgs).await?;
+            let group = bot.send_media_group(chat_id, imgs).await?;
+            if let Some(message) = group.get(0) {
+                bot.send_message(chat_id, "What would you like to do?")
+                    .reply_to_message_id(message.id)
+                    .reply_markup(keyboard(source))
+                    .await?;
+            }
         }
         _ => {
             error!("Did not get any images from the API.")
@@ -280,7 +304,7 @@ async fn handle_image(
     let caption =
         message_from_resp(prompt, &resp).context("Failed to build caption from response")?;
 
-    send_response(&bot, msg.chat.id, caption, resp.images).await?;
+    send_response(&bot, msg.chat.id, caption, resp.images, Some(msg.id)).await?;
 
     _ = img2img.init_images.take();
 
@@ -325,12 +349,88 @@ async fn handle_prompt(
     let caption =
         message_from_resp(&prompt, &resp).context("Failed to build caption from response")?;
 
-    send_response(&bot, msg.chat.id, caption, resp.images).await?;
+    send_response(&bot, msg.chat.id, caption, resp.images, None).await?;
 
     dialogue
         .update(State::Ready { txt2img, img2img })
         .await
         .map_err(|e| anyhow!(e))?;
+
+    Ok(())
+}
+
+fn keyboard(id: Option<MessageId>) -> InlineKeyboardMarkup {
+    let rerun = if let Some(id) = id {
+        InlineKeyboardButton::callback("Rerun", "rerun-img-".to_owned() + &id.to_string())
+    } else {
+        InlineKeyboardButton::callback("Rerun", "rerun-txt")
+    };
+    InlineKeyboardMarkup::new([[
+        rerun,
+        InlineKeyboardButton::callback("Settings", "settings"),
+    ]])
+}
+
+async fn handle_rerun(
+    bot: Bot,
+    cfg: ConfigParameters,
+    dialogue: DiffusionDialogue,
+    (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
+    q: CallbackQuery,
+) -> anyhow::Result<()> {
+    let message = if let Some(message) = q.message {
+        message
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Sorry, this message is no longer available.")
+            .await?;
+        return Ok(());
+    };
+
+    let data = if let Some(data) = q.data {
+        data
+    } else {
+        return Ok(());
+    };
+
+    let message = message.reply_to_message().cloned().unwrap_or(message);
+
+    let data: Vec<_> = data.split('-').collect();
+    match data.len() {
+        2 => {
+            bot.answer_callback_query(q.id).await?;
+            if let Some(entities) = message.parse_caption_entities() {
+                if let Some(range) = entities.get(0).map(MessageEntityRef::range) {
+                    if let Some(caption) = message.caption() {
+                        let prompt = caption[range].to_owned();
+                        return handle_prompt(
+                            bot,
+                            cfg,
+                            dialogue,
+                            (txt2img, img2img),
+                            message,
+                            prompt,
+                        )
+                        .await;
+                    }
+                }
+            }
+        }
+        3 => {
+            bot.answer_callback_query(q.id)
+                .cache_time(60)
+                .text("Sorry, not yet implemented.")
+                .await?;
+        }
+        _ => {
+            bot.answer_callback_query(q.id)
+                .cache_time(60)
+                .text("Oops, something went wrong.")
+                .await?;
+            return Ok(());
+        }
+    }
 
     Ok(())
 }
