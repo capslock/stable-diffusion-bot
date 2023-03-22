@@ -8,11 +8,11 @@ use teloxide::{
         UpdateHandler,
     },
     dptree::case,
-    payloads::setters::*,
+    payloads::{setters::*, EditMessageReplyMarkupSetters},
     prelude::*,
     types::{
         ChatAction, File, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, InputMedia,
-        InputMediaPhoto, MessageEntityRef, MessageId, PhotoSize, Update, UserId,
+        InputMediaPhoto, MessageId, PhotoSize, Update, UserId,
     },
     utils::command::BotCommands,
 };
@@ -209,12 +209,17 @@ async fn get_file(client: reqwest::Client, bot: &Bot, file: &File) -> anyhow::Re
         .context("Failed to get bytes")
 }
 
+enum Source {
+    Photo(MessageId),
+    Text(MessageId),
+}
+
 async fn send_response(
     bot: &Bot,
     chat_id: ChatId,
     caption: String,
     images: Vec<String>,
-    source: Option<MessageId>,
+    source: Source,
 ) -> anyhow::Result<()> {
     use base64::{engine::general_purpose, Engine as _};
 
@@ -242,10 +247,13 @@ async fn send_response(
                         .send_photo(chat_id, image.media)
                         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                         .caption(caption);
-                    if let Some(source) = source {
-                        req.reply_to_message_id(source).reply_markup(keyboard_img())
-                    } else {
-                        req.reply_markup(keyboard_txt())
+                    match source {
+                        Source::Photo(source) => {
+                            req.reply_to_message_id(source).reply_markup(keyboard_img())
+                        }
+                        Source::Text(source) => {
+                            req.reply_to_message_id(source).reply_markup(keyboard_txt())
+                        }
                     }
                     .await?;
                 }
@@ -253,30 +261,23 @@ async fn send_response(
         }
         2.. => {
             let req = bot.send_media_group(chat_id, imgs);
-            let group = if let Some(source) = source {
-                req.reply_to_message_id(source)
-            } else {
-                req
+            match source {
+                Source::Photo(source) | Source::Text(source) => req.reply_to_message_id(source),
             }
             .await?;
-            if let Some(message) = group.iter().find(|m| {
-                m.reply_to_message().is_none() || m.reply_to_message().map(|m| m.id) == source
-            }) {
-                let id = if let Some(parent) = message.reply_to_message() {
-                    parent.id
-                } else {
-                    message.id
-                };
-                let req = bot
-                    .send_message(chat_id, "What would you like to do?")
-                    .reply_to_message_id(id);
-                if source.is_some() {
-                    req.reply_markup(keyboard_img())
-                } else {
-                    req.reply_markup(keyboard_txt())
+            let req = bot.send_message(
+                chat_id,
+                "What would you like to do? Select below, or enter a new prompt.",
+            );
+            match source {
+                Source::Photo(source) => {
+                    req.reply_to_message_id(source).reply_markup(keyboard_img())
                 }
-                .await?;
+                Source::Text(source) => {
+                    req.reply_to_message_id(source).reply_markup(keyboard_txt())
+                }
             }
+            .await?;
         }
         _ => {
             error!("Did not get any images from the API.")
@@ -304,6 +305,7 @@ async fn handle_image(
         .await?;
 
     img2img.prompt = Some(prompt.to_owned());
+
     let photo = if let Some(photo) = photo
         .iter()
         .reduce(|a, p| if a.height > p.height { a } else { p })
@@ -327,7 +329,14 @@ async fn handle_image(
     let caption =
         message_from_resp(prompt, &resp).context("Failed to build caption from response")?;
 
-    send_response(&bot, msg.chat.id, caption, resp.images, Some(msg.id)).await?;
+    send_response(
+        &bot,
+        msg.chat.id,
+        caption,
+        resp.images,
+        Source::Photo(msg.id),
+    )
+    .await?;
 
     _ = img2img.init_images.take();
 
@@ -372,7 +381,14 @@ async fn handle_prompt(
     let caption =
         message_from_resp(&prompt, &resp).context("Failed to build caption from response")?;
 
-    send_response(&bot, msg.chat.id, caption, resp.images, None).await?;
+    send_response(
+        &bot,
+        msg.chat.id,
+        caption,
+        resp.images,
+        Source::Text(msg.id),
+    )
+    .await?;
 
     dialogue
         .update(State::Ready { txt2img, img2img })
@@ -423,43 +439,39 @@ async fn handle_rerun(
         return Ok(());
     };
 
+    let id = message.id;
+    let chat_id = message.chat.id;
+
     match data.as_str() {
         "rerun-txt" => {
             let message = message.reply_to_message().cloned().unwrap_or(message);
             bot.answer_callback_query(q.id).await?;
-            if let Some(entities) = message.parse_caption_entities() {
-                if let Some(range) = entities.get(0).map(MessageEntityRef::range) {
-                    if let Some(caption) = message.caption() {
-                        let prompt = caption[range].to_owned();
-                        return handle_prompt(
-                            bot,
-                            cfg,
-                            dialogue,
-                            (txt2img, img2img),
-                            message,
-                            prompt,
-                        )
-                        .await;
-                    }
-                }
+            if let Some(caption) = message.text() {
+                let prompt = caption.to_owned();
+                handle_prompt(
+                    bot.clone(),
+                    cfg,
+                    dialogue,
+                    (txt2img, img2img),
+                    message,
+                    prompt,
+                )
+                .await?;
             }
         }
         "rerun-img" => {
             bot.answer_callback_query(q.id).await?;
-            let mut parent = message.clone();
-            while let Some(p) = parent.reply_to_message().cloned() {
-                parent = p;
-            }
+            let parent = message.reply_to_message().cloned().unwrap_or(message);
             if let Some(photo) = parent.photo().map(|p| p.to_vec()) {
-                return handle_image(
-                    bot,
+                handle_image(
+                    bot.clone(),
                     cfg,
                     dialogue,
                     (txt2img, img2img),
                     parent,
                     photo.to_vec(),
                 )
-                .await;
+                .await?;
             }
         }
         _ => {
@@ -470,6 +482,10 @@ async fn handle_rerun(
             return Ok(());
         }
     }
+    bot.edit_message_reply_markup(chat_id, id)
+        .reply_markup(InlineKeyboardMarkup::new([[]]))
+        .send()
+        .await?;
 
     Ok(())
 }
