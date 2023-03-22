@@ -6,8 +6,8 @@ use figment::{
 use serde::{Deserialize, Serialize};
 
 use tracing::metadata::LevelFilter;
-use tracing_log::LogTracer;
-use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, EnvFilter, FmtSubscriber};
+
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 pub mod api;
 pub mod bot;
@@ -22,18 +22,21 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let subscriber = FmtSubscriber::builder().pretty().with_target(true).finish();
+    tracing_log::env_logger::init();
 
-    tracing::subscriber::set_global_default(
-        subscriber.with(
-            EnvFilter::builder()
-                .with_default_directive(LevelFilter::WARN.into())
-                .from_env_lossy(),
-        ),
-    )
-    .context("setting default subscriber failed")?;
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::WARN.into())
+        .from_env()
+        .context("Failed to parse filter from env")?;
 
-    LogTracer::init()?;
+    let subscriber = FmtSubscriber::builder()
+        .with_env_filter(filter)
+        .pretty()
+        .with_target(true)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber)
+        .context("setting default subscriber failed")?;
 
     let config: Config = Figment::new()
         .merge(("config.allowed_users", Vec::<u64>::new()))
