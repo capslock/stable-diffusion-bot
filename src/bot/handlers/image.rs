@@ -258,7 +258,7 @@ pub(crate) async fn handle_prompt(
     Ok(())
 }
 
-fn keyboard() -> InlineKeyboardMarkup {
+pub(crate) fn keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new([[
         InlineKeyboardButton::callback("Rerun", "rerun"),
         InlineKeyboardButton::callback("Settings", "settings"),

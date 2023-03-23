@@ -25,14 +25,52 @@ pub enum State {
         txt2img: Txt2ImgRequest,
         img2img: Img2ImgRequest,
     },
-    Next,
+    SettingsTxt2Img {
+        selection: Option<String>,
+        txt2img: Txt2ImgRequest,
+        img2img: Img2ImgRequest,
+    },
+    SettingsImg2Img {
+        selection: Option<String>,
+        txt2img: Txt2ImgRequest,
+        img2img: Img2ImgRequest,
+    },
 }
 
 impl Default for State {
     fn default() -> Self {
         Self::Ready {
-            txt2img: Default::default(),
-            img2img: Default::default(),
+            txt2img: Txt2ImgRequest {
+                styles: Some(Vec::new()),
+                seed: Some(-1),
+                sampler_index: Some("Euler".to_owned()),
+                batch_size: Some(1),
+                n_iter: Some(1),
+                steps: Some(50),
+                cfg_scale: Some(7.0),
+                width: Some(512),
+                height: Some(512),
+                restore_faces: Some(false),
+                tiling: Some(false),
+                negative_prompt: Some("".to_owned()),
+                ..Default::default()
+            },
+            img2img: Img2ImgRequest {
+                denoising_strength: Some(0.75),
+                styles: Some(Vec::new()),
+                seed: Some(-1),
+                sampler_index: Some("Euler".to_owned()),
+                batch_size: Some(1),
+                n_iter: Some(1),
+                steps: Some(50),
+                cfg_scale: Some(7.0),
+                width: Some(512),
+                height: Some(512),
+                restore_faces: Some(false),
+                tiling: Some(false),
+                negative_prompt: Some("".to_owned()),
+                ..Default::default()
+            },
         }
     }
 }
@@ -125,19 +163,86 @@ fn schema() -> UpdateHandler<anyhow::Error> {
         )
         .branch(
             Message::filter_text()
-                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
+                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt))
+                .branch(
+                    case![State::SettingsTxt2Img {
+                        selection,
+                        txt2img,
+                        img2img
+                    }]
+                    .endpoint(handle_settings_value),
+                )
+                .branch(
+                    case![State::SettingsImg2Img {
+                        selection,
+                        txt2img,
+                        img2img
+                    }]
+                    .endpoint(handle_settings_value),
+                ),
+        )
+        .branch(
+            case![State::SettingsTxt2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(|bot: Bot, msg: Message| async move {
+                bot.send_message(msg.chat.id, "Please enter a valid value.")
+                    .await?;
+                Ok(())
+            }),
+        )
+        .branch(
+            case![State::SettingsImg2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(|bot: Bot, msg: Message| async move {
+                bot.send_message(msg.chat.id, "Please enter a valid value.")
+                    .await?;
+                Ok(())
+            }),
         );
 
-    let callback_handler = Update::filter_callback_query().branch(
-        dptree::filter(|q: CallbackQuery| {
-            if let Some(data) = q.data {
-                data.starts_with("rerun")
-            } else {
-                false
-            }
-        })
-        .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun)),
-    );
+    let callback_handler = Update::filter_callback_query()
+        .branch(
+            dptree::filter(|q: CallbackQuery| {
+                if let Some(data) = q.data {
+                    data.starts_with("rerun")
+                } else {
+                    false
+                }
+            })
+            .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun)),
+        )
+        .branch(
+            dptree::filter(|q: CallbackQuery| {
+                if let Some(data) = q.data {
+                    data.starts_with("settings")
+                } else {
+                    false
+                }
+            })
+            .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_settings))
+            .branch(
+                case![State::SettingsImg2Img {
+                    selection,
+                    txt2img,
+                    img2img
+                }]
+                .endpoint(handle_settings_button),
+            )
+            .branch(
+                case![State::SettingsTxt2Img {
+                    selection,
+                    txt2img,
+                    img2img
+                }]
+                .endpoint(handle_settings_button),
+            ),
+        );
 
     let handler = Update::filter_message()
         .branch(unauth_command_handler)

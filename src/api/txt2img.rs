@@ -11,7 +11,7 @@ use super::ImgResponse;
 #[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct Txt2ImgRequest {
     pub enable_hr: Option<bool>,
-    pub denoising_strength: Option<u32>,
+    pub denoising_strength: Option<f64>,
     pub firstphase_width: Option<u32>,
     pub firstphase_height: Option<u32>,
     pub hr_scale: Option<f64>,
