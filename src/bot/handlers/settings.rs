@@ -1,5 +1,7 @@
 use anyhow::anyhow;
 use teloxide::{
+    dispatching::UpdateHandler,
+    dptree::case,
     payloads::setters::*,
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
@@ -7,7 +9,7 @@ use teloxide::{
 
 use crate::api::{Img2ImgRequest, Txt2ImgRequest};
 
-use super::{DiffusionDialogue, State};
+use super::{AuthenticatedCommands, DiffusionDialogue, State};
 
 #[allow(dead_code)]
 pub struct Settings {
@@ -402,4 +404,136 @@ pub(crate) async fn handle_settings_value(
         .await?;
 
     Ok(())
+}
+
+pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
+    let auth_command_handler =
+        Update::filter_message()
+            .filter_command::<AuthenticatedCommands>()
+            .endpoint(
+                |msg: Message,
+                 bot: Bot,
+                 dialogue: DiffusionDialogue,
+                 cmd: AuthenticatedCommands| async move {
+                    let (txt2img, img2img) =
+                        match dialogue.get_or_default().await.map_err(|e| anyhow!(e))? {
+                            State::Ready { txt2img, img2img }
+                            | State::SettingsTxt2Img {
+                                txt2img, img2img, ..
+                            }
+                            | State::SettingsImg2Img {
+                                txt2img, img2img, ..
+                            } => (txt2img, img2img),
+                        };
+                    match cmd {
+                        AuthenticatedCommands::Img2ImgSettings => {
+                            dialogue
+                                .update(State::SettingsImg2Img {
+                                    selection: None,
+                                    txt2img,
+                                    img2img: img2img.clone(),
+                                })
+                                .await
+                                .map_err(|e| anyhow!(e))?;
+                            let settings = Settings::try_from(img2img)?;
+                            bot.send_message(msg.chat.id, "Please make a selection.")
+                                .reply_markup(settings.keyboard())
+                                .send()
+                                .await?;
+                            Ok(())
+                        }
+                        AuthenticatedCommands::Txt2ImgSettings => {
+                            dialogue
+                                .update(State::SettingsTxt2Img {
+                                    selection: None,
+                                    txt2img: txt2img.clone(),
+                                    img2img,
+                                })
+                                .await
+                                .map_err(|e| anyhow!(e))?;
+                            let settings = Settings::try_from(txt2img)?;
+                            bot.send_message(msg.chat.id, "Please make a selection.")
+                                .reply_markup(settings.keyboard())
+                                .send()
+                                .await?;
+                            Ok(())
+                        }
+                    }
+                },
+            );
+    let callback_handler = Update::filter_callback_query().branch(
+        dptree::filter(|q: CallbackQuery| {
+            if let Some(data) = q.data {
+                data.starts_with("settings")
+            } else {
+                false
+            }
+        })
+        .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_settings))
+        .branch(
+            case![State::SettingsImg2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(handle_settings_button),
+        )
+        .branch(
+            case![State::SettingsTxt2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(handle_settings_button),
+        ),
+    );
+
+    let message_handler = Update::filter_message()
+        .branch(
+            Message::filter_text()
+                .branch(
+                    case![State::SettingsTxt2Img {
+                        selection,
+                        txt2img,
+                        img2img
+                    }]
+                    .endpoint(handle_settings_value),
+                )
+                .branch(
+                    case![State::SettingsImg2Img {
+                        selection,
+                        txt2img,
+                        img2img
+                    }]
+                    .endpoint(handle_settings_value),
+                ),
+        )
+        .branch(
+            case![State::SettingsTxt2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(|bot: Bot, msg: Message| async move {
+                bot.send_message(msg.chat.id, "Please enter a valid value.")
+                    .await?;
+                Ok(())
+            }),
+        )
+        .branch(
+            case![State::SettingsImg2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(|bot: Bot, msg: Message| async move {
+                bot.send_message(msg.chat.id, "Please enter a valid value.")
+                    .await?;
+                Ok(())
+            }),
+        );
+    dptree::entry()
+        .branch(auth_command_handler)
+        .branch(message_handler)
+        .branch(callback_handler)
 }
