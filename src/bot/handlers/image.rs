@@ -331,7 +331,9 @@ pub(crate) async fn handle_rerun(
     };
 
     if let Some(photo) = parent.photo().map(ToOwned::to_owned) {
-        bot.answer_callback_query(q.id).await?;
+        bot.answer_callback_query(q.id)
+            .text("Rerunning this image...")
+            .await?;
         handle_image(
             bot.clone(),
             cfg,
@@ -342,7 +344,9 @@ pub(crate) async fn handle_rerun(
         )
         .await?;
     } else if let Some(text) = parent.text().map(ToOwned::to_owned) {
-        bot.answer_callback_query(q.id).await?;
+        bot.answer_callback_query(q.id)
+            .text("Rerunning this prompt...")
+            .await?;
         handle_prompt(bot.clone(), cfg, dialogue, (txt2img, img2img), parent, text).await?;
     } else {
         bot.answer_callback_query(q.id)

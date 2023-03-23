@@ -273,7 +273,7 @@ pub(crate) async fn handle_settings_button(
             .update(State::Ready { txt2img, img2img })
             .await
             .map_err(|e| anyhow!(e))?;
-        bot.answer_callback_query(q.id).await?;
+        bot.answer_callback_query(q.id).text("Canceled.").await?;
         bot.edit_message_text(message.chat.id, message.id, "Please enter a prompt.")
             .reply_markup(InlineKeyboardMarkup::new([[]]))
             .await?;
