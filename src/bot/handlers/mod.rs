@@ -86,7 +86,7 @@ pub(crate) async fn handle_rerun(
         return Ok(());
     };
 
-    if let Some(photo) = parent.photo().map(|p| p.to_vec()) {
+    if let Some(photo) = parent.photo().map(ToOwned::to_owned) {
         bot.answer_callback_query(q.id).await?;
         handle_image(
             bot.clone(),
@@ -94,21 +94,12 @@ pub(crate) async fn handle_rerun(
             dialogue,
             (txt2img, img2img),
             parent,
-            photo.to_vec(),
+            photo,
         )
         .await?;
-    } else if let Some(caption) = parent.text() {
+    } else if let Some(text) = parent.text().map(ToOwned::to_owned) {
         bot.answer_callback_query(q.id).await?;
-        let prompt = caption.to_owned();
-        handle_prompt(
-            bot.clone(),
-            cfg,
-            dialogue,
-            (txt2img, img2img),
-            parent,
-            prompt,
-        )
-        .await?;
+        handle_prompt(bot.clone(), cfg, dialogue, (txt2img, img2img), parent, text).await?;
     } else {
         bot.answer_callback_query(q.id)
             .cache_time(60)

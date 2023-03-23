@@ -20,16 +20,20 @@ enum Photo {
     Album(Vec<Vec<u8>>),
 }
 
-struct Response {
-    caption: String,
-    images: Photo,
-    source: MessageId,
-}
-
-impl Response {
-    pub fn new(caption: String, images: Vec<String>, source: MessageId) -> anyhow::Result<Self> {
+impl Photo {
+    #[allow(dead_code)]
+    pub fn single(photo: String) -> anyhow::Result<Self> {
         use base64::{engine::general_purpose, Engine as _};
-        let images = images
+        Ok(Self::Single(
+            general_purpose::STANDARD
+                .decode(photo)
+                .context("Failed to decode image")?,
+        ))
+    }
+
+    pub fn album(photos: Vec<String>) -> anyhow::Result<Self> {
+        use base64::{engine::general_purpose, Engine as _};
+        let images = photos
             .into_iter()
             .map(|i| {
                 general_purpose::STANDARD
@@ -47,6 +51,20 @@ impl Response {
             2.. => Photo::Album(images),
             _ => return Err(anyhow!("Must provide at least one image!")),
         };
+
+        Ok(images)
+    }
+}
+
+struct Response {
+    caption: String,
+    images: Photo,
+    source: MessageId,
+}
+
+impl Response {
+    pub fn new(caption: String, images: Vec<String>, source: MessageId) -> anyhow::Result<Self> {
+        let images = Photo::album(images)?;
         Ok(Self {
             caption,
             images,
