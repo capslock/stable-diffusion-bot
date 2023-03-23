@@ -24,8 +24,10 @@ pub(crate) enum UnauthenticatedCommands {
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Authenticated commands")]
 pub(crate) enum AuthenticatedCommands {
-    #[command(description = "Set the value")]
-    Set { value: u64 },
+    #[command(description = "txt2img settings")]
+    Txt2ImgSettings,
+    #[command(description = "img2img settings")]
+    Img2ImgSettings,
 }
 
 pub(crate) async fn unauthenticated_commands_handler(
@@ -119,7 +121,7 @@ pub(crate) async fn handle_rerun(
 }
 
 #[allow(dead_code)]
-struct Settings {
+pub struct Settings {
     pub steps: u32,
     pub seed: i64,
     pub batch_size: u32,
@@ -136,7 +138,7 @@ struct Settings {
 }
 
 impl Settings {
-    fn keyboard(&self) -> InlineKeyboardMarkup {
+    pub fn keyboard(&self) -> InlineKeyboardMarkup {
         let keyboard = InlineKeyboardMarkup::new([
             [
                 InlineKeyboardButton::callback(format!("Steps: {}", self.steps), "settings_steps"),

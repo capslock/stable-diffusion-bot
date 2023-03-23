@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::{
@@ -142,19 +142,61 @@ fn schema() -> UpdateHandler<anyhow::Error> {
     let unauth_command_handler = teloxide::filter_command::<UnauthenticatedCommands, _>()
         .endpoint(unauthenticated_commands_handler);
 
-    let auth_command_handler = auth_filter
-        .clone()
-        .filter_command::<AuthenticatedCommands>()
-        .endpoint(
-            |msg: Message, bot: Bot, cmd: AuthenticatedCommands| async move {
-                match cmd {
-                    AuthenticatedCommands::Set { value } => {
-                        bot.send_message(msg.chat.id, format!("{value}")).await?;
-                        Ok(())
+    let auth_command_handler =
+        auth_filter
+            .clone()
+            .filter_command::<AuthenticatedCommands>()
+            .endpoint(
+                |msg: Message,
+                 bot: Bot,
+                 dialogue: DiffusionDialogue,
+                 cmd: AuthenticatedCommands| async move {
+                    let (txt2img, img2img) =
+                        match dialogue.get_or_default().await.map_err(|e| anyhow!(e))? {
+                            State::Ready { txt2img, img2img }
+                            | State::SettingsTxt2Img {
+                                txt2img, img2img, ..
+                            }
+                            | State::SettingsImg2Img {
+                                txt2img, img2img, ..
+                            } => (txt2img, img2img),
+                        };
+                    match cmd {
+                        AuthenticatedCommands::Img2ImgSettings => {
+                            dialogue
+                                .update(State::SettingsImg2Img {
+                                    selection: None,
+                                    txt2img,
+                                    img2img: img2img.clone(),
+                                })
+                                .await
+                                .map_err(|e| anyhow!(e))?;
+                            let settings = Settings::try_from(img2img)?;
+                            bot.send_message(msg.chat.id, "Please make a selection.")
+                                .reply_markup(settings.keyboard())
+                                .send()
+                                .await?;
+                            Ok(())
+                        }
+                        AuthenticatedCommands::Txt2ImgSettings => {
+                            dialogue
+                                .update(State::SettingsTxt2Img {
+                                    selection: None,
+                                    txt2img: txt2img.clone(),
+                                    img2img,
+                                })
+                                .await
+                                .map_err(|e| anyhow!(e))?;
+                            let settings = Settings::try_from(txt2img)?;
+                            bot.send_message(msg.chat.id, "Please make a selection.")
+                                .reply_markup(settings.keyboard())
+                                .send()
+                                .await?;
+                            Ok(())
+                        }
                     }
-                }
-            },
-        );
+                },
+            );
 
     let message_handler = auth_filter
         .branch(
