@@ -139,11 +139,12 @@ fn schema() -> UpdateHandler<anyhow::Error> {
             .unwrap_or_default()
     });
 
-    let unauth_command_handler = teloxide::filter_command::<UnauthenticatedCommands, _>()
-        .endpoint(unauthenticated_commands_handler);
+    let unauth_command_handler = Update::filter_message().chain(
+        teloxide::filter_command::<UnauthenticatedCommands, _>()
+            .endpoint(unauthenticated_commands_handler),
+    );
 
-    let message_handler = auth_filter
-        .clone()
+    let message_handler = Update::filter_message()
         .branch(
             Message::filter_photo()
                 .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
@@ -153,25 +154,22 @@ fn schema() -> UpdateHandler<anyhow::Error> {
                 .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
         );
 
-    let callback_handler = auth_filter.clone().branch(
-        Update::filter_callback_query().branch(
-            dptree::filter(|q: CallbackQuery| {
-                if let Some(data) = q.data {
-                    data.starts_with("rerun")
-                } else {
-                    false
-                }
-            })
-            .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun)),
-        ),
-    );
+    let callback_handler = Update::filter_callback_query()
+        .chain(dptree::filter(|q: CallbackQuery| {
+            if let Some(data) = q.data {
+                data.starts_with("rerun")
+            } else {
+                false
+            }
+        }))
+        .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun));
 
-    let handler = Update::filter_message()
-        .branch(unauth_command_handler)
-        .branch(message_handler);
+    let authenticated = auth_filter
+        .branch(message_handler)
+        .branch(settings_schema())
+        .branch(callback_handler);
 
     dialogue::enter::<Update, ErasedStorage<State>, State, _>()
-        .branch(handler)
-        .branch(callback_handler)
-        .branch(auth_filter.branch(settings_schema()))
+        .branch(unauth_command_handler)
+        .branch(authenticated)
 }

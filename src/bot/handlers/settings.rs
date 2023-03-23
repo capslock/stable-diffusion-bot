@@ -461,14 +461,14 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                     }
                 },
             );
-    let callback_handler = Update::filter_callback_query().branch(
-        dptree::filter(|q: CallbackQuery| {
+    let callback_handler = Update::filter_callback_query()
+        .chain(dptree::filter(|q: CallbackQuery| {
             if let Some(data) = q.data {
                 data.starts_with("settings")
             } else {
                 false
             }
-        })
+        }))
         .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_settings))
         .branch(
             case![State::SettingsImg2Img {
@@ -485,8 +485,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                 img2img
             }]
             .endpoint(handle_settings_button),
-        ),
-    );
+        );
 
     let message_handler = Update::filter_message()
         .branch(
