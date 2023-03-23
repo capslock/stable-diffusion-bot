@@ -7,7 +7,6 @@ use teloxide::{
         dialogue::{self, serializer::Json, ErasedStorage, InMemStorage, SqliteStorage, Storage},
         UpdateHandler,
     },
-    dptree::case,
     prelude::*,
     types::{Update, UserId},
 };
@@ -144,30 +143,7 @@ fn schema() -> UpdateHandler<anyhow::Error> {
             .endpoint(unauthenticated_commands_handler),
     );
 
-    let message_handler = Update::filter_message()
-        .branch(
-            Message::filter_photo()
-                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
-        )
-        .branch(
-            Message::filter_text()
-                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
-        );
-
-    let callback_handler = Update::filter_callback_query()
-        .chain(dptree::filter(|q: CallbackQuery| {
-            if let Some(data) = q.data {
-                data.starts_with("rerun")
-            } else {
-                false
-            }
-        }))
-        .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun));
-
-    let authenticated = auth_filter
-        .branch(message_handler)
-        .branch(settings_schema())
-        .branch(callback_handler);
+    let authenticated = auth_filter.branch(image_schema()).branch(settings_schema());
 
     dialogue::enter::<Update, ErasedStorage<State>, State, _>()
         .branch(unauth_command_handler)

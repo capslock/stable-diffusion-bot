@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Context};
 use teloxide::{
+    dispatching::UpdateHandler,
+    dptree::case,
     payloads::setters::*,
     prelude::*,
     types::{
@@ -263,4 +265,90 @@ pub(crate) fn keyboard() -> InlineKeyboardMarkup {
         InlineKeyboardButton::callback("Rerun", "rerun"),
         InlineKeyboardButton::callback("Settings", "settings"),
     ]])
+}
+
+pub(crate) async fn handle_rerun(
+    bot: Bot,
+    cfg: ConfigParameters,
+    dialogue: DiffusionDialogue,
+    (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
+    q: CallbackQuery,
+) -> anyhow::Result<()> {
+    let message = if let Some(message) = q.message {
+        message
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Sorry, this message is no longer available.")
+            .await?;
+        return Ok(());
+    };
+
+    let id = message.id;
+    let chat_id = message.chat.id;
+
+    let parent = if let Some(parent) = message.reply_to_message().cloned() {
+        parent
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Oops, something went wrong.")
+            .await?;
+        return Ok(());
+    };
+
+    if let Some(photo) = parent.photo().map(ToOwned::to_owned) {
+        bot.answer_callback_query(q.id).await?;
+        handle_image(
+            bot.clone(),
+            cfg,
+            dialogue,
+            (txt2img, img2img),
+            parent,
+            photo,
+        )
+        .await?;
+    } else if let Some(text) = parent.text().map(ToOwned::to_owned) {
+        bot.answer_callback_query(q.id).await?;
+        handle_prompt(bot.clone(), cfg, dialogue, (txt2img, img2img), parent, text).await?;
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Oops, something went wrong.")
+            .await?;
+        return Ok(());
+    }
+
+    bot.edit_message_reply_markup(chat_id, id)
+        .reply_markup(InlineKeyboardMarkup::new([[]]))
+        .send()
+        .await?;
+
+    Ok(())
+}
+
+pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
+    let message_handler = Update::filter_message()
+        .branch(
+            Message::filter_photo()
+                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
+        )
+        .branch(
+            Message::filter_text()
+                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
+        );
+
+    let callback_handler = Update::filter_callback_query()
+        .chain(dptree::filter(|q: CallbackQuery| {
+            if let Some(data) = q.data {
+                data.starts_with("rerun")
+            } else {
+                false
+            }
+        }))
+        .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun));
+
+    dptree::entry()
+        .branch(message_handler)
+        .branch(callback_handler)
 }
