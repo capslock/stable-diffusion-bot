@@ -331,20 +331,16 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
     let message_handler = Update::filter_message()
         .branch(
             Message::filter_photo()
-                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
+                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
         )
         .branch(
             Message::filter_text()
-                .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
+                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
         );
 
     let callback_handler = Update::filter_callback_query()
         .chain(dptree::filter(|q: CallbackQuery| {
-            if let Some(data) = q.data {
-                data.starts_with("rerun")
-            } else {
-                false
-            }
+            q.data.filter(|d| d.starts_with("rerun")).is_some()
         }))
         .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun));
 

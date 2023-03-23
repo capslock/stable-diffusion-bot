@@ -15,15 +15,6 @@ pub(crate) enum UnauthenticatedCommands {
     Help,
 }
 
-#[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "Authenticated commands")]
-pub(crate) enum AuthenticatedCommands {
-    #[command(description = "txt2img settings")]
-    Txt2ImgSettings,
-    #[command(description = "img2img settings")]
-    Img2ImgSettings,
-}
-
 pub(crate) async fn unauthenticated_commands_handler(
     cfg: ConfigParameters,
     bot: Bot,
@@ -37,7 +28,7 @@ pub(crate) async fn unauthenticated_commands_handler(
                 format!(
                     "{}\n\n{}",
                     UnauthenticatedCommands::descriptions(),
-                    AuthenticatedCommands::descriptions()
+                    SettingsCommands::descriptions()
                 )
             } else if msg.chat.is_group() || msg.chat.is_supergroup() {
                 UnauthenticatedCommands::descriptions()

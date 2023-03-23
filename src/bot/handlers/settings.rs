@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
+    macros::BotCommands,
     payloads::setters::*,
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
@@ -9,7 +10,16 @@ use teloxide::{
 
 use crate::api::{Img2ImgRequest, Txt2ImgRequest};
 
-use super::{AuthenticatedCommands, DiffusionDialogue, State};
+use super::{DiffusionDialogue, State};
+
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase", description = "Authenticated commands")]
+pub enum SettingsCommands {
+    #[command(description = "txt2img settings")]
+    Txt2ImgSettings,
+    #[command(description = "img2img settings")]
+    Img2ImgSettings,
+}
 
 #[allow(dead_code)]
 pub struct Settings {
@@ -407,14 +417,14 @@ pub(crate) async fn handle_settings_value(
 }
 
 pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
-    let auth_command_handler =
+    let settings_command_handler =
         Update::filter_message()
-            .filter_command::<AuthenticatedCommands>()
+            .filter_command::<SettingsCommands>()
             .endpoint(
                 |msg: Message,
                  bot: Bot,
                  dialogue: DiffusionDialogue,
-                 cmd: AuthenticatedCommands| async move {
+                 cmd: SettingsCommands| async move {
                     let (txt2img, img2img) =
                         match dialogue.get_or_default().await.map_err(|e| anyhow!(e))? {
                             State::Ready { txt2img, img2img }
@@ -426,7 +436,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                             } => (txt2img, img2img),
                         };
                     match cmd {
-                        AuthenticatedCommands::Img2ImgSettings => {
+                        SettingsCommands::Img2ImgSettings => {
                             dialogue
                                 .update(State::SettingsImg2Img {
                                     selection: None,
@@ -442,7 +452,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                                 .await?;
                             Ok(())
                         }
-                        AuthenticatedCommands::Txt2ImgSettings => {
+                        SettingsCommands::Txt2ImgSettings => {
                             dialogue
                                 .update(State::SettingsTxt2Img {
                                     selection: None,
@@ -532,7 +542,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
             }),
         );
     dptree::entry()
-        .branch(auth_command_handler)
+        .branch(settings_command_handler)
         .branch(message_handler)
         .branch(callback_handler)
 }
