@@ -1,4 +1,6 @@
 use anyhow::{anyhow, Context};
+use lazy_static::lazy_static;
+use regex::Regex;
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
@@ -62,15 +64,22 @@ struct Response {
     caption: String,
     images: Photo,
     source: MessageId,
+    seed: i64,
 }
 
 impl Response {
-    pub fn new(caption: String, images: Vec<String>, source: MessageId) -> anyhow::Result<Self> {
+    pub fn new(
+        caption: String,
+        images: Vec<String>,
+        seed: i64,
+        source: MessageId,
+    ) -> anyhow::Result<Self> {
         let images = Photo::album(images)?;
         Ok(Self {
             caption,
             images,
             source,
+            seed,
         })
     }
 
@@ -80,7 +89,7 @@ impl Response {
                 bot.send_photo(chat_id, InputFile::memory(image))
                     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                     .caption(self.caption)
-                    .reply_markup(keyboard())
+                    .reply_markup(keyboard(self.seed))
                     .reply_to_message_id(self.source)
                     .await?;
             }
@@ -99,7 +108,7 @@ impl Response {
                     chat_id,
                     "What would you like to do? Select below, or enter a new prompt.",
                 )
-                .reply_markup(keyboard())
+                .reply_markup(keyboard(self.seed))
                 .reply_to_message_id(self.source)
                 .await?;
             }
@@ -114,10 +123,16 @@ struct MessageText(String);
 impl MessageText {
     pub fn new_with_infotxt(prompt: &str, infotxt: &str) -> Self {
         use teloxide::utils::markdown::escape;
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r"Seed: (?P<seed>\d+)").unwrap();
+        }
         Self(format!(
             "`{}`\n{}",
             escape(prompt),
-            escape(infotxt.strip_prefix(prompt).unwrap_or(infotxt).trim())
+            RE.replace(
+                escape(infotxt.strip_prefix(prompt).unwrap_or(infotxt).trim()).as_str(),
+                "Seed: `$seed`"
+            )
         ))
     }
 
@@ -207,8 +222,14 @@ pub(crate) async fn handle_image(
 
     let resp = do_img2img(&bot, &cfg, &mut img2img, &msg, photo).await?;
 
+    let seed = if resp.info()?.seed == resp.parameters.seed {
+        -1
+    } else {
+        resp.info()?.seed.unwrap_or(-1)
+    };
+
     let caption = MessageText::try_from(&resp).context("Failed to build caption from response")?;
-    Response::new(caption.0, resp.images, msg.id)
+    Response::new(caption.0, resp.images, seed, msg.id)
         .context("Failed to create response!")?
         .send(&bot, msg.chat.id)
         .await?;
@@ -246,8 +267,14 @@ pub(crate) async fn handle_prompt(
 
     let resp = do_txt2img(text.as_str(), &cfg, &mut txt2img).await?;
 
+    let seed = if resp.info()?.seed == resp.parameters.seed {
+        -1
+    } else {
+        resp.info()?.seed.unwrap_or(-1)
+    };
+
     let caption = MessageText::try_from(&resp).context("Failed to build caption from response")?;
-    Response::new(caption.0, resp.images, msg.id)
+    Response::new(caption.0, resp.images, seed, msg.id)
         .context("Failed to create response!")?
         .send(&bot, msg.chat.id)
         .await?;
@@ -260,9 +287,15 @@ pub(crate) async fn handle_prompt(
     Ok(())
 }
 
-pub(crate) fn keyboard() -> InlineKeyboardMarkup {
+pub(crate) fn keyboard(seed: i64) -> InlineKeyboardMarkup {
+    let seed_button = if seed == -1 {
+        InlineKeyboardButton::callback("🎲 Seed", format!("reuse/{seed}"))
+    } else {
+        InlineKeyboardButton::callback("♻️ Seed", format!("reuse/{seed}"))
+    };
     InlineKeyboardMarkup::new([[
         InlineKeyboardButton::callback("Rerun", "rerun"),
+        seed_button,
         InlineKeyboardButton::callback("Settings", "settings"),
     ]])
 }
@@ -339,12 +372,87 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         );
 
     let callback_handler = Update::filter_callback_query()
-        .chain(dptree::filter(|q: CallbackQuery| {
-            q.data.filter(|d| d.starts_with("rerun")).is_some()
-        }))
-        .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_rerun));
+        .chain(case![State::Ready { txt2img, img2img }])
+        .branch(
+            dptree::filter_map(|q: CallbackQuery| {
+                q.data
+                    .filter(|d| d.starts_with("reuse"))
+                    .and_then(|d| d.split('/').skip(1).flat_map(str::parse::<i64>).next())
+            })
+            .endpoint(handle_reuse),
+        )
+        .branch(
+            dptree::filter(|q: CallbackQuery| q.data.filter(|d| d.starts_with("rerun")).is_some())
+                .endpoint(handle_rerun),
+        );
 
     dptree::entry()
         .branch(message_handler)
         .branch(callback_handler)
+}
+
+pub(crate) async fn handle_reuse(
+    bot: Bot,
+    dialogue: DiffusionDialogue,
+    (mut txt2img, mut img2img): (Txt2ImgRequest, Img2ImgRequest),
+    q: CallbackQuery,
+    seed: i64,
+) -> anyhow::Result<()> {
+    let message = if let Some(message) = q.message {
+        message
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Sorry, this message is no longer available.")
+            .await?;
+        return Ok(());
+    };
+
+    let id = message.id;
+    let chat_id = message.chat.id;
+
+    let parent = if let Some(parent) = message.reply_to_message().cloned() {
+        parent
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Oops, something went wrong.")
+            .await?;
+        return Ok(());
+    };
+
+    if parent.photo().is_some() {
+        img2img.with_seed(seed);
+        dialogue
+            .update(State::Ready { txt2img, img2img })
+            .await
+            .map_err(|e| anyhow!(e))?;
+    } else if parent.text().is_some() {
+        txt2img.with_seed(seed);
+        dialogue
+            .update(State::Ready { txt2img, img2img })
+            .await
+            .map_err(|e| anyhow!(e))?;
+    } else {
+        bot.answer_callback_query(q.id)
+            .cache_time(60)
+            .text("Oops, something went wrong.")
+            .await?;
+        return Ok(());
+    }
+    if seed == -1 {
+        bot.answer_callback_query(q.id)
+            .text("Seed randomized.")
+            .await?;
+    } else {
+        bot.answer_callback_query(q.id)
+            .text(format!("Seed set to {seed}."))
+            .await?;
+        bot.edit_message_reply_markup(chat_id, id)
+            .reply_markup(keyboard(-1))
+            .send()
+            .await?;
+    }
+
+    Ok(())
 }

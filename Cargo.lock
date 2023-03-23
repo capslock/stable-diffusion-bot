@@ -1645,6 +1645,8 @@ dependencies = [
  "base64 0.21.0",
  "bytes",
  "figment",
+ "lazy_static",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
