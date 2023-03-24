@@ -143,7 +143,7 @@ fn schema() -> UpdateHandler<anyhow::Error> {
             .endpoint(unauthenticated_commands_handler),
     );
 
-    let authenticated = auth_filter.branch(image_schema()).branch(settings_schema());
+    let authenticated = auth_filter.branch(settings_schema()).branch(image_schema());
 
     dialogue::enter::<Update, ErasedStorage<State>, State, _>()
         .branch(unauth_command_handler)
