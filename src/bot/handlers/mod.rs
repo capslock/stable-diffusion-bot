@@ -11,8 +11,10 @@ pub(crate) use settings::*;
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Simple commands")]
 pub(crate) enum UnauthenticatedCommands {
-    #[command(description = "shows this message.")]
+    #[command(description = "shows help message.")]
     Help,
+    #[command(description = "starts the bot.")]
+    Start,
 }
 
 pub(crate) async fn unauthenticated_commands_handler(
@@ -37,6 +39,10 @@ pub(crate) async fn unauthenticated_commands_handler(
             } else {
                 UnauthenticatedCommands::descriptions().to_string()
             }
+        }
+        UnauthenticatedCommands::Start => {
+            "This bot generates images using stable diffusion! Enter a prompt to get started!"
+                .to_owned()
         }
     };
 

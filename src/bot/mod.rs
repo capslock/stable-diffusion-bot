@@ -9,6 +9,7 @@ use teloxide::{
     },
     prelude::*,
     types::{Update, UserId},
+    utils::command::BotCommands,
 };
 use tracing::warn;
 
@@ -114,6 +115,14 @@ pub async fn run_bot(
         client,
         api,
     };
+
+    bot.set_my_commands(UnauthenticatedCommands::bot_commands())
+        .scope(teloxide::types::BotCommandScope::Default)
+        .await?;
+
+    bot.set_my_commands(SettingsCommands::bot_commands())
+        .scope(teloxide::types::BotCommandScope::AllPrivateChats)
+        .await?;
 
     Dispatcher::builder(bot, schema())
         .dependencies(dptree::deps![parameters, storage])
