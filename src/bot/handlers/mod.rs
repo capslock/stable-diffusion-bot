@@ -15,6 +15,8 @@ pub(crate) enum UnauthenticatedCommands {
     Help,
     #[command(description = "starts the bot.")]
     Start,
+    #[command(description = "change settings.")]
+    Settings,
 }
 
 pub(crate) async fn unauthenticated_commands_handler(
@@ -44,6 +46,7 @@ pub(crate) async fn unauthenticated_commands_handler(
             "This bot generates images using stable diffusion! Enter a prompt to get started!"
                 .to_owned()
         }
+        UnauthenticatedCommands::Settings => "Sorry, not yet implemented.".to_owned(),
     };
 
     bot.send_message(msg.chat.id, text).await?;
