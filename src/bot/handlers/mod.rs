@@ -11,9 +11,9 @@ pub(crate) use settings::*;
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Simple commands")]
 pub(crate) enum UnauthenticatedCommands {
-    #[command(description = "shows help message.")]
+    #[command(description = "show help message.")]
     Help,
-    #[command(description = "starts the bot.")]
+    #[command(description = "start the bot.")]
     Start,
     #[command(description = "change settings.")]
     Settings,
