@@ -121,7 +121,7 @@ pub async fn run_bot(
         .await?;
 
     bot.set_my_commands(SettingsCommands::bot_commands())
-        .scope(teloxide::types::BotCommandScope::AllPrivateChats)
+        .scope(teloxide::types::BotCommandScope::Default)
         .await?;
 
     Dispatcher::builder(bot, schema())

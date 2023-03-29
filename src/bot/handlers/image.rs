@@ -364,37 +364,6 @@ pub(crate) async fn handle_rerun(
     Ok(())
 }
 
-pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
-    let message_handler = Update::filter_message()
-        .branch(
-            Message::filter_photo()
-                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
-        )
-        .branch(
-            Message::filter_text()
-                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
-        );
-
-    let callback_handler = Update::filter_callback_query()
-        .chain(case![State::Ready { txt2img, img2img }])
-        .branch(
-            dptree::filter_map(|q: CallbackQuery| {
-                q.data
-                    .filter(|d| d.starts_with("reuse"))
-                    .and_then(|d| d.split('/').skip(1).flat_map(str::parse::<i64>).next())
-            })
-            .endpoint(handle_reuse),
-        )
-        .branch(
-            dptree::filter(|q: CallbackQuery| q.data.filter(|d| d.starts_with("rerun")).is_some())
-                .endpoint(handle_rerun),
-        );
-
-    dptree::entry()
-        .branch(message_handler)
-        .branch(callback_handler)
-}
-
 pub(crate) async fn handle_reuse(
     bot: Bot,
     dialogue: DiffusionDialogue,
@@ -459,4 +428,35 @@ pub(crate) async fn handle_reuse(
     }
 
     Ok(())
+}
+
+pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
+    let message_handler = Update::filter_message()
+        .branch(
+            Message::filter_photo()
+                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
+        )
+        .branch(
+            Message::filter_text()
+                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
+        );
+
+    let callback_handler = Update::filter_callback_query()
+        .chain(case![State::Ready { txt2img, img2img }])
+        .branch(
+            dptree::filter_map(|q: CallbackQuery| {
+                q.data
+                    .filter(|d| d.starts_with("reuse"))
+                    .and_then(|d| d.split('/').skip(1).flat_map(str::parse::<i64>).next())
+            })
+            .endpoint(handle_reuse),
+        )
+        .branch(
+            dptree::filter(|q: CallbackQuery| q.data.filter(|d| d.starts_with("rerun")).is_some())
+                .endpoint(handle_rerun),
+        );
+
+    dptree::entry()
+        .branch(message_handler)
+        .branch(callback_handler)
 }
