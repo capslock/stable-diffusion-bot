@@ -416,61 +416,67 @@ pub(crate) async fn handle_settings_value(
     Ok(())
 }
 
+async fn handle_settings_command(
+    msg: Message,
+    bot: Bot,
+    dialogue: DiffusionDialogue,
+    cmd: SettingsCommands,
+) -> anyhow::Result<()> {
+    let (txt2img, img2img) = match dialogue.get_or_default().await.map_err(|e| anyhow!(e))? {
+        State::Ready { txt2img, img2img }
+        | State::SettingsTxt2Img {
+            txt2img, img2img, ..
+        }
+        | State::SettingsImg2Img {
+            txt2img, img2img, ..
+        } => (txt2img, img2img),
+    };
+    match cmd {
+        SettingsCommands::Img2ImgSettings => {
+            dialogue
+                .update(State::SettingsImg2Img {
+                    selection: None,
+                    txt2img,
+                    img2img: img2img.clone(),
+                })
+                .await
+                .map_err(|e| anyhow!(e))?;
+            let settings = Settings::try_from(img2img)?;
+            bot.send_message(msg.chat.id, "Please make a selection.")
+                .reply_markup(settings.keyboard())
+                .send()
+                .await?;
+            Ok(())
+        }
+        SettingsCommands::Txt2ImgSettings => {
+            dialogue
+                .update(State::SettingsTxt2Img {
+                    selection: None,
+                    txt2img: txt2img.clone(),
+                    img2img,
+                })
+                .await
+                .map_err(|e| anyhow!(e))?;
+            let settings = Settings::try_from(txt2img)?;
+            bot.send_message(msg.chat.id, "Please make a selection.")
+                .reply_markup(settings.keyboard())
+                .send()
+                .await?;
+            Ok(())
+        }
+    }
+}
+
+async fn handle_invalid_setting_value(bot: Bot, msg: Message) -> anyhow::Result<()> {
+    bot.send_message(msg.chat.id, "Please enter a valid value.")
+        .await?;
+    Ok(())
+}
+
 pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
-    let settings_command_handler =
-        Update::filter_message()
-            .filter_command::<SettingsCommands>()
-            .endpoint(
-                |msg: Message,
-                 bot: Bot,
-                 dialogue: DiffusionDialogue,
-                 cmd: SettingsCommands| async move {
-                    let (txt2img, img2img) =
-                        match dialogue.get_or_default().await.map_err(|e| anyhow!(e))? {
-                            State::Ready { txt2img, img2img }
-                            | State::SettingsTxt2Img {
-                                txt2img, img2img, ..
-                            }
-                            | State::SettingsImg2Img {
-                                txt2img, img2img, ..
-                            } => (txt2img, img2img),
-                        };
-                    match cmd {
-                        SettingsCommands::Img2ImgSettings => {
-                            dialogue
-                                .update(State::SettingsImg2Img {
-                                    selection: None,
-                                    txt2img,
-                                    img2img: img2img.clone(),
-                                })
-                                .await
-                                .map_err(|e| anyhow!(e))?;
-                            let settings = Settings::try_from(img2img)?;
-                            bot.send_message(msg.chat.id, "Please make a selection.")
-                                .reply_markup(settings.keyboard())
-                                .send()
-                                .await?;
-                            Ok(())
-                        }
-                        SettingsCommands::Txt2ImgSettings => {
-                            dialogue
-                                .update(State::SettingsTxt2Img {
-                                    selection: None,
-                                    txt2img: txt2img.clone(),
-                                    img2img,
-                                })
-                                .await
-                                .map_err(|e| anyhow!(e))?;
-                            let settings = Settings::try_from(txt2img)?;
-                            bot.send_message(msg.chat.id, "Please make a selection.")
-                                .reply_markup(settings.keyboard())
-                                .send()
-                                .await?;
-                            Ok(())
-                        }
-                    }
-                },
-            );
+    let settings_command_handler = Update::filter_message()
+        .filter_command::<SettingsCommands>()
+        .endpoint(handle_settings_command);
     let callback_handler = Update::filter_callback_query()
         .chain(dptree::filter(|q: CallbackQuery| {
             if let Some(data) = q.data {
@@ -523,11 +529,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                 txt2img,
                 img2img
             }]
-            .endpoint(|bot: Bot, msg: Message| async move {
-                bot.send_message(msg.chat.id, "Please enter a valid value.")
-                    .await?;
-                Ok(())
-            }),
+            .endpoint(handle_invalid_setting_value),
         )
         .branch(
             case![State::SettingsImg2Img {
@@ -535,11 +537,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                 txt2img,
                 img2img
             }]
-            .endpoint(|bot: Bot, msg: Message| async move {
-                bot.send_message(msg.chat.id, "Please enter a valid value.")
-                    .await?;
-                Ok(())
-            }),
+            .endpoint(handle_invalid_setting_value),
         );
     dptree::entry()
         .branch(settings_command_handler)
