@@ -289,7 +289,7 @@ pub(crate) async fn handle_prompt(
 
 pub(crate) fn keyboard(seed: i64) -> InlineKeyboardMarkup {
     let seed_button = if seed == -1 {
-        InlineKeyboardButton::callback("🎲 Seed", format!("reuse/{seed}"))
+        InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")
     } else {
         InlineKeyboardButton::callback("♻️ Seed", format!("reuse/{seed}"))
     };
