@@ -69,6 +69,7 @@ impl Default for State {
                 restore_faces: Some(false),
                 tiling: Some(false),
                 negative_prompt: Some("".to_owned()),
+                resize_mode: Some(1),
                 ..Default::default()
             },
         }
