@@ -48,7 +48,14 @@
           buildInputs = [
             pkgs.openssl
             pkgs.sqlite
-          ];
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
+            let frameworks = pkgs.darwin.apple_sdk.frameworks;
+            in
+            [
+              frameworks.Security
+              frameworks.CoreFoundation
+              frameworks.CoreServices
+            ]);
 
           doCheck = false;
         };
