@@ -50,9 +50,6 @@
             pkgs.sqlite
           ];
 
-          SQLITE3_LIB_DIR = "${pkgs.sqlite.out}/lib";
-          SQLITE3_INCLUDE_DIR = "${pkgs.sqlite.dev}/include";
-
           doCheck = false;
         };
       });
