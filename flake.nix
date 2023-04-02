@@ -1,5 +1,5 @@
 {
-  description = "Example Rust development environment for Zero to Nix";
+  description = "Telegram bot for Stable Diffusion, written in Rust.";
 
   # Flake inputs
   inputs = {
