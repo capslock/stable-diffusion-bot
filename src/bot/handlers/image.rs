@@ -294,9 +294,9 @@ pub(crate) fn keyboard(seed: i64) -> InlineKeyboardMarkup {
         InlineKeyboardButton::callback("♻️ Seed", format!("reuse/{seed}"))
     };
     InlineKeyboardMarkup::new([[
-        InlineKeyboardButton::callback("Rerun 🔄", "rerun"),
+        InlineKeyboardButton::callback("🔄 Rerun", "rerun"),
         seed_button,
-        InlineKeyboardButton::callback("Settings ⚙️", "settings"),
+        InlineKeyboardButton::callback("⚙️ Settings", "settings"),
     ]])
 }
 
