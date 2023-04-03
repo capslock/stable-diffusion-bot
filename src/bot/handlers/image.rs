@@ -50,7 +50,7 @@ impl Photo {
                 images
                     .into_iter()
                     .next()
-                    .ok_or(anyhow!("Failed to get image"))?,
+                    .ok_or_else(|| anyhow!("Failed to get image"))?,
             ),
             2.. => Photo::Album(images),
             _ => return Err(anyhow!("Must provide at least one image!")),

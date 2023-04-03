@@ -99,27 +99,34 @@ impl TryFrom<&Txt2ImgRequest> for Settings {
 
     fn try_from(value: &Txt2ImgRequest) -> Result<Self, Self::Error> {
         Ok(Self {
-            steps: value.steps.ok_or(anyhow!("Missing steps!"))?,
-            seed: value.seed.ok_or(anyhow!("Missing seed!"))?,
-            batch_size: value.batch_size.ok_or(anyhow!("Missing batch_size!"))?,
-            n_iter: value.n_iter.ok_or(anyhow!("Missing n_iter!"))?,
-            cfg_scale: value.cfg_scale.ok_or(anyhow!("Missing cfg_scale!"))?,
-            width: value.width.ok_or(anyhow!("Missing width!"))?,
-            height: value.height.ok_or(anyhow!("Missing height!"))?,
+            steps: value.steps.ok_or_else(|| anyhow!("Missing steps!"))?,
+            seed: value.seed.ok_or_else(|| anyhow!("Missing seed!"))?,
+            batch_size: value
+                .batch_size
+                .ok_or_else(|| anyhow!("Missing batch_size!"))?,
+            n_iter: value.n_iter.ok_or_else(|| anyhow!("Missing n_iter!"))?,
+            cfg_scale: value
+                .cfg_scale
+                .ok_or_else(|| anyhow!("Missing cfg_scale!"))?,
+            width: value.width.ok_or_else(|| anyhow!("Missing width!"))?,
+            height: value.height.ok_or_else(|| anyhow!("Missing height!"))?,
             negative_prompt: value
                 .negative_prompt
                 .clone()
-                .ok_or(anyhow!("Missing negative_prompt!"))?,
-            styles: value.styles.clone().ok_or(anyhow!("Missing styles!"))?,
+                .ok_or_else(|| anyhow!("Missing negative_prompt!"))?,
+            styles: value
+                .styles
+                .clone()
+                .ok_or_else(|| anyhow!("Missing styles!"))?,
             restore_faces: value
                 .restore_faces
-                .ok_or(anyhow!("Missing restore_faces!"))?,
-            tiling: value.tiling.ok_or(anyhow!("Missing tiling!"))?,
+                .ok_or_else(|| anyhow!("Missing restore_faces!"))?,
+            tiling: value.tiling.ok_or_else(|| anyhow!("Missing tiling!"))?,
             denoising_strength: value.denoising_strength,
             sampler_index: value
                 .sampler_index
                 .clone()
-                .ok_or(anyhow!("Missing sampler_index!"))?,
+                .ok_or_else(|| anyhow!("Missing sampler_index!"))?,
         })
     }
 }
@@ -137,27 +144,34 @@ impl TryFrom<&Img2ImgRequest> for Settings {
 
     fn try_from(value: &Img2ImgRequest) -> Result<Self, Self::Error> {
         Ok(Self {
-            steps: value.steps.ok_or(anyhow!("Missing steps!"))?,
-            seed: value.seed.ok_or(anyhow!("Missing seed!"))?,
-            batch_size: value.batch_size.ok_or(anyhow!("Missing batch_size!"))?,
-            n_iter: value.n_iter.ok_or(anyhow!("Missing n_iter!"))?,
-            cfg_scale: value.cfg_scale.ok_or(anyhow!("Missing cfg_scale!"))?,
-            width: value.width.ok_or(anyhow!("Missing width!"))?,
-            height: value.height.ok_or(anyhow!("Missing height!"))?,
+            steps: value.steps.ok_or_else(|| anyhow!("Missing steps!"))?,
+            seed: value.seed.ok_or_else(|| anyhow!("Missing seed!"))?,
+            batch_size: value
+                .batch_size
+                .ok_or_else(|| anyhow!("Missing batch_size!"))?,
+            n_iter: value.n_iter.ok_or_else(|| anyhow!("Missing n_iter!"))?,
+            cfg_scale: value
+                .cfg_scale
+                .ok_or_else(|| anyhow!("Missing cfg_scale!"))?,
+            width: value.width.ok_or_else(|| anyhow!("Missing width!"))?,
+            height: value.height.ok_or_else(|| anyhow!("Missing height!"))?,
             negative_prompt: value
                 .negative_prompt
                 .clone()
-                .ok_or(anyhow!("Missing negative_prompt!"))?,
-            styles: value.styles.clone().ok_or(anyhow!("Missing styles!"))?,
+                .ok_or_else(|| anyhow!("Missing negative_prompt!"))?,
+            styles: value
+                .styles
+                .clone()
+                .ok_or_else(|| anyhow!("Missing styles!"))?,
             restore_faces: value
                 .restore_faces
-                .ok_or(anyhow!("Missing restore_faces!"))?,
-            tiling: value.tiling.ok_or(anyhow!("Missing tiling!"))?,
+                .ok_or_else(|| anyhow!("Missing restore_faces!"))?,
+            tiling: value.tiling.ok_or_else(|| anyhow!("Missing tiling!"))?,
             denoising_strength: value.denoising_strength,
             sampler_index: value
                 .sampler_index
                 .clone()
-                .ok_or(anyhow!("Missing sampler_index!"))?,
+                .ok_or_else(|| anyhow!("Missing sampler_index!"))?,
         })
     }
 }
