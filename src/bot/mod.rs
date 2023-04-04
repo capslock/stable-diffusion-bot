@@ -87,6 +87,46 @@ type DialogueStorage = std::sync::Arc<ErasedStorage<State>>;
 
 type DiffusionDialogue = Dialogue<State, ErasedStorage<State>>;
 
+#[derive(Clone)]
+pub struct StableDiffusionBot {
+    bot: Bot,
+    storage: DialogueStorage,
+    config: ConfigParameters,
+}
+
+impl StableDiffusionBot {
+    pub async fn run(self) -> anyhow::Result<()> {
+        let StableDiffusionBot {
+            bot,
+            storage,
+            config,
+        } = self;
+
+        bot.set_my_commands(UnauthenticatedCommands::bot_commands())
+            .scope(teloxide::types::BotCommandScope::Default)
+            .await?;
+
+        bot.set_my_commands(SettingsCommands::bot_commands())
+            .scope(teloxide::types::BotCommandScope::Default)
+            .await?;
+
+        Dispatcher::builder(bot, schema())
+            .dependencies(dptree::deps![config, storage])
+            .default_handler(|upd| async move {
+                warn!("Unhandled update: {:?}", upd);
+            })
+            .error_handler(LoggingErrorHandler::with_custom_text(
+                "An error has occurred in the dispatcher",
+            ))
+            .enable_ctrlc_handler()
+            .build()
+            .dispatch()
+            .await;
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ConfigParameters {
     allowed_users: HashSet<UserId>,
@@ -96,62 +136,75 @@ pub(crate) struct ConfigParameters {
     img2img_defaults: Img2ImgRequest,
 }
 
-pub async fn run_bot(
+pub struct StableDiffusionBotBuilder {
     api_key: String,
     allowed_users: Vec<u64>,
     db_path: Option<String>,
     sd_api_url: String,
     txt2img_defaults: Option<Txt2ImgRequest>,
     img2img_defaults: Option<Img2ImgRequest>,
-) -> anyhow::Result<()> {
-    let storage: DialogueStorage = if let Some(path) = db_path {
-        SqliteStorage::open(&path, Json)
-            .await
-            .context("failed to open db")?
-            .erase()
-    } else {
-        InMemStorage::new().erase()
-    };
+}
 
-    let bot = Bot::new(api_key);
+impl StableDiffusionBotBuilder {
+    pub fn new(api_key: String, allowed_users: Vec<u64>, sd_api_url: String) -> Self {
+        StableDiffusionBotBuilder {
+            api_key,
+            allowed_users,
+            db_path: None,
+            sd_api_url,
+            txt2img_defaults: None,
+            img2img_defaults: None,
+        }
+    }
 
-    let allowed_users = allowed_users.into_iter().map(UserId).collect();
+    pub fn db_path(mut self, path: Option<String>) -> Self {
+        self.db_path = path;
+        self
+    }
 
-    let client = reqwest::Client::new();
+    pub fn txt2img_defaults(mut self, request: Option<Txt2ImgRequest>) -> Self {
+        self.txt2img_defaults = request;
+        self
+    }
 
-    let api = Api::new_with_client_and_url(client.clone(), sd_api_url)
-        .context("Failed to initialize sd api")?;
+    pub fn img2img_defaults(mut self, request: Option<Img2ImgRequest>) -> Self {
+        self.img2img_defaults = request;
+        self
+    }
 
-    let parameters = ConfigParameters {
-        allowed_users,
-        client,
-        api,
-        txt2img_defaults: txt2img_defaults.unwrap_or(default_txt2img()),
-        img2img_defaults: img2img_defaults.unwrap_or(default_img2img()),
-    };
+    pub async fn build(self) -> anyhow::Result<StableDiffusionBot> {
+        let storage: DialogueStorage = if let Some(path) = self.db_path {
+            SqliteStorage::open(&path, Json)
+                .await
+                .context("failed to open db")?
+                .erase()
+        } else {
+            InMemStorage::new().erase()
+        };
 
-    bot.set_my_commands(UnauthenticatedCommands::bot_commands())
-        .scope(teloxide::types::BotCommandScope::Default)
-        .await?;
+        let bot = Bot::new(self.api_key.clone());
 
-    bot.set_my_commands(SettingsCommands::bot_commands())
-        .scope(teloxide::types::BotCommandScope::Default)
-        .await?;
+        let allowed_users = self.allowed_users.into_iter().map(UserId).collect();
 
-    Dispatcher::builder(bot, schema())
-        .dependencies(dptree::deps![parameters, storage])
-        .default_handler(|upd| async move {
-            warn!("Unhandled update: {:?}", upd);
+        let client = reqwest::Client::new();
+
+        let api = Api::new_with_client_and_url(client.clone(), self.sd_api_url.clone())
+            .context("Failed to initialize sd api")?;
+
+        let parameters = ConfigParameters {
+            allowed_users,
+            client,
+            api,
+            txt2img_defaults: self.txt2img_defaults.unwrap_or(default_txt2img()),
+            img2img_defaults: self.img2img_defaults.unwrap_or(default_img2img()),
+        };
+
+        Ok(StableDiffusionBot {
+            bot,
+            storage,
+            config: parameters,
         })
-        .error_handler(LoggingErrorHandler::with_custom_text(
-            "An error has occurred in the dispatcher",
-        ))
-        .enable_ctrlc_handler()
-        .build()
-        .dispatch()
-        .await;
-
-    Ok(())
+    }
 }
 
 fn schema() -> UpdateHandler<anyhow::Error> {

@@ -1,5 +1,6 @@
 use anyhow::Context;
 use api::{Img2ImgRequest, Txt2ImgRequest};
+use bot::StableDiffusionBotBuilder;
 use figment::{
     providers::{Env, Format, Toml},
     Figment,
@@ -46,15 +47,14 @@ async fn main() -> anyhow::Result<()> {
         .extract()
         .context("Invalid configuration")?;
 
-    bot::run_bot(
-        config.api_key,
-        config.allowed_users,
-        config.db_path,
-        config.sd_api_url,
-        config.txt2img,
-        config.img2img,
-    )
-    .await?;
+    StableDiffusionBotBuilder::new(config.api_key, config.allowed_users, config.sd_api_url)
+        .db_path(config.db_path)
+        .txt2img_defaults(config.txt2img)
+        .img2img_defaults(config.img2img)
+        .build()
+        .await?
+        .run()
+        .await?;
 
     Ok(())
 }
