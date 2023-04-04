@@ -55,3 +55,23 @@ can pass it through as an environment variable:
 ```shell
 SD_TELEGRAM_API_KEY="your_telegram_bot_api_key" stable-diffusion-bot
 ```
+
+## Advanced
+
+### Configuration
+
+You can set the default `txt2img` and `img2img` parameters via the `config.toml` file.
+
+:construction: **TODO**: Document the available options.
+
+```
+[txt2img]
+steps = 50
+cfg_scale = 10
+width = 768
+height = 768
+
+[img2img]
+width = 768
+height = 768
+```
