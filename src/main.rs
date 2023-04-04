@@ -1,4 +1,5 @@
 use anyhow::Context;
+use api::{Img2ImgRequest, Txt2ImgRequest};
 use figment::{
     providers::{Env, Format, Toml},
     Figment,
@@ -16,6 +17,8 @@ struct Config {
     allowed_users: Vec<u64>,
     db_path: Option<String>,
     sd_api_url: String,
+    txt2img: Option<Txt2ImgRequest>,
+    img2img: Option<Img2ImgRequest>,
 }
 
 #[tokio::main]
@@ -48,6 +51,8 @@ async fn main() -> anyhow::Result<()> {
         config.allowed_users,
         config.db_path,
         config.sd_api_url,
+        config.txt2img,
+        config.img2img,
     )
     .await?;
 

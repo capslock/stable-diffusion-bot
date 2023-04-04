@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use teloxide::{prelude::*, utils::command::BotCommands};
 
 use super::{ConfigParameters, DiffusionDialogue, State};
@@ -25,6 +26,7 @@ pub(crate) async fn unauthenticated_commands_handler(
     me: teloxide::types::Me,
     msg: Message,
     cmd: UnauthenticatedCommands,
+    dialogue: DiffusionDialogue,
 ) -> anyhow::Result<()> {
     let text = match cmd {
         UnauthenticatedCommands::Help => {
@@ -43,6 +45,13 @@ pub(crate) async fn unauthenticated_commands_handler(
             }
         }
         UnauthenticatedCommands::Start => {
+            dialogue
+                .update(State::Ready {
+                    txt2img: cfg.txt2img_defaults,
+                    img2img: cfg.img2img_defaults,
+                })
+                .await
+                .map_err(|e| anyhow!(e))?;
             "This bot generates images using stable diffusion! Enter a prompt to get started!"
                 .to_owned()
         }

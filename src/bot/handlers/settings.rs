@@ -8,7 +8,10 @@ use teloxide::{
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
 };
 
-use crate::api::{Img2ImgRequest, Txt2ImgRequest};
+use crate::{
+    api::{Img2ImgRequest, Txt2ImgRequest},
+    bot::ConfigParameters,
+};
 
 use super::{DiffusionDialogue, State};
 
@@ -252,6 +255,7 @@ pub(crate) async fn handle_settings(
 
 pub(crate) async fn handle_settings_button(
     bot: Bot,
+    cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
     (_, txt2img, img2img): (Option<String>, Txt2ImgRequest, Img2ImgRequest),
     q: CallbackQuery,
@@ -294,7 +298,11 @@ pub(crate) async fn handle_settings_button(
         return Ok(());
     }
 
-    let mut state = dialogue.get_or_default().await.map_err(|e| anyhow!(e))?;
+    let mut state = dialogue
+        .get()
+        .await
+        .map_err(|e| anyhow!(e))?
+        .unwrap_or_else(|| State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults));
     match &mut state {
         State::SettingsTxt2Img { selection, .. } | State::SettingsImg2Img { selection, .. } => {
             *selection = Some(setting.to_string())
@@ -385,11 +393,16 @@ where
 
 pub(crate) async fn handle_settings_value(
     bot: Bot,
+    cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
     msg: Message,
     text: String,
 ) -> anyhow::Result<()> {
-    let mut state = dialogue.get_or_default().await.map_err(|e| anyhow!(e))?;
+    let mut state = dialogue
+        .get()
+        .await
+        .map_err(|e| anyhow!(e))?
+        .unwrap_or_else(|| State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults));
 
     let settings = match &mut state {
         State::SettingsTxt2Img {
@@ -432,11 +445,18 @@ pub(crate) async fn handle_settings_value(
 
 async fn handle_settings_command(
     msg: Message,
+    cfg: ConfigParameters,
     bot: Bot,
     dialogue: DiffusionDialogue,
     cmd: SettingsCommands,
 ) -> anyhow::Result<()> {
-    let (txt2img, img2img) = match dialogue.get_or_default().await.map_err(|e| anyhow!(e))? {
+    let (txt2img, img2img) = match dialogue
+        .get()
+        .await
+        .map_err(|e| anyhow!(e))?
+        .unwrap_or_else(|| {
+            State::new_with_defaults(cfg.txt2img_defaults.clone(), cfg.img2img_defaults.clone())
+        }) {
         State::Ready { txt2img, img2img }
         | State::SettingsTxt2Img {
             txt2img, img2img, ..
@@ -444,6 +464,7 @@ async fn handle_settings_command(
         | State::SettingsImg2Img {
             txt2img, img2img, ..
         } => (txt2img, img2img),
+        State::New => (cfg.txt2img_defaults, cfg.img2img_defaults),
     };
     match cmd {
         SettingsCommands::Img2ImgSettings => {

@@ -19,8 +19,10 @@ mod handlers;
 mod helpers;
 use handlers::*;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub enum State {
+    #[default]
+    New,
     Ready {
         txt2img: Txt2ImgRequest,
         img2img: Img2ImgRequest,
@@ -37,42 +39,47 @@ pub enum State {
     },
 }
 
-impl Default for State {
-    fn default() -> Self {
-        Self::Ready {
-            txt2img: Txt2ImgRequest {
-                styles: Some(Vec::new()),
-                seed: Some(-1),
-                sampler_index: Some("Euler".to_owned()),
-                batch_size: Some(1),
-                n_iter: Some(1),
-                steps: Some(50),
-                cfg_scale: Some(7.0),
-                width: Some(512),
-                height: Some(512),
-                restore_faces: Some(false),
-                tiling: Some(false),
-                negative_prompt: Some("".to_owned()),
-                ..Default::default()
-            },
-            img2img: Img2ImgRequest {
-                denoising_strength: Some(0.75),
-                styles: Some(Vec::new()),
-                seed: Some(-1),
-                sampler_index: Some("Euler".to_owned()),
-                batch_size: Some(1),
-                n_iter: Some(1),
-                steps: Some(50),
-                cfg_scale: Some(7.0),
-                width: Some(512),
-                height: Some(512),
-                restore_faces: Some(false),
-                tiling: Some(false),
-                negative_prompt: Some("".to_owned()),
-                resize_mode: Some(1),
-                ..Default::default()
-            },
-        }
+impl State {
+    fn new_with_defaults(txt2img: Txt2ImgRequest, img2img: Img2ImgRequest) -> Self {
+        Self::Ready { txt2img, img2img }
+    }
+}
+
+fn default_txt2img() -> Txt2ImgRequest {
+    Txt2ImgRequest {
+        styles: Some(Vec::new()),
+        seed: Some(-1),
+        sampler_index: Some("Euler".to_owned()),
+        batch_size: Some(1),
+        n_iter: Some(1),
+        steps: Some(50),
+        cfg_scale: Some(7.0),
+        width: Some(512),
+        height: Some(512),
+        restore_faces: Some(false),
+        tiling: Some(false),
+        negative_prompt: Some("".to_owned()),
+        ..Default::default()
+    }
+}
+
+fn default_img2img() -> Img2ImgRequest {
+    Img2ImgRequest {
+        denoising_strength: Some(0.75),
+        styles: Some(Vec::new()),
+        seed: Some(-1),
+        sampler_index: Some("Euler".to_owned()),
+        batch_size: Some(1),
+        n_iter: Some(1),
+        steps: Some(50),
+        cfg_scale: Some(7.0),
+        width: Some(512),
+        height: Some(512),
+        restore_faces: Some(false),
+        tiling: Some(false),
+        negative_prompt: Some("".to_owned()),
+        resize_mode: Some(1),
+        ..Default::default()
     }
 }
 
@@ -85,6 +92,8 @@ pub(crate) struct ConfigParameters {
     allowed_users: HashSet<UserId>,
     client: reqwest::Client,
     api: Api,
+    txt2img_defaults: Txt2ImgRequest,
+    img2img_defaults: Img2ImgRequest,
 }
 
 pub async fn run_bot(
@@ -92,6 +101,8 @@ pub async fn run_bot(
     allowed_users: Vec<u64>,
     db_path: Option<String>,
     sd_api_url: String,
+    txt2img_defaults: Option<Txt2ImgRequest>,
+    img2img_defaults: Option<Img2ImgRequest>,
 ) -> anyhow::Result<()> {
     let storage: DialogueStorage = if let Some(path) = db_path {
         SqliteStorage::open(&path, Json)
@@ -115,6 +126,8 @@ pub async fn run_bot(
         allowed_users,
         client,
         api,
+        txt2img_defaults: txt2img_defaults.unwrap_or(default_txt2img()),
+        img2img_defaults: img2img_defaults.unwrap_or(default_img2img()),
     };
 
     bot.set_my_commands(UnauthenticatedCommands::bot_commands())
