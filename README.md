@@ -56,6 +56,24 @@ can pass it through as an environment variable:
 SD_TELEGRAM_API_KEY="your_telegram_bot_api_key" stable-diffusion-bot
 ```
 
+## Using the bot
+
+* `/start` to get started.
+* `/help` will list the available commands.
+
+### `txt2img`
+
+Send the bot a prompt and it will generate an image using the default generation
+settings. The reply will also have an inline keyboard, giving you options to:
+  * rerun the same prompt
+  * save the seed for subsequent generations
+  * change settings
+
+### `img2img`
+
+Send the bot an image with a caption and it will generate a new image based on
+that image and the prompt.
+
 ## Advanced
 
 ### Configuration
