@@ -195,8 +195,8 @@ impl StableDiffusionBotBuilder {
             allowed_users,
             client,
             api,
-            txt2img_defaults: self.txt2img_defaults.unwrap_or(default_txt2img()),
-            img2img_defaults: self.img2img_defaults.unwrap_or(default_img2img()),
+            txt2img_defaults: self.txt2img_defaults.unwrap_or_else(default_txt2img),
+            img2img_defaults: self.img2img_defaults.unwrap_or_else(default_img2img),
         };
 
         Ok(StableDiffusionBot {
