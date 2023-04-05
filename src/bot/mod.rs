@@ -87,6 +87,7 @@ type DialogueStorage = std::sync::Arc<ErasedStorage<State>>;
 
 type DiffusionDialogue = Dialogue<State, ErasedStorage<State>>;
 
+/// Struct to run a StableDiffusionBot
 #[derive(Clone)]
 pub struct StableDiffusionBot {
     bot: Bot,
@@ -95,6 +96,7 @@ pub struct StableDiffusionBot {
 }
 
 impl StableDiffusionBot {
+    /// Creates an UpdateHandler for the bot
     fn schema() -> UpdateHandler<anyhow::Error> {
         let auth_filter = dptree::filter(|cfg: ConfigParameters, upd: Update| {
             upd.user()
@@ -114,6 +116,7 @@ impl StableDiffusionBot {
             .branch(authenticated)
     }
 
+    /// Runs the StableDiffusionBot
     pub async fn run(self) -> anyhow::Result<()> {
         let StableDiffusionBot {
             bot,
@@ -155,6 +158,7 @@ pub(crate) struct ConfigParameters {
     img2img_defaults: Img2ImgRequest,
 }
 
+/// Struct that builds a StableDiffusionBot instance.
 pub struct StableDiffusionBotBuilder {
     api_key: String,
     allowed_users: Vec<u64>,
@@ -165,6 +169,7 @@ pub struct StableDiffusionBotBuilder {
 }
 
 impl StableDiffusionBotBuilder {
+    /// Constructor that returns a new StableDiffusionBotBuilder instance.
     pub fn new(api_key: String, allowed_users: Vec<u64>, sd_api_url: String) -> Self {
         StableDiffusionBotBuilder {
             api_key,
@@ -176,21 +181,69 @@ impl StableDiffusionBotBuilder {
         }
     }
 
+    /// Builder function that sets the path of the storage database for the bot.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - An optional `String` representing the path to the storage database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.db_path(Some("database.sqlite".to_string())).build().await.unwrap();
+    /// ```
     pub fn db_path(mut self, path: Option<String>) -> Self {
         self.db_path = path;
         self
     }
 
+    /// Builder function that sets the defaults for text to image requests.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - An optional `Txt2ImgRequest` representing the default settings for text to image conversion.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.txt2img_defaults(Some(txt2img_request)).build().await.unwrap();
+    /// ```
     pub fn txt2img_defaults(mut self, request: Option<Txt2ImgRequest>) -> Self {
         self.txt2img_defaults = request;
         self
     }
 
+    /// Builder function that sets the defaults for image to image requests.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - An optional `Img2ImgRequest` representing the default settings for image to image conversion.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.img2img_defaults(Some(img2img_request)).build().await.unwrap();
+    /// ```
     pub fn img2img_defaults(mut self, request: Option<Img2ImgRequest>) -> Self {
         self.img2img_defaults = request;
         self
     }
 
+    /// Consumes the builder and builds a `StableDiffusionBot` instance.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.build().await.unwrap();
+    /// ```
     pub async fn build(self) -> anyhow::Result<StableDiffusionBot> {
         let storage: DialogueStorage = if let Some(path) = self.db_path {
             SqliteStorage::open(&path, Json)
