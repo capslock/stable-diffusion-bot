@@ -95,6 +95,25 @@ pub struct StableDiffusionBot {
 }
 
 impl StableDiffusionBot {
+    fn schema() -> UpdateHandler<anyhow::Error> {
+        let auth_filter = dptree::filter(|cfg: ConfigParameters, upd: Update| {
+            upd.user()
+                .map(|user| cfg.allowed_users.contains(&user.id))
+                .unwrap_or_default()
+        });
+
+        let unauth_command_handler = Update::filter_message().chain(
+            teloxide::filter_command::<UnauthenticatedCommands, _>()
+                .endpoint(unauthenticated_commands_handler),
+        );
+
+        let authenticated = auth_filter.branch(settings_schema()).branch(image_schema());
+
+        dialogue::enter::<Update, ErasedStorage<State>, State, _>()
+            .branch(unauth_command_handler)
+            .branch(authenticated)
+    }
+
     pub async fn run(self) -> anyhow::Result<()> {
         let StableDiffusionBot {
             bot,
@@ -110,7 +129,7 @@ impl StableDiffusionBot {
             .scope(teloxide::types::BotCommandScope::Default)
             .await?;
 
-        Dispatcher::builder(bot, schema())
+        Dispatcher::builder(bot, Self::schema())
             .dependencies(dptree::deps![config, storage])
             .default_handler(|upd| async move {
                 warn!("Unhandled update: {:?}", upd);
@@ -205,23 +224,4 @@ impl StableDiffusionBotBuilder {
             config: parameters,
         })
     }
-}
-
-fn schema() -> UpdateHandler<anyhow::Error> {
-    let auth_filter = dptree::filter(|cfg: ConfigParameters, upd: Update| {
-        upd.user()
-            .map(|user| cfg.allowed_users.contains(&user.id))
-            .unwrap_or_default()
-    });
-
-    let unauth_command_handler = Update::filter_message().chain(
-        teloxide::filter_command::<UnauthenticatedCommands, _>()
-            .endpoint(unauthenticated_commands_handler),
-    );
-
-    let authenticated = auth_filter.branch(settings_schema()).branch(image_schema());
-
-    dialogue::enter::<Update, ErasedStorage<State>, State, _>()
-        .branch(unauth_command_handler)
-        .branch(authenticated)
 }
