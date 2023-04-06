@@ -15,33 +15,51 @@ use crate::{
 
 use super::{DiffusionDialogue, State};
 
+/// BotCommands for settings.
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Authenticated commands")]
-pub enum SettingsCommands {
+pub(crate) enum SettingsCommands {
+    /// Command to set txt2img settings
     #[command(description = "txt2img settings")]
     Txt2ImgSettings,
+    /// Command to set img2img settings
     #[command(description = "img2img settings")]
     Img2ImgSettings,
 }
 
+/// User-configurable image generation settings.
 #[allow(dead_code)]
-pub struct Settings {
+pub(crate) struct Settings {
+    // Number of sampling steps.
     pub steps: u32,
+    // Random seed.
     pub seed: i64,
+    // Number of images to generate per batch.
     pub batch_size: u32,
+    // Number of batches of images to generate.
     pub n_iter: u32,
+    // CFG scale.
     pub cfg_scale: f64,
+    // Image width.
     pub width: u32,
+    // Image height.
     pub height: u32,
+    // Negative prompt.
     pub negative_prompt: String,
+    // Styles to apply.
     pub styles: Vec<String>,
+    // Whether to run a restore faces pass.
     pub restore_faces: bool,
+    // Enable or disable image tiling.
     pub tiling: bool,
+    // Denoising strength. Only used for img2img.
     pub denoising_strength: Option<f64>,
+    // Sampler name.
     pub sampler_index: String,
 }
 
 impl Settings {
+    /// Build an inline keyboard to configure settings.
     pub fn keyboard(&self) -> InlineKeyboardMarkup {
         let keyboard = InlineKeyboardMarkup::new([
             [
@@ -80,6 +98,7 @@ impl Settings {
                 ),
             ],
         ]);
+
         if let Some(d) = self.denoising_strength {
             keyboard.append_row([
                 InlineKeyboardButton::callback(
