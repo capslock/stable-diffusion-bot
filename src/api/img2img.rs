@@ -212,12 +212,24 @@ impl Img2ImgRequest {
     }
 }
 
+/// A client for sending image requests to a specified endpoint.
 pub struct Img2Img {
     client: reqwest::Client,
     endpoint: Url,
 }
 
 impl Img2Img {
+    /// Constructs a new Img2Img client with a given `reqwest::Client` and Stable Diffusion API
+    /// endpoint `String`.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - A `reqwest::Client` used to send requests.
+    /// * `endpoint` - A `String` representation of the endpoint url.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a new Img2Img instance on success, or an error if url parsing failed.
     #[allow(dead_code)]
     pub(crate) fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
         Ok(Self {
@@ -226,10 +238,29 @@ impl Img2Img {
         })
     }
 
+    /// Constructs a new Img2Img client with a given `reqwest::Client` and endpoint `Url`.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - A `reqwest::Client` used to send requests.
+    /// * `endpoint` - A `Url` representing the endpoint url.
+    ///
+    /// # Returns
+    ///
+    /// A new Img2Img instance.
     pub(crate) fn new_with_url(client: reqwest::Client, endpoint: Url) -> Self {
         Self { client, endpoint }
     }
 
+    /// Sends an image request using the Img2Img client.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - An Img2ImgRequest containing the parameters for the image request.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an `ImgResponse<Img2ImgRequest>` on success, or an error if one occurred.
     pub async fn send(
         &self,
         request: &Img2ImgRequest,
