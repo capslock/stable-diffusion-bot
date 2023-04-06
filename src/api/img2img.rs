@@ -230,12 +230,11 @@ impl Img2Img {
     /// # Returns
     ///
     /// A `Result` containing a new Img2Img instance on success, or an error if url parsing failed.
-    #[allow(dead_code)]
-    pub(crate) fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
+        Ok(Self::new_with_url(
             client,
-            endpoint: Url::parse(&endpoint).context("failed to parse endpoint url")?,
-        })
+            Url::parse(&endpoint).context("failed to parse endpoint url")?,
+        ))
     }
 
     /// Constructs a new Img2Img client with a given `reqwest::Client` and endpoint `Url`.
@@ -248,7 +247,7 @@ impl Img2Img {
     /// # Returns
     ///
     /// A new Img2Img instance.
-    pub(crate) fn new_with_url(client: reqwest::Client, endpoint: Url) -> Self {
+    pub fn new_with_url(client: reqwest::Client, endpoint: Url) -> Self {
         Self { client, endpoint }
     }
 
