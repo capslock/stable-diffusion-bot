@@ -21,7 +21,7 @@
       # create a Rust environment
       (self: super: {
         rustToolchain = super.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" ];
+          extensions = ["rust-src"];
         };
       })
     ];
