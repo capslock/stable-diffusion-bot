@@ -64,7 +64,7 @@ impl Txt2ImgRequest {
     /// # Example
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_prompt("A blue sky with green grass".to_string());
     /// ```
     pub fn with_prompt(&mut self, prompt: String) -> &mut Self {
@@ -81,7 +81,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_styles(vec!["cubism".to_string(), "impressionism".to_string()]);
     /// ```
     pub fn with_styles(&mut self, styles: Vec<String>) -> &mut Self {
@@ -99,7 +99,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_style("cubism".to_string());
     /// ```
     pub fn with_style(&mut self, style: String) -> &mut Self {
@@ -121,7 +121,7 @@ impl Txt2ImgRequest {
     /// # Example
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_seed(12345);
     /// ```
     pub fn with_seed(&mut self, seed: i64) -> &mut Self {
@@ -139,7 +139,7 @@ impl Txt2ImgRequest {
     /// # Example
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_subseed(12345);
     /// ```
     pub fn with_subseed(&mut self, subseed: i64) -> &mut Self {
@@ -156,7 +156,7 @@ impl Txt2ImgRequest {
     /// # Example
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_subseed_strength(5);
     /// ```
     pub fn with_subseed_strength(&mut self, subseed_strength: u32) -> &mut Self {
@@ -173,7 +173,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_sampler_name("Euler".to_string());
     /// ```
     pub fn with_sampler_name(&mut self, sampler_name: String) -> &mut Self {
@@ -190,7 +190,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_batch_size(16);
     /// ```
     pub fn with_batch_size(&mut self, batch_size: u32) -> &mut Self {
@@ -207,7 +207,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_n_iter(1000);
     /// ```
     pub fn with_n_iter(&mut self, n_iter: u32) -> &mut Self {
@@ -224,7 +224,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_steps(50);
     /// ```
     pub fn with_steps(&mut self, steps: u32) -> &mut Self {
@@ -241,7 +241,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_cfg_scale(0.7);
     /// ```
     pub fn with_cfg_scale(&mut self, cfg_scale: f64) -> &mut Self {
@@ -258,7 +258,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_width(512);
     /// ```
     pub fn with_width(&mut self, width: u32) -> &mut Self {
@@ -275,7 +275,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_height(512);
     /// ```
     pub fn with_height(&mut self, height: u32) -> &mut Self {
@@ -292,7 +292,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_restore_faces(true);
     /// ```
     pub fn with_restore_faces(&mut self, restore_faces: bool) -> &mut Self {
@@ -309,7 +309,7 @@ impl Txt2ImgRequest {
     /// # Examples
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_tiling(true);
     /// ```
     pub fn with_tiling(&mut self, tiling: bool) -> &mut Self {
@@ -326,7 +326,7 @@ impl Txt2ImgRequest {
     /// # Example
     ///
     /// ```
-    /// let mut req = Img2ImgRequest::default();
+    /// let mut req = Txt2ImgRequest::default();
     /// req.with_prompt("bad, ugly, worst quality".to_string());
     /// ```
     pub fn with_negative_prompt(&mut self, negative_prompt: String) -> &mut Self {
