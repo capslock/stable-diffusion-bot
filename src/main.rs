@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
         .context("setting default subscriber failed")?;
 
     let config: Config = Figment::new()
-        .merge(("config.allowed_users", Vec::<u64>::new()))
+        .merge(Toml::file("/etc/sdbot/config.toml"))
         .merge(Toml::file("config.toml"))
         .merge(Env::prefixed("SD_TELEGRAM_"))
         .extract()

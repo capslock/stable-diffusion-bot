@@ -83,5 +83,61 @@
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs; [libiconv]);
       };
     });
+    nixosModule = {
+      config,
+      lib,
+      pkgs,
+      ...
+    }: let
+      cfg = config.services.stableDiffusionBot;
+      settingsFormat = pkgs.formats.toml {};
+    in
+      with lib; {
+        options = {
+          services.stableDiffusionBot = {
+            enable = mkOption {
+              default = false;
+              type = with types; bool;
+              description = ''
+                Start the stable diffusion bot.
+              '';
+            };
+            telegram_api_key = mkOption {
+              type = with types; uniq string;
+              description = ''
+                Telegram Bot API key.
+              '';
+            };
+            settings = lib.mkOption {
+              # Setting this type allows for correct merging behavior
+              type = settingsFormat.type;
+              default = {};
+              description = ''
+                Configuration for stable-diffusion-bot, see
+                <link xlink:href="https://www.github.com/capslock/stable-diffusion-bot"/>
+                for supported settings.
+              '';
+            };
+          };
+        };
+
+        config = mkIf cfg.enable {
+          systemd.services.stableDiffusionBot = {
+            wantedBy = ["multi-user.target"];
+            after = ["network-online.target"];
+            description = "Stable Diffusion Bot";
+            environment = {
+              SD_TELEGRAM_API_KEY = cfg.telegram_api_key;
+            };
+            serviceConfig = let
+              pkg = self.packages.${pkgs.system}.default;
+            in {
+              ExecStart = "${pkg}/bin/stable-diffusion-bot";
+            };
+          };
+          environment.etc."sdbot/config.toml".source = settingsFormat.generate "sdbot-config.toml" cfg.settings;
+        };
+      };
+    nixosModules.default = self.nixosModule;
   };
 }
