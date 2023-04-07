@@ -7,6 +7,7 @@ use serde_with::skip_serializing_none;
 
 use super::ImgResponse;
 
+/// Struct representing a text to image request.
 #[skip_serializing_none]
 #[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct Txt2ImgRequest {
@@ -54,16 +55,53 @@ pub struct Txt2ImgRequest {
 }
 
 impl Txt2ImgRequest {
+    /// Adds a prompt to the request.
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - A String representing the prompt to be used for image generation.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_prompt("A blue sky with green grass".to_string());
+    /// ```
     pub fn with_prompt(&mut self, prompt: String) -> &mut Self {
         self.prompt = Some(prompt);
         self
     }
 
+    /// Adds styles to the request.
+    ///
+    /// # Arguments
+    ///
+    /// * `styles` - A vector of Strings representing the styles to be used for image generation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_styles(vec!["cubism".to_string(), "impressionism".to_string()]);
+    /// ```
     pub fn with_styles(&mut self, styles: Vec<String>) -> &mut Self {
         self.styles = Some(styles);
         self
     }
 
+    /// Adds a style to the request.
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `style` - A String representing the style to be used for image generation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_style("cubism".to_string());
+    /// ```
     pub fn with_style(&mut self, style: String) -> &mut Self {
         if let Some(ref mut styles) = self.styles {
             styles.push(style);
@@ -73,66 +111,224 @@ impl Txt2ImgRequest {
         }
     }
 
+    /// Sets the seed for random number generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - An i64 value representing the seed for random number generation.
+    ///            Set to `-1` to randomize.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_seed(12345);
+    /// ```
     pub fn with_seed(&mut self, seed: i64) -> &mut Self {
         self.seed = Some(seed);
         self
     }
 
+    /// Sets the subseed for random number generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `subseed` - An i64 value representing the subseed for random number generation.
+    ///               Set to `-1` to randomize.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_subseed(12345);
+    /// ```
     pub fn with_subseed(&mut self, subseed: i64) -> &mut Self {
         self.subseed = Some(subseed);
         self
     }
 
+    /// Sets the strength of the subseed parameter for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `subseed_strength` - A u32 value representing the strength of the subseed parameter.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_subseed_strength(5);
+    /// ```
     pub fn with_subseed_strength(&mut self, subseed_strength: u32) -> &mut Self {
         self.subseed_strength = Some(subseed_strength);
         self
     }
 
+    /// Sets the sampler name for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `sampler_name` - A String representing the sampler name to be used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_sampler_name("Euler".to_string());
+    /// ```
     pub fn with_sampler_name(&mut self, sampler_name: String) -> &mut Self {
         self.sampler_name = Some(sampler_name);
         self
     }
 
+    /// Sets the batch size for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `batch_size` - A u32 value representing the batch size to be used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_batch_size(16);
+    /// ```
     pub fn with_batch_size(&mut self, batch_size: u32) -> &mut Self {
         self.batch_size = Some(batch_size);
         self
     }
 
+    /// Sets the number of iterations for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `n_iter` - A u32 value representing the number of iterations to run for image generation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_n_iter(1000);
+    /// ```
     pub fn with_n_iter(&mut self, n_iter: u32) -> &mut Self {
         self.n_iter = Some(n_iter);
         self
     }
 
+    /// Sets the number of steps for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `steps` - A u32 value representing the number of steps for image generation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_steps(50);
+    /// ```
     pub fn with_steps(&mut self, steps: u32) -> &mut Self {
         self.steps = Some(steps);
         self
     }
 
+    /// Sets the cfg scale for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `cfg_scale` - A f64 value representing the cfg scale parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_cfg_scale(0.7);
+    /// ```
     pub fn with_cfg_scale(&mut self, cfg_scale: f64) -> &mut Self {
         self.cfg_scale = Some(cfg_scale);
         self
     }
 
+    /// Sets the width for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `width` - A u32 value representing the image width.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_width(512);
+    /// ```
     pub fn with_width(&mut self, width: u32) -> &mut Self {
         self.width = Some(width);
         self
     }
 
+    /// Sets the height for image generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `height` - A u32 value representing the image height.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_height(512);
+    /// ```
     pub fn with_height(&mut self, height: u32) -> &mut Self {
         self.height = Some(height);
         self
     }
 
+    /// Enable or disable face restoration.
+    ///
+    /// # Arguments
+    ///
+    /// * `restore_faces` - A bool value to enable or disable face restoration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_restore_faces(true);
+    /// ```
     pub fn with_restore_faces(&mut self, restore_faces: bool) -> &mut Self {
         self.restore_faces = Some(restore_faces);
         self
     }
 
+    /// Enable or disable image tiling.
+    ///
+    /// # Arguments
+    ///
+    /// * `tiling` - A bool value to enable or disable tiling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_tiling(true);
+    /// ```
     pub fn with_tiling(&mut self, tiling: bool) -> &mut Self {
         self.tiling = Some(tiling);
         self
     }
 
+    /// Adds a negative prompt to the request.
+    ///
+    /// # Arguments
+    ///
+    /// * `negative_prompt` - A String representing the negative prompt to be used for image generation.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut req = Img2ImgRequest::default();
+    /// req.with_prompt("bad, ugly, worst quality".to_string());
+    /// ```
     pub fn with_negative_prompt(&mut self, negative_prompt: String) -> &mut Self {
         self.negative_prompt = Some(negative_prompt);
         self
