@@ -8,6 +8,7 @@ pub use txt2img::*;
 mod img2img;
 pub use img2img::*;
 
+/// Struct representing a connection to a Stable Diffusion WebUI API.
 #[derive(Clone, Debug)]
 pub struct Api {
     client: reqwest::Client,
@@ -24,10 +25,20 @@ impl Default for Api {
 }
 
 impl Api {
+    /// Returns a new `Api` instance with default settings.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Returns a new `Api` instance with the given URL as a string value.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - A string that specifies the Stable Diffusion WebUI API URL endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
     pub fn new_with_url<S>(url: S) -> anyhow::Result<Self>
     where
         S: AsRef<str>,
@@ -38,6 +49,16 @@ impl Api {
         })
     }
 
+    /// Returns a new `Api` instance with the given `reqwest::Client` and URL as a string value.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - An instance of `reqwest::Client`.
+    /// * `url` - A string that specifies the Stable Diffusion WebUI API URL endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
     pub fn new_with_client_and_url<S>(client: reqwest::Client, url: S) -> anyhow::Result<Self>
     where
         S: AsRef<str>,
@@ -48,6 +69,11 @@ impl Api {
         })
     }
 
+    /// Returns a new instance of `Txt2Img` with the API's cloned `reqwest::Client` and the URL for `txt2img` endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
     pub fn txt2img(&self) -> anyhow::Result<Txt2Img> {
         Ok(Txt2Img::new_with_url(
             self.client.clone(),
@@ -57,6 +83,11 @@ impl Api {
         ))
     }
 
+    /// Returns a new instance of `Img2Img` with the API's cloned `reqwest::Client` and the URL for `img2img` endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
     pub fn img2img(&self) -> anyhow::Result<Img2Img> {
         Ok(Img2Img::new_with_url(
             self.client.clone(),
@@ -67,15 +98,24 @@ impl Api {
     }
 }
 
+/// A struct that represents the response from the Stable Diffusion WebUI API endpoint.
 #[skip_serializing_none]
 #[derive(Default, Serialize, Deserialize, Debug)]
 pub struct ImgResponse<T> {
+    /// A vector of strings containing base64-encoded images.
     pub images: Vec<String>,
+    /// The parameters that were provided for the generation request.
     pub parameters: T,
+    /// A string containing JSON representing information about the request.
     pub info: String,
 }
 
 impl<T> ImgResponse<T> {
+    /// Parses and returns a new `ImgInfo` instance from the `info` field of the `ImgResponse`.
+    ///
+    /// # Errors
+    ///
+    /// If the `info` field fails to parse, an error will be returned.
     pub fn info(&self) -> anyhow::Result<ImgInfo> {
         serde_json::from_str(&self.info).context("failed to parse info")
     }
