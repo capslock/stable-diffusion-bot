@@ -152,7 +152,6 @@ impl StableDiffusionBot {
 #[derive(Clone, Debug)]
 pub(crate) struct ConfigParameters {
     allowed_users: HashSet<UserId>,
-    client: reqwest::Client,
     api: Api,
     txt2img_defaults: Txt2ImgRequest,
     img2img_defaults: Img2ImgRequest,
@@ -260,12 +259,11 @@ impl StableDiffusionBotBuilder {
 
         let client = reqwest::Client::new();
 
-        let api = Api::new_with_client_and_url(client.clone(), self.sd_api_url.clone())
+        let api = Api::new_with_client_and_url(client, self.sd_api_url.clone())
             .context("Failed to initialize sd api")?;
 
         let parameters = ConfigParameters {
             allowed_users,
-            client,
             api,
             txt2img_defaults: self.txt2img_defaults.unwrap_or_else(default_txt2img),
             img2img_defaults: self.img2img_defaults.unwrap_or_else(default_img2img),

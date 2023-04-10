@@ -198,7 +198,7 @@ async fn do_img2img(
     };
     let file = bot.get_file(&photo.file.id).send().await?;
 
-    let photo = helpers::get_file(&cfg.client, bot, &file).await?;
+    let photo = helpers::get_file(bot, &file).await?;
 
     img2img.with_image(photo);
 

@@ -1,21 +1,11 @@
 use anyhow::Context;
-use teloxide::{types::File, Bot};
+use futures::TryStreamExt;
+use teloxide::{net::Download, types::File, Bot};
 
-pub(crate) async fn get_file(
-    client: &reqwest::Client,
-    bot: &Bot,
-    file: &File,
-) -> anyhow::Result<bytes::Bytes> {
-    client
-        .get(format!(
-            "https://api.telegram.org/file/bot{}/{}",
-            bot.token(),
-            file.path
-        ))
-        .send()
+pub(crate) async fn get_file(bot: &Bot, file: &File) -> anyhow::Result<bytes::Bytes> {
+    bot.download_file_stream(&file.path)
+        .try_collect()
         .await
-        .context("Failed to get file")?
-        .bytes()
-        .await
-        .context("Failed to get bytes")
+        .context("Failed to download file")
+        .map(bytes::BytesMut::freeze)
 }
