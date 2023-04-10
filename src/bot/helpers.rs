@@ -7,7 +7,7 @@ use teloxide::{net::Download, types::File, Bot};
 /// # Examples
 ///
 /// ```no_run
-/// use telegram_bot::*;
+/// use teloxide::prelude::*;
 ///
 /// async fn handle_photo(bot: Bot, message: Message) -> Result<(), Box<dyn std::error::Error>> {
 ///     if let Some(photos) = message.photo(){
