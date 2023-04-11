@@ -34,6 +34,16 @@
       "aarch64-darwin" # 64-bit ARM macOS
     ];
 
+    # Mac frameworks needed for build & development
+    macFrameworks = pkgs: let
+      frameworks = pkgs.darwin.apple_sdk.frameworks;
+    in
+      with frameworks; [
+        Security
+        CoreFoundation
+        CoreServices
+      ];
+
     # Helper to provide system-specific attributes
     forAllSystems = f:
       nixpkgs.lib.genAttrs allSystems (system:
@@ -56,15 +66,7 @@
             pkgs.openssl
             pkgs.sqlite
           ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
-            let
-              frameworks = pkgs.darwin.apple_sdk.frameworks;
-            in [
-              frameworks.Security
-              frameworks.CoreFoundation
-              frameworks.CoreServices
-            ]
-          );
+          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin macFrameworks pkgs;
 
         doCheck = false;
       };
@@ -80,7 +82,13 @@
             # rustdoc, rustfmt, and other tools.
             rustToolchain
           ])
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs; [libiconv]);
+          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
+            with pkgs;
+              [
+                libiconv
+              ]
+              ++ macFrameworks pkgs
+          );
       };
     });
     nixosModule = {
