@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context};
 use lazy_static::lazy_static;
 use regex::Regex;
+use stable_diffusion_api::{Img2ImgRequest, ImgResponse, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
@@ -12,10 +13,7 @@ use teloxide::{
     },
 };
 
-use crate::{
-    api::{Img2ImgRequest, ImgResponse, Txt2ImgRequest},
-    bot::{helpers, State},
-};
+use crate::bot::{helpers, State};
 
 use super::{ConfigParameters, DiffusionDialogue};
 

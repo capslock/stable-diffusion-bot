@@ -1638,6 +1638,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "stable-diffusion-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.0",
+ "bytes",
+ "figment",
+ "futures",
+ "lazy_static",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "tokio",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "stable-diffusion-bot"
 version = "0.1.0"
 dependencies = [
@@ -1652,6 +1673,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "stable-diffusion-api",
  "teloxide",
  "tokio",
  "tracing",

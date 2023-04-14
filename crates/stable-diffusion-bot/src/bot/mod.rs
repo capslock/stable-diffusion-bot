@@ -13,7 +13,7 @@ use teloxide::{
 };
 use tracing::warn;
 
-use crate::api::{Api, Img2ImgRequest, Txt2ImgRequest};
+use stable_diffusion_api::{Api, Img2ImgRequest, Txt2ImgRequest};
 
 mod handlers;
 mod helpers;

@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
@@ -8,10 +9,7 @@ use teloxide::{
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
 };
 
-use crate::{
-    api::{Img2ImgRequest, Txt2ImgRequest},
-    bot::ConfigParameters,
-};
+use crate::bot::ConfigParameters;
 
 use super::{DiffusionDialogue, State};
 

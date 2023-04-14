@@ -1,15 +1,14 @@
 use anyhow::Context;
-use api::{Img2ImgRequest, Txt2ImgRequest};
 use bot::StableDiffusionBotBuilder;
 use figment::{
     providers::{Env, Format, Toml},
     Figment,
 };
 use serde::{Deserialize, Serialize};
+use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-pub mod api;
 pub mod bot;
 
 #[derive(Serialize, Deserialize, Default, Debug)]
