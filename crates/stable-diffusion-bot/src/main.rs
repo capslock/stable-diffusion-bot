@@ -1,15 +1,13 @@
 use anyhow::Context;
-use bot::StableDiffusionBotBuilder;
 use figment::{
     providers::{Env, Format, Toml},
     Figment,
 };
 use serde::{Deserialize, Serialize};
 use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
+use stable_diffusion_bot::StableDiffusionBotBuilder;
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
-
-pub mod bot;
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct Config {
