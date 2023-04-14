@@ -66,7 +66,7 @@
             pkgs.openssl
             pkgs.sqlite
           ]
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin macFrameworks pkgs;
+          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (macFrameworks pkgs);
 
         doCheck = false;
       };
