@@ -1662,8 +1662,6 @@ dependencies = [
  "regex",
  "reqwest",
  "serde",
- "serde_json",
- "serde_with",
  "stable-diffusion-api",
  "teloxide",
  "tokio",
