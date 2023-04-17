@@ -45,40 +45,39 @@ impl State {
     }
 }
 
-fn default_txt2img() -> Txt2ImgRequest {
+fn default_txt2img(txt2img: Txt2ImgRequest) -> Txt2ImgRequest {
     Txt2ImgRequest {
-        styles: Some(Vec::new()),
-        seed: Some(-1),
-        sampler_index: Some("Euler".to_owned()),
-        batch_size: Some(1),
-        n_iter: Some(1),
-        steps: Some(50),
-        cfg_scale: Some(7.0),
-        width: Some(512),
-        height: Some(512),
-        restore_faces: Some(false),
-        tiling: Some(false),
-        negative_prompt: Some("".to_owned()),
+        styles: txt2img.styles.or_else(|| Some(Vec::new())),
+        seed: txt2img.seed.or(Some(-1)),
+        sampler_index: txt2img.sampler_index.or_else(|| Some("Euler".to_owned())),
+        batch_size: txt2img.batch_size.or(Some(1)),
+        n_iter: txt2img.n_iter.or(Some(1)),
+        steps: txt2img.steps.or(Some(50)),
+        cfg_scale: txt2img.cfg_scale.or(Some(7.0)),
+        width: txt2img.width.or(Some(512)),
+        height: txt2img.height.or(Some(512)),
+        restore_faces: txt2img.restore_faces.or(Some(false)),
+        tiling: txt2img.tiling.or(Some(false)),
+        negative_prompt: txt2img.negative_prompt.or_else(|| Some("".to_owned())),
         ..Default::default()
     }
 }
 
-fn default_img2img() -> Img2ImgRequest {
+fn default_img2img(img2img: Img2ImgRequest) -> Img2ImgRequest {
     Img2ImgRequest {
-        denoising_strength: Some(0.75),
-        styles: Some(Vec::new()),
-        seed: Some(-1),
-        sampler_index: Some("Euler".to_owned()),
-        batch_size: Some(1),
-        n_iter: Some(1),
-        steps: Some(50),
-        cfg_scale: Some(7.0),
-        width: Some(512),
-        height: Some(512),
-        restore_faces: Some(false),
-        tiling: Some(false),
-        negative_prompt: Some("".to_owned()),
-        resize_mode: Some(1),
+        denoising_strength: img2img.denoising_strength.or(Some(0.75)),
+        styles: img2img.styles.or_else(|| Some(Vec::new())),
+        seed: img2img.seed.or(Some(-1)),
+        sampler_index: img2img.sampler_index.or_else(|| Some("Euler".to_owned())),
+        batch_size: img2img.batch_size.or(Some(1)),
+        n_iter: img2img.n_iter.or(Some(1)),
+        steps: img2img.steps.or(Some(50)),
+        cfg_scale: img2img.cfg_scale.or(Some(7.0)),
+        width: img2img.width.or(Some(512)),
+        height: img2img.height.or(Some(512)),
+        restore_faces: img2img.restore_faces.or(Some(false)),
+        tiling: img2img.tiling.or(Some(false)),
+        negative_prompt: img2img.negative_prompt.or_else(|| Some("".to_owned())),
         ..Default::default()
     }
 }
@@ -265,8 +264,8 @@ impl StableDiffusionBotBuilder {
         let parameters = ConfigParameters {
             allowed_users,
             api,
-            txt2img_defaults: self.txt2img_defaults.unwrap_or_else(default_txt2img),
-            img2img_defaults: self.img2img_defaults.unwrap_or_else(default_img2img),
+            txt2img_defaults: default_txt2img(self.txt2img_defaults.unwrap_or_default()),
+            img2img_defaults: default_img2img(self.img2img_defaults.unwrap_or_default()),
         };
 
         Ok(StableDiffusionBot {
