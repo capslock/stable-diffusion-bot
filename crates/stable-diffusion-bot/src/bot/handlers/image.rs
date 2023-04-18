@@ -207,7 +207,7 @@ async fn do_img2img(
     Ok(resp)
 }
 
-pub(crate) async fn handle_image(
+async fn handle_image(
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
@@ -252,7 +252,7 @@ async fn do_txt2img(
     Ok(resp)
 }
 
-pub(crate) async fn handle_prompt(
+async fn handle_prompt(
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
@@ -285,7 +285,7 @@ pub(crate) async fn handle_prompt(
     Ok(())
 }
 
-pub(crate) fn keyboard(seed: i64) -> InlineKeyboardMarkup {
+fn keyboard(seed: i64) -> InlineKeyboardMarkup {
     let seed_button = if seed == -1 {
         InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")
     } else {
@@ -298,7 +298,7 @@ pub(crate) fn keyboard(seed: i64) -> InlineKeyboardMarkup {
     ]])
 }
 
-pub(crate) async fn handle_rerun(
+async fn handle_rerun(
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
@@ -362,7 +362,7 @@ pub(crate) async fn handle_rerun(
     Ok(())
 }
 
-pub(crate) async fn handle_reuse(
+async fn handle_reuse(
     bot: Bot,
     dialogue: DiffusionDialogue,
     (mut txt2img, mut img2img): (Txt2ImgRequest, Img2ImgRequest),
