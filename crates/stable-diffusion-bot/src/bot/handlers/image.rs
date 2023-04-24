@@ -5,6 +5,7 @@ use stable_diffusion_api::{Img2ImgRequest, ImgResponse, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
+    macros::BotCommands,
     payloads::setters::*,
     prelude::*,
     types::{
@@ -428,7 +429,23 @@ async fn handle_reuse(
     Ok(())
 }
 
+/// BotCommands for settings.
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase", description = "Image generation commands")]
+pub(crate) enum GenCommands {
+    /// Command to generate an image
+    #[command(description = "generate an image")]
+    Gen(String),
+}
+
 pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
+    let gen_command_handler = Update::filter_message()
+        .filter_command::<GenCommands>()
+        .chain(dptree::filter_map(|GenCommands::Gen(s): GenCommands| {
+            Some(s)
+        }))
+        .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt));
+
     let message_handler = Update::filter_message()
         .branch(
             Message::filter_photo()
@@ -455,6 +472,7 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         );
 
     dptree::entry()
+        .branch(gen_command_handler)
         .branch(message_handler)
         .branch(callback_handler)
 }

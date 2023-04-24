@@ -32,9 +32,10 @@ pub(crate) async fn unauthenticated_commands_handler(
         UnauthenticatedCommands::Help => {
             if cfg.allowed_users.contains(&msg.from().unwrap().id) {
                 format!(
-                    "{}\n\n{}",
+                    "{}\n\n{}\n\n{}",
                     UnauthenticatedCommands::descriptions(),
-                    SettingsCommands::descriptions()
+                    SettingsCommands::descriptions(),
+                    GenCommands::descriptions()
                 )
             } else if msg.chat.is_group() || msg.chat.is_supergroup() {
                 UnauthenticatedCommands::descriptions()
