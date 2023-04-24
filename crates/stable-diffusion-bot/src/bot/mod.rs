@@ -123,11 +123,10 @@ impl StableDiffusionBot {
             config,
         } = self;
 
-        bot.set_my_commands(UnauthenticatedCommands::bot_commands())
-            .scope(teloxide::types::BotCommandScope::Default)
-            .await?;
-
-        bot.set_my_commands(SettingsCommands::bot_commands())
+        let mut commands = UnauthenticatedCommands::bot_commands();
+        commands.extend(SettingsCommands::bot_commands());
+        commands.extend(GenCommands::bot_commands());
+        bot.set_my_commands(commands)
             .scope(teloxide::types::BotCommandScope::Default)
             .await?;
 
