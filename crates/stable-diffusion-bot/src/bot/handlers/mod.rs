@@ -30,7 +30,9 @@ pub(crate) async fn unauthenticated_commands_handler(
 ) -> anyhow::Result<()> {
     let text = match cmd {
         UnauthenticatedCommands::Help => {
-            if cfg.allowed_users.contains(&msg.from().unwrap().id) {
+            if cfg.allowed_users.contains(&msg.chat.id)
+                || cfg.allowed_users.contains(&msg.from().unwrap().id.into())
+            {
                 format!(
                     "{}\n\n{}\n\n{}",
                     UnauthenticatedCommands::descriptions(),

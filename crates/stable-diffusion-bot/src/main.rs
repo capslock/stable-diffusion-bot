@@ -12,7 +12,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct Config {
     api_key: String,
-    allowed_users: Vec<u64>,
+    allowed_users: Vec<i64>,
     db_path: Option<String>,
     sd_api_url: String,
     txt2img: Option<Txt2ImgRequest>,

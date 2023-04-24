@@ -8,7 +8,7 @@ use teloxide::{
         UpdateHandler,
     },
     prelude::*,
-    types::{Update, UserId},
+    types::Update,
     utils::command::BotCommands,
 };
 use tracing::warn;
@@ -98,9 +98,13 @@ impl StableDiffusionBot {
     /// Creates an UpdateHandler for the bot
     fn schema() -> UpdateHandler<anyhow::Error> {
         let auth_filter = dptree::filter(|cfg: ConfigParameters, upd: Update| {
-            upd.user()
-                .map(|user| cfg.allowed_users.contains(&user.id))
+            upd.chat()
+                .map(|chat| cfg.allowed_users.contains(&chat.id))
                 .unwrap_or_default()
+                || upd
+                    .user()
+                    .map(|user| cfg.allowed_users.contains(&user.id.into()))
+                    .unwrap_or_default()
         });
 
         let unauth_command_handler = Update::filter_message().chain(
@@ -149,7 +153,7 @@ impl StableDiffusionBot {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ConfigParameters {
-    allowed_users: HashSet<UserId>,
+    allowed_users: HashSet<ChatId>,
     api: Api,
     txt2img_defaults: Txt2ImgRequest,
     img2img_defaults: Img2ImgRequest,
@@ -158,7 +162,7 @@ pub(crate) struct ConfigParameters {
 /// Struct that builds a StableDiffusionBot instance.
 pub struct StableDiffusionBotBuilder {
     api_key: String,
-    allowed_users: Vec<u64>,
+    allowed_users: Vec<i64>,
     db_path: Option<String>,
     sd_api_url: String,
     txt2img_defaults: Option<Txt2ImgRequest>,
@@ -167,7 +171,7 @@ pub struct StableDiffusionBotBuilder {
 
 impl StableDiffusionBotBuilder {
     /// Constructor that returns a new StableDiffusionBotBuilder instance.
-    pub fn new(api_key: String, allowed_users: Vec<u64>, sd_api_url: String) -> Self {
+    pub fn new(api_key: String, allowed_users: Vec<i64>, sd_api_url: String) -> Self {
         StableDiffusionBotBuilder {
             api_key,
             allowed_users,
@@ -253,7 +257,7 @@ impl StableDiffusionBotBuilder {
 
         let bot = Bot::new(self.api_key.clone());
 
-        let allowed_users = self.allowed_users.into_iter().map(UserId).collect();
+        let allowed_users = self.allowed_users.into_iter().map(ChatId).collect();
 
         let client = reqwest::Client::new();
 
