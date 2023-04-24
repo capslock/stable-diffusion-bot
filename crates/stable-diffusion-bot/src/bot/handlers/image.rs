@@ -18,6 +18,15 @@ use crate::bot::{helpers, State};
 
 use super::{ConfigParameters, DiffusionDialogue};
 
+/// BotCommands for generating images.
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase", description = "Image generation commands")]
+pub(crate) enum GenCommands {
+    /// Command to generate an image
+    #[command(description = "generate an image")]
+    Gen(String),
+}
+
 enum Photo {
     Single(Vec<u8>),
     Album(Vec<Vec<u8>>),
@@ -427,15 +436,6 @@ async fn handle_reuse(
     }
 
     Ok(())
-}
-
-/// BotCommands for settings.
-#[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "Image generation commands")]
-pub(crate) enum GenCommands {
-    /// Command to generate an image
-    #[command(description = "generate an image")]
-    Gen(String),
 }
 
 pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
