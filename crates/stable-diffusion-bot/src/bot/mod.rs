@@ -59,7 +59,7 @@ fn default_txt2img(txt2img: Txt2ImgRequest) -> Txt2ImgRequest {
         restore_faces: txt2img.restore_faces.or(Some(false)),
         tiling: txt2img.tiling.or(Some(false)),
         negative_prompt: txt2img.negative_prompt.or_else(|| Some("".to_owned())),
-        ..Default::default()
+        ..txt2img
     }
 }
 
@@ -78,7 +78,7 @@ fn default_img2img(img2img: Img2ImgRequest) -> Img2ImgRequest {
         restore_faces: img2img.restore_faces.or(Some(false)),
         tiling: img2img.tiling.or(Some(false)),
         negative_prompt: img2img.negative_prompt.or_else(|| Some("".to_owned())),
-        ..Default::default()
+        ..img2img
     }
 }
 
