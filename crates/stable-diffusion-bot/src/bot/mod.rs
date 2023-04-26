@@ -1,17 +1,19 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::{
-        dialogue::{self, serializer::Json, ErasedStorage, InMemStorage, SqliteStorage, Storage},
-        UpdateHandler,
+        dialogue::{
+            serializer::Json, ErasedStorage, GetChatId, InMemStorage, SqliteStorage, Storage,
+        },
+        DpHandlerDescription, UpdateHandler,
     },
     prelude::*,
     types::Update,
     utils::command::BotCommands,
 };
-use tracing::warn;
+use tracing::{error, warn};
 
 use stable_diffusion_api::{Api, Img2ImgRequest, Txt2ImgRequest};
 
@@ -114,9 +116,37 @@ impl StableDiffusionBot {
 
         let authenticated = auth_filter.branch(settings_schema()).branch(image_schema());
 
-        dialogue::enter::<Update, ErasedStorage<State>, State, _>()
+        Self::enter::<Update, ErasedStorage<State>, _>()
             .branch(unauth_command_handler)
             .branch(authenticated)
+    }
+
+    // Borrowed/adapted from teloxide's `dialogue::enter()` function.
+    fn enter<Upd, S, Output>() -> Handler<'static, DependencyMap, Output, DpHandlerDescription>
+    where
+        S: Storage<State> + ?Sized + Send + Sync + 'static,
+        <S as Storage<State>>::Error: std::fmt::Debug + Send,
+        Upd: GetChatId + Clone + Send + Sync + 'static,
+        Output: Send + Sync + 'static,
+    {
+        dptree::filter_map(|storage: Arc<S>, upd: Upd| {
+            let chat_id = upd.chat_id()?;
+            Some(Dialogue::new(storage, chat_id))
+        })
+        .filter_map_async(
+            |dialogue: Dialogue<State, S>, cfg: ConfigParameters| async move {
+                match dialogue.get().await {
+                    Ok(dialogue) => Some(dialogue.unwrap_or(State::Ready {
+                        txt2img: cfg.txt2img_defaults,
+                        img2img: cfg.img2img_defaults,
+                    })),
+                    Err(err) => {
+                        error!("dialogue.get() failed: {:?}", err);
+                        None
+                    }
+                }
+            },
+        )
     }
 
     /// Runs the StableDiffusionBot
