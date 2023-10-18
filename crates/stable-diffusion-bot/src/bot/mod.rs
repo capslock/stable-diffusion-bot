@@ -101,11 +101,11 @@ impl StableDiffusionBot {
     fn schema() -> UpdateHandler<anyhow::Error> {
         let auth_filter = dptree::filter(|cfg: ConfigParameters, upd: Update| {
             upd.chat()
-                .map(|chat| cfg.allowed_users.contains(&chat.id))
+                .map(|chat| cfg.chat_is_allowed(&chat.id))
                 .unwrap_or_default()
                 || upd
                     .user()
-                    .map(|user| cfg.allowed_users.contains(&user.id.into()))
+                    .map(|user| cfg.chat_is_allowed(&user.id.into()))
                     .unwrap_or_default()
         });
 
@@ -187,6 +187,14 @@ pub(crate) struct ConfigParameters {
     api: Api,
     txt2img_defaults: Txt2ImgRequest,
     img2img_defaults: Img2ImgRequest,
+    allow_all_users: bool,
+}
+
+impl ConfigParameters {
+    /// Checks whether a chat is allowed by the config.
+    pub fn chat_is_allowed(&self, chat_id: &ChatId) -> bool {
+        self.allow_all_users || self.allowed_users.contains(chat_id)
+    }
 }
 
 /// Struct that builds a StableDiffusionBot instance.
@@ -197,11 +205,17 @@ pub struct StableDiffusionBotBuilder {
     sd_api_url: String,
     txt2img_defaults: Option<Txt2ImgRequest>,
     img2img_defaults: Option<Img2ImgRequest>,
+    allow_all_users: bool,
 }
 
 impl StableDiffusionBotBuilder {
     /// Constructor that returns a new StableDiffusionBotBuilder instance.
-    pub fn new(api_key: String, allowed_users: Vec<i64>, sd_api_url: String) -> Self {
+    pub fn new(
+        api_key: String,
+        allowed_users: Vec<i64>,
+        sd_api_url: String,
+        allow_all_users: bool,
+    ) -> Self {
         StableDiffusionBotBuilder {
             api_key,
             allowed_users,
@@ -209,6 +223,7 @@ impl StableDiffusionBotBuilder {
             sd_api_url,
             txt2img_defaults: None,
             img2img_defaults: None,
+            allow_all_users,
         }
     }
 
@@ -299,6 +314,7 @@ impl StableDiffusionBotBuilder {
             api,
             txt2img_defaults: default_txt2img(self.txt2img_defaults.unwrap_or_default()),
             img2img_defaults: default_img2img(self.img2img_defaults.unwrap_or_default()),
+            allow_all_users: self.allow_all_users,
         };
 
         Ok(StableDiffusionBot {

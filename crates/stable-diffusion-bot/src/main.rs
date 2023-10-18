@@ -17,6 +17,7 @@ struct Config {
     sd_api_url: String,
     txt2img: Option<Txt2ImgRequest>,
     img2img: Option<Img2ImgRequest>,
+    allow_all_users: Option<bool>,
 }
 
 #[tokio::main]
@@ -44,14 +45,19 @@ async fn main() -> anyhow::Result<()> {
         .extract()
         .context("Invalid configuration")?;
 
-    StableDiffusionBotBuilder::new(config.api_key, config.allowed_users, config.sd_api_url)
-        .db_path(config.db_path)
-        .txt2img_defaults(config.txt2img)
-        .img2img_defaults(config.img2img)
-        .build()
-        .await?
-        .run()
-        .await?;
+    StableDiffusionBotBuilder::new(
+        config.api_key,
+        config.allowed_users,
+        config.sd_api_url,
+        config.allow_all_users.unwrap_or_default(),
+    )
+    .db_path(config.db_path)
+    .txt2img_defaults(config.txt2img)
+    .img2img_defaults(config.img2img)
+    .build()
+    .await?
+    .run()
+    .await?;
 
     Ok(())
 }

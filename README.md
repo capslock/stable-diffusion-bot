@@ -78,6 +78,16 @@ that image and the prompt.
 
 ### Configuration
 
+#### Specifying allowed users
+
+* User IDs can be specified individually, or Chat IDs can be specified to permit
+  all users in a group chat from using the bot.
+* The option `allow_all_users = true` can be set to instead allow any user to
+  access the bot. Note that this means if someone finds your bot, there's no way
+  to stop them from using it to generate images.
+
+#### Stable Diffusion Settings
+
 You can set the default `txt2img` and `img2img` parameters via the `config.toml` file.
 
 :construction: **TODO**: Document the available options.
