@@ -12,6 +12,12 @@ backend to generate images.
 cargo install --git https://github.com/capslock/stable-diffusion-bot
 ```
 
+or a specific version:
+
+```shell
+cargo install --git https://github.com/capslock/stable-diffusion-bot --tag v0.1.0
+```
+
 ### Configure
 
 #### Prerequisites
@@ -102,4 +108,33 @@ height = 768
 [img2img]
 width = 768
 height = 768
+```
+
+### Using the sub-crates.
+
+This projects consists of two crates:
+* the `stable-diffusion-bot` crate containing the main program and bot
+  implementation 
+* the `stable-diffusion-api` crate containing a wrapper around the Stable
+  Diffusion web UI API.
+
+Both can be used as a standalone library:
+
+#### stable-diffusion-bot
+
+You can use this to integrate the full bot into another program. This crate does
+not expose much of an API surface for the bot aside from initial configuration
+structs.
+
+```shell
+cargo add --git https://github.com/capslock/stable-diffusion-bot stable-diffusion-bot
+```
+
+#### stable-diffusion-api
+
+You can use these simple API bindings to build another application that utilizes
+the Stable Diffusion web UI API.
+
+```shell
+cargo add --git https://github.com/capslock/stable-diffusion-bot stable-diffusion-api
 ```
