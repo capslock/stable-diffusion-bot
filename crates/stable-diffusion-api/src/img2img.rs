@@ -11,49 +11,93 @@ use super::ImgResponse;
 #[skip_serializing_none]
 #[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct Img2ImgRequest {
+    /// Initial images.
     pub init_images: Option<Vec<String>>,
+    /// Resize mode.
     pub resize_mode: Option<u32>,
+    /// Strength of denoising applied to the image.
     pub denoising_strength: Option<f64>,
+    /// CFG scale.
     pub image_cfg_scale: Option<u32>,
+    /// Mask.
     pub mask: Option<String>,
+    /// Blur to apply to the mask.
     pub mask_blur: Option<u32>,
+    /// Amount of inpainting to apply.
     pub inpainting_fill: Option<u32>,
+    /// Whether to perform inpainting at full resolution.
     pub inpaint_full_res: Option<bool>,
+    /// Padding to apply when performing inpainting at full resolution.
     pub inpaint_full_res_padding: Option<u32>,
+    /// Whether to invert the inpainting mask.
     pub inpainting_mask_invert: Option<u32>,
+    /// Initial noise multiplier.
     pub initial_noise_multiplier: Option<u32>,
+    /// Text prompt for generating the image.
     pub prompt: Option<String>,
+    /// List of style prompts for generating the image.
     pub styles: Option<Vec<String>>,
+    /// Seed.
     pub seed: Option<i64>,
+    /// Subseed.
     pub subseed: Option<i64>,
+    /// Strength of the subseed.
     pub subseed_strength: Option<u32>,
+    /// Height to resize the seed image from.
     pub seed_resize_from_h: Option<i32>,
+    /// Width to resize the seed image from.
     pub seed_resize_from_w: Option<i32>,
+    /// Name of the sampler.
     pub sampler_name: Option<String>,
+    /// Batch size.
     pub batch_size: Option<u32>,
+    /// Number of iterations.
     pub n_iter: Option<u32>,
+    /// Number of steps.
     pub steps: Option<u32>,
+    /// CFG scale.
     pub cfg_scale: Option<f64>,
+    /// Width of the generated image.
     pub width: Option<u32>,
+    /// Height of the generated image.
     pub height: Option<u32>,
+    /// Whether to restore faces in the generated image.
     pub restore_faces: Option<bool>,
+    /// Whether tiling for the generated image.
     pub tiling: Option<bool>,
+    /// Whether to save samples when generating multiple images.
     pub do_not_save_samples: Option<bool>,
+    /// Whether to save the grid when generating multiple images.
     pub do_not_save_grid: Option<bool>,
+    /// Negative prompt.
     pub negative_prompt: Option<String>,
+    /// Eta value.
     pub eta: Option<u32>,
+    /// Churn value.
     pub s_churn: Option<f64>,
+    /// Maximum temperature value.
     pub s_tmax: Option<f64>,
+    /// Minimum temperature value.
     pub s_tmin: Option<f64>,
+    /// Amount of noise.
     pub s_noise: Option<f64>,
+    /// Settings to override when generating the image.
     pub override_settings: Option<HashMap<String, serde_json::Value>>,
+    /// Whether to restore the settings after generating the image.
     pub override_settings_restore_afterwards: Option<bool>,
+    /// Arguments to pass to the script.
     pub script_args: Option<Vec<serde_json::Value>>,
+    /// Index of the sampler.
     pub sampler_index: Option<String>,
+    /// Whether to include initial images in the output.
     pub include_init_images: Option<bool>,
+    /// Name of the script.
     pub script_name: Option<String>,
+    /// Whether to send the generated images.
     pub send_images: Option<bool>,
+    /// Whether to save the generated images.
     pub save_images: Option<bool>,
+    /// Scripts to always run.
     pub alwayson_scripts: Option<HashMap<String, serde_json::Value>>,
 }
 
