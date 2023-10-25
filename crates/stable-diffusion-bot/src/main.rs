@@ -22,8 +22,6 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_log::env_logger::init();
-
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into())
         .from_env()
