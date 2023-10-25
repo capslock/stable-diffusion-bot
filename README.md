@@ -91,7 +91,7 @@ services.stableDiffusionBot = {
 
 Create a `config.toml` file:
 
-```
+```toml
 api_key = "your_telegram_bot_api_key"
 allowed_users = [ list, of, telegram, ids ]
 db_path = "./db.sqlite"
@@ -153,9 +153,7 @@ that image and the prompt.
 
 You can set the default `txt2img` and `img2img` parameters via the `config.toml` file.
 
-:construction: **TODO**: Document the available options.
-
-```
+```toml
 [txt2img]
 steps = 50
 cfg_scale = 10
@@ -167,17 +165,25 @@ width = 768
 height = 768
 ```
 
+See the documentation for
+[`Txt2ImgRequest`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Tmg2ImgRequest.html)
+and
+[`Img2ImgRequest `](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Img2ImgRequest.html)
+for all of the available options.
+
 ### Using the sub-crates.
 
 This projects consists of two crates:
 * the `stable-diffusion-bot` crate containing the main program and bot
-  implementation 
+  implementation.
 * the `stable-diffusion-api` crate containing a wrapper around the Stable
   Diffusion web UI API.
 
 Both can be used as a standalone library:
 
 #### stable-diffusion-bot
+
+[Crate Documentation](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_bot/index.html)
 
 You can use this to integrate the full bot into another program. This crate does
 not expose much of an API surface for the bot aside from initial configuration
@@ -188,6 +194,8 @@ cargo add --git https://github.com/capslock/stable-diffusion-bot stable-diffusio
 ```
 
 #### stable-diffusion-api
+
+[Crate Documentation](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/index.html)
 
 You can use these simple API bindings to build another application that utilizes
 the Stable Diffusion web UI API.
