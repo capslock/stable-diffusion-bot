@@ -166,7 +166,7 @@ height = 768
 ```
 
 See the documentation for
-[`Txt2ImgRequest`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Tmg2ImgRequest.html)
+[`Txt2ImgRequest`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Txt2ImgRequest.html)
 and
 [`Img2ImgRequest `](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Img2ImgRequest.html)
 for all of the available options.
