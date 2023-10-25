@@ -38,6 +38,10 @@ jobs:
         uses: actions/configure-pages@v3
       - name: Build Documentation
         run: cargo doc --all --no-deps
+      - name: Add Redirect
+        # From https://dev.to/deciduously/prepare-your-rust-api-docs-for-github-pages-2n5i
+        run: |
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=stable_diffusion_bot\">" > target/doc/index.html
       - name: Fix permissions
         run: |
           chmod -c -R +rX "./target/doc/" | while read line; do
