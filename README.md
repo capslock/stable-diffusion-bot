@@ -8,6 +8,14 @@ backend to generate images.
 
 ### Install
 
+#### Using Cargo
+
+The simplest way to install the bot is to use Cargo, the Rust package manager.
+If you don't already have it installed, follow
+[the official instructions to install Rust](https://www.rust-lang.org/tools/install).
+
+Then you can simply install the bot:
+
 ```shell
 cargo install --git https://github.com/capslock/stable-diffusion-bot
 ```
@@ -16,6 +24,55 @@ or a specific version:
 
 ```shell
 cargo install --git https://github.com/capslock/stable-diffusion-bot --tag v0.1.0
+```
+
+#### Using Nix Flakes
+
+If you are using the Nix package manager with flakes enabled, you can invoke the
+bot directly from the provided flake:
+
+```shell
+nix run github:capslock/stable-diffusion-bot#stable-diffusion-bot
+```
+
+#### Using NixOS with Flakes
+
+If you are running NixOS, you can add the flake to your system `flake.nix` to
+use the provided module:
+
+```nix
+{
+  inputs.stable-diffusion-bot.url = "github:capslock/stable-diffusion-bot";
+
+  outputs = {
+    self,
+    nixpkgs,
+    stable-diffusion-bot
+  }: {
+    nixosConfigurations.<yourhostnamehere> = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./configuration.nix
+        sops-nix.nixosModule
+      ];
+    };
+  };
+}
+```
+
+Then simply configure and enable the service in your `configuration.nix`:
+
+```nix
+services.stableDiffusionBot = {
+  enable = true;
+  telegram_api_key = "your telegram api key here";
+  settings = {
+    # All other settings, as described below
+    allowed_users = [ list of telegram ids ];
+    db_path = "/somedirectory/db.sqlite";
+    sd_api_url = "http://localhost:7860";
+  };
+};
 ```
 
 ### Configure
