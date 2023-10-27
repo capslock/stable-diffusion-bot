@@ -169,7 +169,7 @@ impl<T> TryFrom<&ImgResponse<T>> for MessageText {
             return Err(anyhow!("No prompt in image info response"));
         };
         if let Some(infos) = info.infotexts {
-            if let Some(info) = infos.get(0) {
+            if let Some(info) = infos.first() {
                 return Ok(Self::new_with_infotxt(prompt.as_str(), info.as_str()));
             }
         }
