@@ -28,3 +28,15 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
+  verify-nix:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Nix
+      uses: cachix/install-nix-action@v22
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Check flake formatting
+      run: nix run nixpkgs#alejandra -- -c flake.nix
+    - name: Check flake.nix
+      run: nix flake check
