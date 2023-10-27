@@ -1,5 +1,7 @@
 # stable-diffusion-bot
 
+[![CI](https://github.com/capslock/stable-diffusion-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/capslock/stable-diffusion-bot/actions?query=workflow%3ACI+event%3Apush)
+
 A Telegram bot written in Rust that can be connected to a
 [Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
 backend to generate images.
