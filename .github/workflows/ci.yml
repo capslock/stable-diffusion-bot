@@ -10,10 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  check-rust:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
     - name: Install Rust
@@ -37,6 +35,6 @@ jobs:
       with:
         github_access_token: ${{ secrets.GITHUB_TOKEN }}
     - name: Check flake formatting
-      run: nix run nixpkgs#alejandra -- -c flake.nix
+      run: nix run nixpkgs#alejandra -- -c .
     - name: Check flake.nix
-      run: nix flake check
+      run: nix flake check --all-systems
