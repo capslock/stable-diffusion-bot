@@ -55,7 +55,7 @@ use the provided module:
       system = "x86_64-linux";
       modules = [
         ./configuration.nix
-        sops-nix.nixosModule
+        stable-diffusion-bot.nixosModules.default
       ];
     };
   };

@@ -91,7 +91,7 @@
           );
       };
     });
-    nixosModule = {
+    nixosModules.default = {
       config,
       lib,
       pkgs,
@@ -146,6 +146,5 @@
           environment.etc."sdbot/config.toml".source = settingsFormat.generate "sdbot-config.toml" cfg.settings;
         };
       };
-    nixosModules.default = self.nixosModule;
   };
 }
