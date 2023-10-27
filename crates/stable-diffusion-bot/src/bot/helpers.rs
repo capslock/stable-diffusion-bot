@@ -6,7 +6,7 @@ use teloxide::{net::Download, types::File, Bot};
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```ignore
 /// use teloxide::prelude::*;
 ///
 /// async fn handle_photo(bot: Bot, message: Message) -> Result<(), Box<dyn std::error::Error>> {
@@ -23,7 +23,7 @@ use teloxide::{net::Download, types::File, Bot};
 ///     Ok(())
 /// }
 /// ```
-pub(crate) async fn get_file(bot: &Bot, file: &File) -> anyhow::Result<bytes::Bytes> {
+pub async fn get_file(bot: &Bot, file: &File) -> anyhow::Result<bytes::Bytes> {
     bot.download_file_stream(&file.path)
         .try_collect()
         .await

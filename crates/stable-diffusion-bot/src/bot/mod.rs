@@ -236,9 +236,16 @@ impl StableDiffusionBotBuilder {
     /// # Examples
     ///
     /// ```
-    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
     ///
     /// let bot = builder.db_path(Some("database.sqlite".to_string())).build().await.unwrap();
+    /// # });
     /// ```
     pub fn db_path(mut self, path: Option<String>) -> Self {
         self.db_path = path;
@@ -254,9 +261,17 @@ impl StableDiffusionBotBuilder {
     /// # Examples
     ///
     /// ```
-    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// # use stable_diffusion_api::Txt2ImgRequest;
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
     ///
-    /// let bot = builder.txt2img_defaults(Some(txt2img_request)).build().await.unwrap();
+    /// let bot = builder.txt2img_defaults(Some(Txt2ImgRequest::default())).build().await.unwrap();
+    /// # });
     /// ```
     pub fn txt2img_defaults(mut self, request: Option<Txt2ImgRequest>) -> Self {
         self.txt2img_defaults = request;
@@ -272,9 +287,17 @@ impl StableDiffusionBotBuilder {
     /// # Examples
     ///
     /// ```
-    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// # use stable_diffusion_api::Img2ImgRequest;
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
     ///
-    /// let bot = builder.img2img_defaults(Some(img2img_request)).build().await.unwrap();
+    /// let bot = builder.img2img_defaults(Some(Img2ImgRequest::default())).build().await.unwrap();
+    /// # });
     /// ```
     pub fn img2img_defaults(mut self, request: Option<Img2ImgRequest>) -> Self {
         self.img2img_defaults = request;
@@ -286,9 +309,16 @@ impl StableDiffusionBotBuilder {
     /// # Examples
     ///
     /// ```
-    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
     ///
     /// let bot = builder.build().await.unwrap();
+    /// # });
     /// ```
     pub async fn build(self) -> anyhow::Result<StableDiffusionBot> {
         let storage: DialogueStorage = if let Some(path) = self.db_path {
