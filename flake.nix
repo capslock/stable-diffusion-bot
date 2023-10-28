@@ -68,8 +68,6 @@
             pkgs.sqlite
           ]
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (macFrameworks pkgs);
-
-        doCheck = false;
       };
     });
     # Development environment output
