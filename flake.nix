@@ -39,9 +39,10 @@
       frameworks = pkgs.darwin.apple_sdk.frameworks;
     in
       with frameworks; [
-        Security
         CoreFoundation
         CoreServices
+        Security
+        SystemConfiguration
       ];
 
     # Helper to provide system-specific attributes
