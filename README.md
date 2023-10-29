@@ -94,9 +94,13 @@ services.stableDiffusionBot = {
 Create a `config.toml` file:
 
 ```toml
+# Replace this with your telegram bot API key
 api_key = "your_telegram_bot_api_key"
-allowed_users = [ list, of, telegram, ids ]
+# Replace this with the telegram IDs of users or chats that you want to allow
+allowed_users = [ 123, 456, 789 ]
+# Path to where the DB should be stored. If not provided, user settings are not persisted.
 db_path = "./db.sqlite"
+# URL of the Stable Diffusion to use to generate images.
 sd_api_url = "http://localhost:7860"
 ```
 
