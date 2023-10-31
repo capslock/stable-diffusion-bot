@@ -109,14 +109,14 @@
                 Start the stable diffusion bot.
               '';
             };
-            telegram_api_key = mkOption {
-              type = with types; uniq string;
-              description = ''
-                Telegram Bot API key.
+            environmentFile = mkOption {
+              example = "./sdbot.env";
+              type = types.str;
+              description = lib.mdDoc ''
+                File which contains environment settings for the stable-diffusion-bot service.
               '';
             };
             settings = lib.mkOption {
-              # Setting this type allows for correct merging behavior
               type = settingsFormat.type;
               default = {};
               description = ''
@@ -133,9 +133,6 @@
             wantedBy = ["multi-user.target"];
             after = ["network-online.target"];
             description = "Stable Diffusion Bot";
-            environment = {
-              SD_TELEGRAM_API_KEY = cfg.telegram_api_key;
-            };
             serviceConfig = let
               pkg = self.packages.${pkgs.system}.default;
             in {
