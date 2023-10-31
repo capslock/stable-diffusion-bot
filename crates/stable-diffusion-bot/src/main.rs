@@ -1,4 +1,5 @@
 use anyhow::Context;
+use clap::Parser;
 use figment::{
     providers::{Env, Format, Toml},
     Figment,
@@ -8,6 +9,20 @@ use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 use stable_diffusion_bot::StableDiffusionBotBuilder;
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
+
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+struct Args {
+    /// Path to the configuration file
+    #[arg(
+        short,
+        long,
+        value_parser = clap::value_parser!(PathBuf),
+        default_value = "config.toml"
+    )]
+    config: PathBuf,
+}
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct Config {
@@ -22,6 +37,7 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into())
         .from_env()
@@ -38,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
 
     let config: Config = Figment::new()
         .merge(Toml::file("/etc/sdbot/config.toml"))
-        .merge(Toml::file("config.toml"))
+        .merge(Toml::file(args.config))
         .merge(Env::prefixed("SD_TELEGRAM_"))
         .extract()
         .context("Invalid configuration")?;
