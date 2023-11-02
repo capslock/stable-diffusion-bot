@@ -111,7 +111,7 @@
             };
             environmentFile = mkOption {
               example = "./sdbot.env";
-              type = types.str;
+              type = nullOr types.str;
               description = lib.mdDoc ''
                 File which contains environment settings for the stable-diffusion-bot service.
               '';
@@ -135,11 +135,12 @@
             description = "Stable Diffusion Bot";
             serviceConfig = let
               pkg = self.packages.${pkgs.system}.default;
+              configFile = settingsFormat.generate "sdbot-config.toml" cfg.settings;
             in {
-              ExecStart = "${pkg}/bin/stable-diffusion-bot";
+              ExecStart = "${pkg}/bin/stable-diffusion-bot -c ${configFile}";
+              EnvironmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
             };
           };
-          environment.etc."sdbot/config.toml".source = settingsFormat.generate "sdbot-config.toml" cfg.settings;
         };
       };
   };
