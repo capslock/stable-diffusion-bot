@@ -60,3 +60,5 @@ jobs:
       run: nix flake check --all-systems
     - name: Check Nix flake Nixpkgs inputs
       uses: DeterminateSystems/flake-checker-action@main
+    - name: Build flake
+      run: nix build
