@@ -66,8 +66,8 @@ async fn main() -> anyhow::Result<()> {
         config.allow_all_users.unwrap_or_default(),
     )
     .db_path(config.db_path)
-    .txt2img_defaults(config.txt2img)
-    .img2img_defaults(config.img2img)
+    .txt2img_defaults(config.txt2img.unwrap_or_default())
+    .img2img_defaults(config.img2img.unwrap_or_default())
     .build()
     .await?
     .run()

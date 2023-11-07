@@ -260,7 +260,7 @@ impl StableDiffusionBotBuilder {
     ///
     /// # Arguments
     ///
-    /// * `request` - An optional `Txt2ImgRequest` representing the default settings for text to image conversion.
+    /// * `request` - A `Txt2ImgRequest` representing the default settings for text to image conversion.
     ///
     /// # Examples
     ///
@@ -274,11 +274,17 @@ impl StableDiffusionBotBuilder {
     /// # tokio_test::block_on(async {
     /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
     ///
-    /// let bot = builder.txt2img_defaults(Some(Txt2ImgRequest::default())).build().await.unwrap();
+    /// let bot = builder.txt2img_defaults(Txt2ImgRequest::default()).build().await.unwrap();
     /// # });
     /// ```
-    pub fn txt2img_defaults(mut self, request: Option<Txt2ImgRequest>) -> Self {
-        self.txt2img_defaults = request;
+    pub fn txt2img_defaults(mut self, request: Txt2ImgRequest) -> Self {
+        self.txt2img_defaults = Some(self.txt2img_defaults.unwrap_or_default().merge(request));
+        self
+    }
+
+    /// Builder function that clears the defaults for text to image requests.
+    pub fn clear_txt2img_defaults(mut self) -> Self {
+        self.txt2img_defaults = None;
         self
     }
 
@@ -286,7 +292,7 @@ impl StableDiffusionBotBuilder {
     ///
     /// # Arguments
     ///
-    /// * `request` - An optional `Img2ImgRequest` representing the default settings for image to image conversion.
+    /// * `request` - An `Img2ImgRequest` representing the default settings for image to image conversion.
     ///
     /// # Examples
     ///
@@ -300,11 +306,17 @@ impl StableDiffusionBotBuilder {
     /// # tokio_test::block_on(async {
     /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
     ///
-    /// let bot = builder.img2img_defaults(Some(Img2ImgRequest::default())).build().await.unwrap();
+    /// let bot = builder.img2img_defaults(Img2ImgRequest::default()).build().await.unwrap();
     /// # });
     /// ```
-    pub fn img2img_defaults(mut self, request: Option<Img2ImgRequest>) -> Self {
-        self.img2img_defaults = request;
+    pub fn img2img_defaults(mut self, request: Img2ImgRequest) -> Self {
+        self.img2img_defaults = Some(self.img2img_defaults.unwrap_or_default().merge(request));
+        self
+    }
+
+    /// Builder function that clears the defaults for image to image requests.
+    pub fn clear_img2img_defaults(mut self) -> Self {
+        self.img2img_defaults = None;
         self
     }
 
