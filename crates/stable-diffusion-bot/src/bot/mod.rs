@@ -370,3 +370,312 @@ impl StableDiffusionBotBuilder {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_builder() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder =
+            StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
+
+        let bot = builder
+            .db_path(Some("database.sqlite".to_string()))
+            .build()
+            .await
+            .unwrap();
+
+        assert_eq!(bot.config.allowed_users.len(), 3);
+        assert!(!bot.config.allow_all_users);
+        assert_eq!(bot.config.txt2img_defaults.width, Some(512));
+        assert_eq!(bot.config.img2img_defaults.width, Some(512));
+    }
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_defaults() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            allow_all_users,
+        );
+
+        let bot = builder.build().await.unwrap();
+
+        assert_eq!(
+            bot.config.allowed_users,
+            allowed_users.into_iter().map(ChatId).collect()
+        );
+        assert_eq!(bot.config.allow_all_users, allow_all_users);
+        assert_eq!(
+            bot.config.txt2img_defaults,
+            default_txt2img(Txt2ImgRequest::default())
+        );
+        assert_eq!(
+            bot.config.img2img_defaults,
+            default_img2img(Img2ImgRequest::default())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_user_defaults() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            allow_all_users,
+        );
+
+        let bot = builder
+            .txt2img_defaults(Txt2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .img2img_defaults(Img2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .build()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            bot.config.allowed_users,
+            allowed_users.into_iter().map(ChatId).collect()
+        );
+        assert_eq!(bot.config.allow_all_users, allow_all_users);
+        assert_eq!(
+            bot.config.txt2img_defaults,
+            default_txt2img(Txt2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+        );
+        assert_eq!(
+            bot.config.img2img_defaults,
+            default_img2img(Img2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_user_and_default() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            allow_all_users,
+        );
+
+        let bot = builder
+            .txt2img_defaults(Txt2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .img2img_defaults(Img2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .txt2img_defaults(Txt2ImgRequest {
+                width: Some(512),
+                ..Default::default()
+            })
+            .img2img_defaults(Img2ImgRequest {
+                width: Some(512),
+                ..Default::default()
+            })
+            .build()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            bot.config.allowed_users,
+            allowed_users.into_iter().map(ChatId).collect()
+        );
+        assert_eq!(bot.config.allow_all_users, allow_all_users);
+        assert_eq!(
+            bot.config.txt2img_defaults,
+            default_txt2img(Txt2ImgRequest {
+                width: Some(512),
+                height: Some(768),
+                ..Default::default()
+            })
+        );
+        assert_eq!(
+            bot.config.img2img_defaults,
+            default_img2img(Img2ImgRequest {
+                width: Some(512),
+                height: Some(768),
+                ..Default::default()
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_no_user_defaults() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            allow_all_users,
+        );
+
+        let bot = builder
+            .txt2img_defaults(Txt2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .img2img_defaults(Img2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .clear_txt2img_defaults()
+            .clear_img2img_defaults()
+            .build()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            bot.config.allowed_users,
+            allowed_users.into_iter().map(ChatId).collect()
+        );
+        assert_eq!(bot.config.allow_all_users, allow_all_users);
+        assert_eq!(
+            bot.config.txt2img_defaults,
+            default_txt2img(Txt2ImgRequest::default())
+        );
+        assert_eq!(
+            bot.config.img2img_defaults,
+            default_img2img(Img2ImgRequest::default())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_allowed_users() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            allow_all_users,
+        );
+
+        let bot = builder.build().await.unwrap();
+
+        assert_eq!(
+            bot.config.allowed_users,
+            allowed_users.into_iter().map(ChatId).collect()
+        );
+        assert_eq!(bot.config.allow_all_users, allow_all_users);
+    }
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_txt2img_defaults() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            allow_all_users,
+        );
+
+        let bot = builder
+            .txt2img_defaults(Txt2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .build()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            bot.config.txt2img_defaults,
+            default_txt2img(Txt2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stable_diffusion_bot_img2img_defaults() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            allow_all_users,
+        );
+
+        let bot = builder
+            .img2img_defaults(Img2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+            .build()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            bot.config.img2img_defaults,
+            default_img2img(Img2ImgRequest {
+                width: Some(1024),
+                height: Some(768),
+                ..Default::default()
+            })
+        );
+    }
+}
