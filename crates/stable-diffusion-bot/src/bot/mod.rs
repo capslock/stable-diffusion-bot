@@ -49,39 +49,41 @@ impl State {
 
 fn default_txt2img(txt2img: Txt2ImgRequest) -> Txt2ImgRequest {
     Txt2ImgRequest {
-        styles: txt2img.styles.or_else(|| Some(Vec::new())),
-        seed: txt2img.seed.or(Some(-1)),
-        sampler_index: txt2img.sampler_index.or_else(|| Some("Euler".to_owned())),
-        batch_size: txt2img.batch_size.or(Some(1)),
-        n_iter: txt2img.n_iter.or(Some(1)),
-        steps: txt2img.steps.or(Some(50)),
-        cfg_scale: txt2img.cfg_scale.or(Some(7.0)),
-        width: txt2img.width.or(Some(512)),
-        height: txt2img.height.or(Some(512)),
-        restore_faces: txt2img.restore_faces.or(Some(false)),
-        tiling: txt2img.tiling.or(Some(false)),
-        negative_prompt: txt2img.negative_prompt.or_else(|| Some("".to_owned())),
-        ..txt2img
+        styles: Some(Vec::new()),
+        seed: Some(-1),
+        sampler_index: Some("Euler".to_owned()),
+        batch_size: Some(1),
+        n_iter: Some(1),
+        steps: Some(50),
+        cfg_scale: Some(7.0),
+        width: Some(512),
+        height: Some(512),
+        restore_faces: Some(false),
+        tiling: Some(false),
+        negative_prompt: Some("".to_owned()),
+        ..Default::default()
     }
+    .merge(txt2img)
 }
 
 fn default_img2img(img2img: Img2ImgRequest) -> Img2ImgRequest {
     Img2ImgRequest {
-        denoising_strength: img2img.denoising_strength.or(Some(0.75)),
-        styles: img2img.styles.or_else(|| Some(Vec::new())),
-        seed: img2img.seed.or(Some(-1)),
-        sampler_index: img2img.sampler_index.or_else(|| Some("Euler".to_owned())),
-        batch_size: img2img.batch_size.or(Some(1)),
-        n_iter: img2img.n_iter.or(Some(1)),
-        steps: img2img.steps.or(Some(50)),
-        cfg_scale: img2img.cfg_scale.or(Some(7.0)),
-        width: img2img.width.or(Some(512)),
-        height: img2img.height.or(Some(512)),
-        restore_faces: img2img.restore_faces.or(Some(false)),
-        tiling: img2img.tiling.or(Some(false)),
-        negative_prompt: img2img.negative_prompt.or_else(|| Some("".to_owned())),
-        ..img2img
+        denoising_strength: Some(0.75),
+        styles: Some(Vec::new()),
+        seed: Some(-1),
+        sampler_index: Some("Euler".to_owned()),
+        batch_size: Some(1),
+        n_iter: Some(1),
+        steps: Some(50),
+        cfg_scale: Some(7.0),
+        width: Some(512),
+        height: Some(512),
+        restore_faces: Some(false),
+        tiling: Some(false),
+        negative_prompt: Some("".to_owned()),
+        ..Default::default()
     }
+    .merge(img2img)
 }
 
 type DialogueStorage = std::sync::Arc<ErasedStorage<State>>;
@@ -121,7 +123,9 @@ impl StableDiffusionBot {
             .branch(authenticated)
     }
 
-    // Borrowed/adapted from teloxide's `dialogue::enter()` function.
+    // Borrowed and adapted from Teloxide's `dialogue::enter()` function.
+    // Instead of building a default dialogue if one doesn't exist via `get_or_default()`,
+    // we build a dialogue with the defaults that are defined in the `ConfigParameters`.
     fn enter<Upd, S, Output>() -> Handler<'static, DependencyMap, Output, DpHandlerDescription>
     where
         S: Storage<State> + ?Sized + Send + Sync + 'static,

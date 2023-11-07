@@ -9,7 +9,7 @@ use super::ImgResponse;
 
 /// Struct representing an image to image request.
 #[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct Img2ImgRequest {
     /// Initial images.
     pub init_images: Option<Vec<String>>,
@@ -457,6 +457,68 @@ impl Img2ImgRequest {
     pub fn with_negative_prompt(&mut self, negative_prompt: String) -> &mut Self {
         self.negative_prompt = Some(negative_prompt);
         self
+    }
+
+    /// Merges the given settings with the request's settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - A Img2ImgRequest containing the settings to merge.
+    pub fn merge(&self, request: Self) -> Self {
+        Self {
+            init_images: request.init_images.or(self.init_images.clone()),
+            resize_mode: request.resize_mode.or(self.resize_mode),
+            denoising_strength: request.denoising_strength.or(self.denoising_strength),
+            image_cfg_scale: request.image_cfg_scale.or(self.image_cfg_scale),
+            mask: request.mask.or(self.mask.clone()),
+            mask_blur: request.mask_blur.or(self.mask_blur),
+            inpainting_fill: request.inpainting_fill.or(self.inpainting_fill),
+            inpaint_full_res: request.inpaint_full_res.or(self.inpaint_full_res),
+            inpaint_full_res_padding: request
+                .inpaint_full_res_padding
+                .or(self.inpaint_full_res_padding),
+            inpainting_mask_invert: request
+                .inpainting_mask_invert
+                .or(self.inpainting_mask_invert),
+            initial_noise_multiplier: request
+                .initial_noise_multiplier
+                .or(self.initial_noise_multiplier),
+            prompt: request.prompt.or(self.prompt.clone()),
+            styles: request.styles.or(self.styles.clone()),
+            seed: request.seed.or(self.seed),
+            subseed: request.subseed.or(self.subseed),
+            subseed_strength: request.subseed_strength.or(self.subseed_strength),
+            seed_resize_from_h: request.seed_resize_from_h.or(self.seed_resize_from_h),
+            seed_resize_from_w: request.seed_resize_from_w.or(self.seed_resize_from_w),
+            sampler_name: request.sampler_name.or(self.sampler_name.clone()),
+            batch_size: request.batch_size.or(self.batch_size),
+            n_iter: request.n_iter.or(self.n_iter),
+            steps: request.steps.or(self.steps),
+            cfg_scale: request.cfg_scale.or(self.cfg_scale),
+            width: request.width.or(self.width),
+            height: request.height.or(self.height),
+            restore_faces: request.restore_faces.or(self.restore_faces),
+            tiling: request.tiling.or(self.tiling),
+            do_not_save_samples: request.do_not_save_samples.or(self.do_not_save_samples),
+            do_not_save_grid: request.do_not_save_grid.or(self.do_not_save_grid),
+            negative_prompt: request.negative_prompt.or(self.negative_prompt.clone()),
+            eta: request.eta.or(self.eta),
+            s_churn: request.s_churn.or(self.s_churn),
+            s_tmax: request.s_tmax.or(self.s_tmax),
+            s_tmin: request.s_tmin.or(self.s_tmin),
+            s_noise: request.s_noise.or(self.s_noise),
+            override_settings: request.override_settings.or(self.override_settings.clone()),
+            override_settings_restore_afterwards: request
+                .override_settings_restore_afterwards
+                .or(self.override_settings_restore_afterwards),
+            script_args: request.script_args.or(self.script_args.clone()),
+            sampler_index: request.sampler_index.or(self.sampler_index.clone()),
+            include_init_images: request.include_init_images.or(self.include_init_images),
+            script_name: request.script_name.or(self.script_name.clone()),
+            send_images: request.send_images.or(self.send_images),
+            save_images: request.save_images.or(self.save_images),
+            alwayson_scripts: request.alwayson_scripts.or(self.alwayson_scripts.clone()),
+        }
     }
 }
 

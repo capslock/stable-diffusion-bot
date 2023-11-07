@@ -9,7 +9,7 @@ use super::ImgResponse;
 
 /// Struct representing a text to image request.
 #[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct Txt2ImgRequest {
     /// Whether to enable high resolution mode.
     pub enable_hr: Option<bool>,
@@ -373,6 +373,59 @@ impl Txt2ImgRequest {
     pub fn with_negative_prompt(&mut self, negative_prompt: String) -> &mut Self {
         self.negative_prompt = Some(negative_prompt);
         self
+    }
+
+    /// Merges the given settings with the request's settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - A Txt2ImgRequest containing the settings to merge.
+    pub fn merge(&self, request: Self) -> Self {
+        Self {
+            enable_hr: request.enable_hr.or(self.enable_hr),
+            denoising_strength: request.denoising_strength.or(self.denoising_strength),
+            firstphase_width: request.firstphase_width.or(self.firstphase_width),
+            firstphase_height: request.firstphase_height.or(self.firstphase_height),
+            hr_scale: request.hr_scale.or(self.hr_scale),
+            hr_upscaler: request.hr_upscaler.or(self.hr_upscaler.clone()),
+            hr_second_pass_steps: request.hr_second_pass_steps.or(self.hr_second_pass_steps),
+            hr_resize_x: request.hr_resize_x.or(self.hr_resize_x),
+            hr_resize_y: request.hr_resize_y.or(self.hr_resize_y),
+            prompt: request.prompt.or(self.prompt.clone()),
+            styles: request.styles.or(self.styles.clone()),
+            seed: request.seed.or(self.seed),
+            subseed: request.subseed.or(self.subseed),
+            subseed_strength: request.subseed_strength.or(self.subseed_strength),
+            seed_resize_from_h: request.seed_resize_from_h.or(self.seed_resize_from_h),
+            seed_resize_from_w: request.seed_resize_from_w.or(self.seed_resize_from_w),
+            sampler_name: request.sampler_name.or(self.sampler_name.clone()),
+            batch_size: request.batch_size.or(self.batch_size),
+            n_iter: request.n_iter.or(self.n_iter),
+            steps: request.steps.or(self.steps),
+            cfg_scale: request.cfg_scale.or(self.cfg_scale),
+            width: request.width.or(self.width),
+            height: request.height.or(self.height),
+            restore_faces: request.restore_faces.or(self.restore_faces),
+            tiling: request.tiling.or(self.tiling),
+            do_not_save_samples: request.do_not_save_samples.or(self.do_not_save_samples),
+            do_not_save_grid: request.do_not_save_grid.or(self.do_not_save_grid),
+            negative_prompt: request.negative_prompt.or(self.negative_prompt.clone()),
+            eta: request.eta.or(self.eta),
+            s_churn: request.s_churn.or(self.s_churn),
+            s_tmax: request.s_tmax.or(self.s_tmax),
+            s_tmin: request.s_tmin.or(self.s_tmin),
+            s_noise: request.s_noise.or(self.s_noise),
+            override_settings: request.override_settings.or(self.override_settings.clone()),
+            override_settings_restore_afterwards: request
+                .override_settings_restore_afterwards
+                .or(self.override_settings_restore_afterwards),
+            script_args: request.script_args.or(self.script_args.clone()),
+            sampler_index: request.sampler_index.or(self.sampler_index.clone()),
+            script_name: request.script_name.or(self.script_name.clone()),
+            send_images: request.send_images.or(self.send_images),
+            save_images: request.save_images.or(self.save_images),
+            alwayson_scripts: request.alwayson_scripts.or(self.alwayson_scripts.clone()),
+        }
     }
 }
 
