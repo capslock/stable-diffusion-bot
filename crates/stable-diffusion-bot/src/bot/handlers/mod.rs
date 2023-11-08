@@ -78,11 +78,12 @@ pub(crate) fn auth_filter() -> UpdateHandler<anyhow::Error> {
     })
 }
 
+pub(crate) fn unauth_command_filter() -> UpdateHandler<anyhow::Error> {
+    Update::filter_message().chain(teloxide::filter_command::<UnauthenticatedCommands, _>())
+}
+
 pub(crate) fn unauth_command_handler() -> UpdateHandler<anyhow::Error> {
-    Update::filter_message().chain(
-        teloxide::filter_command::<UnauthenticatedCommands, _>()
-            .endpoint(unauthenticated_commands_handler),
-    )
+    unauth_command_filter().endpoint(unauthenticated_commands_handler)
 }
 
 pub(crate) fn authenticated_command_handler() -> UpdateHandler<anyhow::Error> {
@@ -99,28 +100,31 @@ mod tests {
     use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
     use teloxide::types::{Me, UpdateKind, User};
 
-    fn create_message() -> Message {
-        let json = r#"{
+    fn create_message(text: &str) -> Message {
+        let json = format!(
+            r#"{{
           "message_id": 123456,
-          "from": {
+          "from": {{
            "id": 123456789,
            "is_bot": false,
            "first_name": "Stable",
            "last_name": "Diffusion",
            "username": "sd",
            "language_code": "en"
-          },
-          "chat": {
+          }},
+          "chat": {{
            "id": 123456789,
            "first_name": "Stable",
            "last_name": "Diffusion",
            "username": "sd",
            "type": "private"
-          },
-          "date": 1234567890,
-          "text": "hi"
-         }"#;
-        serde_json::from_str::<Message>(json).unwrap()
+          }},
+          "date": 1634567890,
+          "text": "{}"
+         }}"#,
+            text
+        );
+        serde_json::from_str::<Message>(&json).unwrap()
     }
     fn create_me() -> Me {
         Me {
@@ -151,10 +155,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_unauth_command_handler() {
+    async fn test_unauth_command_filter_help() {
         let me = create_me();
 
-        let msg = create_message();
+        let msg = create_message("/help");
 
         let update = Update {
             id: 1,
@@ -162,20 +166,19 @@ mod tests {
         };
 
         assert!(matches!(
-            unauth_command_handler()
+            unauth_command_filter()
+                .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![msg, update, me])
                 .await,
-            ControlFlow::Continue(_)
+            ControlFlow::Break(_)
         ));
     }
 
     #[tokio::test]
-    async fn test_auth_command_handler() {
-        let cfg = create_config();
-
+    async fn test_unauth_command_handler_start() {
         let me = create_me();
 
-        let msg = create_message();
+        let msg = create_message("/start");
 
         let update = Update {
             id: 1,
@@ -183,7 +186,50 @@ mod tests {
         };
 
         assert!(matches!(
-            authenticated_command_handler()
+            unauth_command_filter()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![msg, update, me])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_unauth_command_filter_settings() {
+        let me = create_me();
+
+        let msg = create_message("/settings");
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::Message(msg.clone()),
+        };
+
+        assert!(matches!(
+            unauth_command_filter()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![msg, update, me])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_auth_filter() {
+        let cfg = create_config();
+
+        let me = create_me();
+
+        let msg = create_message("");
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::Message(msg.clone()),
+        };
+
+        assert!(matches!(
+            auth_filter()
+                .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![msg, update, me, cfg])
                 .await,
             ControlFlow::Continue(_)
