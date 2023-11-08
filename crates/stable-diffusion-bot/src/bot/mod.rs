@@ -101,26 +101,9 @@ pub struct StableDiffusionBot {
 impl StableDiffusionBot {
     /// Creates an UpdateHandler for the bot
     fn schema() -> UpdateHandler<anyhow::Error> {
-        let auth_filter = dptree::filter(|cfg: ConfigParameters, upd: Update| {
-            upd.chat()
-                .map(|chat| cfg.chat_is_allowed(&chat.id))
-                .unwrap_or_default()
-                || upd
-                    .user()
-                    .map(|user| cfg.chat_is_allowed(&user.id.into()))
-                    .unwrap_or_default()
-        });
-
-        let unauth_command_handler = Update::filter_message().chain(
-            teloxide::filter_command::<UnauthenticatedCommands, _>()
-                .endpoint(unauthenticated_commands_handler),
-        );
-
-        let authenticated = auth_filter.branch(settings_schema()).branch(image_schema());
-
         Self::enter::<Update, ErasedStorage<State>, _>()
-            .branch(unauth_command_handler)
-            .branch(authenticated)
+            .branch(unauth_command_handler())
+            .branch(authenticated_command_handler())
     }
 
     // Borrowed and adapted from Teloxide's `dialogue::enter()` function.

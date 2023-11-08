@@ -23,4 +23,5 @@ stable-diffusion-api = { path = "../stable-diffusion-api" }
 clap = { version = "4.4.7", features = ["derive"] }
 
 [dev-dependencies]
+serde_json = "1.0.108"
 tokio-test = "0.4.3"
