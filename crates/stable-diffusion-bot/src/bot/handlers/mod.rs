@@ -94,8 +94,6 @@ pub(crate) fn authenticated_command_handler() -> UpdateHandler<anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
     use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
     use teloxide::types::{Me, UpdateKind, User};
@@ -113,7 +111,7 @@ mod tests {
            "language_code": "en"
           }},
           "chat": {{
-           "id": 123456789,
+           "id": 1234567890,
            "first_name": "Stable",
            "last_name": "Diffusion",
            "username": "sd",
@@ -144,13 +142,13 @@ mod tests {
         }
     }
 
-    fn create_config() -> ConfigParameters {
+    fn create_config(allowed_users: Vec<i64>, allow_all_users: bool) -> ConfigParameters {
         ConfigParameters {
-            allowed_users: HashSet::new(),
+            allowed_users: allowed_users.into_iter().map(ChatId).collect(),
             api: stable_diffusion_api::Api::new(),
             txt2img_defaults: Txt2ImgRequest::default(),
             img2img_defaults: Img2ImgRequest::default(),
-            allow_all_users: false,
+            allow_all_users,
         }
     }
 
@@ -215,8 +213,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_auth_filter() {
-        let cfg = create_config();
+    async fn test_auth_filter_allow_all_users() {
+        let cfg = create_config(vec![], true);
+
+        let me = create_me();
+
+        let msg = create_message("");
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::Message(msg.clone()),
+        };
+
+        assert!(matches!(
+            auth_filter()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![msg, update, me, cfg])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_auth_filter_allow_no_users() {
+        let cfg = create_config(vec![], false);
 
         let me = create_me();
 
@@ -233,6 +253,50 @@ mod tests {
                 .dispatch(dptree::deps![msg, update, me, cfg])
                 .await,
             ControlFlow::Continue(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_auth_filter_allow_user() {
+        let cfg = create_config(vec![123456789], false);
+
+        let me = create_me();
+
+        let msg = create_message("");
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::Message(msg.clone()),
+        };
+
+        assert!(matches!(
+            auth_filter()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![msg, update, me, cfg])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_auth_filter_allow_chat() {
+        let cfg = create_config(vec![1234567890], false);
+
+        let me = create_me();
+
+        let msg = create_message("");
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::Message(msg.clone()),
+        };
+
+        assert!(matches!(
+            auth_filter()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![msg, update, me, cfg])
+                .await,
+            ControlFlow::Break(_)
         ));
     }
 }
