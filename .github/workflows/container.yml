@@ -6,10 +6,11 @@ on:
       - v*
   workflow_dispatch:
 
+permissions:
+  packages: write
+
 jobs:
   push-container-image:
-    permissions:
-      packages: write
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -40,5 +41,26 @@ jobs:
      - name: 'Push Container Image'
        run: |
          ./result | docker load
-         docker tag stable-diffusion-bot:latest ghcr.io/capslock/stable-diffusion-bot:latest
-         docker push ghcr.io/capslock/stable-diffusion-bot:latest
+         docker tag stable-diffusion-bot:latest ghcr.io/capslock/stable-diffusion-bot:${{ matrix.os }}
+         docker push ghcr.io/capslock/stable-diffusion-bot:${{ matrix.os }}
+
+  push-manifest:
+    needs: push-container-image
+    runs-on: ubuntu-latest
+    steps:
+     - name: 'Login to GitHub Container Registry'
+       uses: docker/login-action@v3
+       with:
+         registry: ghcr.io
+         username: ${{ github.actor }}
+         password: ${{ secrets.GITHUB_TOKEN }}
+     - name: 'Push Manifest'
+       run: |
+         docker manifest create ghcr.io/capslock/stable-diffusion-bot:latest \
+           ghcr.io/capslock/stable-diffusion-bot:ubuntu-latest \
+           ghcr.io/capslock/stable-diffusion-bot:macos-latest
+         docker manifest annotate ghcr.io/capslock/stable-diffusion-bot:latest \
+           ghcr.io/capslock/stable-diffusion-bot:ubuntu-latest --arch amd64 --os linux
+         docker manifest annotate ghcr.io/capslock/stable-diffusion-bot:latest \
+           ghcr.io/capslock/stable-diffusion-bot:macos-latest --arch arm64 --os darwin
+         docker manifest push ghcr.io/capslock/stable-diffusion-bot:latest
