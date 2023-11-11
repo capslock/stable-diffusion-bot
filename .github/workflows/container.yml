@@ -26,4 +26,5 @@ jobs:
      - name: 'Push Container Image'
        run: |
          ./result | docker load
+         docker tag stable-diffusion-bot:latest ghcr.io/capslock/stable-diffusion-bot:latest
          docker push ghcr.io/capslock/stable-diffusion-bot:latest
