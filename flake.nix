@@ -86,9 +86,14 @@
       in
         pkgs.dockerTools.streamLayeredImage {
           name = package.name;
-          tag = package.version;
+          tag = "latest";
           created = "now";
           config = {
+            Labels = {
+              "org.opencontainers.image.source" = "https://github.com/capslock/stable-diffusion-bot";
+              "org.opencontainers.image.description" = "Stable Diffusion Bot";
+              "org.opencontainers.image.licenses" = "MIT";
+            };
             Cmd = ["${package}/bin/${package.name}"];
           };
         };
