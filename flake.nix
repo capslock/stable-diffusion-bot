@@ -139,7 +139,7 @@
             };
             environmentFile = mkOption {
               example = "./sdbot.env";
-              type = nullOr types.str;
+              type = with types; nullOr str;
               description = lib.mdDoc ''
                 File which contains environment settings for the stable-diffusion-bot service.
               '';
