@@ -55,6 +55,7 @@
     packages = forAllSystems ({pkgs}: {
       default = pkgs.rustPlatform.buildRustPackage {
         name = "stable-diffusion-bot";
+        version = "0.1.0";
         src = ./.;
         cargoLock = {
           lockFile = ./Cargo.lock;
@@ -69,6 +70,17 @@
           ]
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (macFrameworks pkgs);
       };
+      container = let
+        package = self.packages.${pkgs.system}.default;
+      in
+        pkgs.dockerTools.buildImage {
+          name = package.name;
+          tag = package.version;
+          created = "now";
+          config = {
+            Cmd = ["${package}/bin/${package.name}"];
+          };
+        };
     });
     # Development environment output
     devShells = forAllSystems ({pkgs}: {
