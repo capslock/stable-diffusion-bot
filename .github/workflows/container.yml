@@ -10,7 +10,10 @@ jobs:
   push-container-image:
     permissions:
       packages: write
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
      - uses: actions/checkout@main
      - name: Install Nix
@@ -19,6 +22,15 @@ jobs:
          github_access_token: ${{ secrets.GITHUB_TOKEN }}
      - name: Build container image
        run: nix build .#streamedContainer
+     - name: Setup docker (missing on MacOS)
+       if: runner.os == 'macos'
+       run: |
+         brew install docker
+         colima start
+         
+         # For testcontainers to find the Colima socket
+         # https://github.com/abiosoft/colima/blob/main/docs/FAQ.md#cannot-connect-to-the-docker-daemon-at-unixvarrundockersock-is-the-docker-daemon-running
+         sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
      - name: 'Login to GitHub Container Registry'
        uses: docker/login-action@v3
        with:
