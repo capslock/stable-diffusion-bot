@@ -73,7 +73,18 @@
       container = let
         package = self.packages.${pkgs.system}.default;
       in
-        pkgs.dockerTools.buildImage {
+        pkgs.dockerTools.buildLayeredImage {
+          name = package.name;
+          tag = package.version;
+          created = "now";
+          config = {
+            Cmd = ["${package}/bin/${package.name}"];
+          };
+        };
+      streamedContainer = let
+        package = self.packages.${pkgs.system}.default;
+      in
+        pkgs.dockerTools.streamLayeredImage {
           name = package.name;
           tag = package.version;
           created = "now";
