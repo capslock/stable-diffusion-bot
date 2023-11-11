@@ -8,6 +8,8 @@ on:
 
 jobs:
   push-container-image:
+    permissions:
+      packages: write
     runs-on: ubuntu-latest
     steps:
      - uses: actions/checkout@main
