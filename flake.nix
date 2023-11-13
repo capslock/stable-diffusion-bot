@@ -140,8 +140,16 @@
             environmentFile = mkOption {
               example = "./sdbot.env";
               type = with types; nullOr str;
-              description = lib.mdDoc ''
+              description = ''
                 File which contains environment settings for the stable-diffusion-bot service.
+              '';
+            };
+            environment = mkOption {
+              example = "RUSTLOG=info";
+              type = with types; str;
+              default = "\"RUSTLOG=info,hyper=error\"";
+              description = ''
+                Environment settings for the stable-diffusion-bot service.
               '';
             };
             settings = lib.mkOption {
@@ -167,6 +175,7 @@
             in {
               ExecStart = "${pkg}/bin/stable-diffusion-bot -c ${configFile}";
               EnvironmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
+              Environment = cfg.environment;
             };
           };
         };
