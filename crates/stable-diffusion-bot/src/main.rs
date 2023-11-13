@@ -8,10 +8,12 @@ use serde::{Deserialize, Serialize};
 use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 use stable_diffusion_bot::StableDiffusionBotBuilder;
 use tracing::metadata::LevelFilter;
-use tracing_log::LogTracer;
-use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 use std::path::PathBuf;
+
+#[cfg(target_os = "linux")]
+use libsystemd::daemon;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -38,21 +40,29 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    LogTracer::init().context("failed to initialize LogTracer")?;
+    let registry = tracing_subscriber::registry();
+    let layer = {
+        #[cfg(target_os = "linux")]
+        if !daemon::booted() {
+            tracing_journald::layer()
+                .context("tracing_journald layer")?
+                .boxed()
+        } else {
+            tracing_subscriber::fmt::layer()
+                .pretty()
+                .with_target(true)
+                .boxed()
+        }
+        #[cfg(not(target_os = "linux"))]
+        tracing_subscriber::fmt::layer().pretty().with_target(true)
+    };
 
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into())
         .from_env()
         .context("Failed to parse filter from env")?;
 
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(filter)
-        .pretty()
-        .with_target(true)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber)
-        .context("setting default subscriber failed")?;
+    registry.with(filter).with(layer).init();
 
     let args = Args::parse();
 
