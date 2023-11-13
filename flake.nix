@@ -140,6 +140,7 @@
             environmentFile = mkOption {
               example = "./sdbot.env";
               type = with types; nullOr str;
+              default = null;
               description = ''
                 File which contains environment settings for the stable-diffusion-bot service.
               '';
@@ -155,6 +156,7 @@
             telegramApiKeyFile = mkOption {
               example = "./sdbot.toml";
               type = with types; nullOr str;
+              default = null;
               description = ''
                 TOML file containing an `api_key` entry set to the telegram API key to use.
                 May also contain other configuration, see
@@ -162,7 +164,7 @@
                 for supported settings.
               '';
             };
-            settings = lib.mkOption {
+            settings = mkOption {
               type = settingsFormat.type;
               default = {};
               description = ''
@@ -182,10 +184,15 @@
             serviceConfig = let
               pkg = self.packages.${pkgs.system}.default;
               configFile = settingsFormat.generate "sdbot-config.toml" cfg.settings;
+              configs = [configFile] ++ lib.optional (cfg.telegramApiKeyFile != null) "$\{CREDENTIALS_DIRECTORY\}/sdbot.toml";
+              args = lib.strings.concatMapStringsSep " " (file: "-c " + file) configs;
             in {
-              ExecStart = "${pkg}/bin/stable-diffusion-bot -c ${configFile}";
+              Type = "exec";
+              DynamicUser = true;
+              ExecStart = "${pkg}/bin/stable-diffusion-bot ${args}";
               EnvironmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
               Environment = cfg.environment;
+              LoadCredential = mkIf (cfg.telegramApiKeyFile != null) "sdbot.toml:${cfg.telegramApiKeyFile}";
             };
           };
         };
