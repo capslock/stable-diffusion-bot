@@ -4,7 +4,10 @@
   # Flake inputs
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs"; # also valid: "nixpkgs"
-    rust-overlay.url = "github:oxalica/rust-overlay"; # A helper for Rust + Nix
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay"; # A helper for Rust + Nix
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   # Flake outputs
