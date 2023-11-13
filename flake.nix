@@ -152,6 +152,16 @@
                 Environment settings for the stable-diffusion-bot service.
               '';
             };
+            telegramApiKeyFile = mkOption {
+              example = "./sdbot.toml";
+              type = with types; nullOr str;
+              description = ''
+                TOML file containing an `api_key` entry set to the telegram API key to use.
+                May also contain other configuration, see
+                <link xlink:href="https://www.github.com/capslock/stable-diffusion-bot"/>
+                for supported settings.
+              '';
+            };
             settings = lib.mkOption {
               type = settingsFormat.type;
               default = {};
