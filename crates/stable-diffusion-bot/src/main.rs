@@ -24,7 +24,7 @@ struct Args {
         value_parser = clap::value_parser!(PathBuf),
         default_value = "config.toml"
     )]
-    config: PathBuf,
+    config: Vec<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -66,10 +66,11 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
-    let config: Config = Figment::new()
-        .merge(Toml::file("/etc/sdbot/config.toml"))
-        .merge(Toml::file(args.config))
-        .merge(Env::prefixed("SD_TELEGRAM_"))
+    let config: Config = args
+        .config
+        .iter()
+        .fold(Figment::new(), |f, path| f.admerge(Toml::file(path)))
+        .admerge(Env::prefixed("SD_TELEGRAM_"))
         .extract()
         .context("Invalid configuration")?;
 
