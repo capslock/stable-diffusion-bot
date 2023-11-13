@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 use stable_diffusion_bot::StableDiffusionBotBuilder;
 use tracing::metadata::LevelFilter;
+use tracing_log::LogTracer;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use std::path::PathBuf;
@@ -37,7 +38,8 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    LogTracer::init().context("failed to initialize LogTracer")?;
+
     let filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::WARN.into())
         .from_env()
@@ -51,6 +53,8 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::subscriber::set_global_default(subscriber)
         .context("setting default subscriber failed")?;
+
+    let args = Args::parse();
 
     let config: Config = Figment::new()
         .merge(Toml::file("/etc/sdbot/config.toml"))
