@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
     let registry = tracing_subscriber::registry();
     let layer = {
         #[cfg(target_os = "linux")]
-        if !daemon::booted() {
+        if daemon::booted() {
             tracing_journald::layer()
                 .context("tracing_journald layer")?
                 .boxed()
