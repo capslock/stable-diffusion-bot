@@ -77,7 +77,7 @@ services.stableDiffusionBot = {
 };
 ```
 
-### Using Docker
+#### Using Docker
 
 If the above options don't suit you, you can use the pre-built docker container.
 Docker support is minimal right now, but you can quickly get up and running using
