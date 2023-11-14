@@ -481,14 +481,25 @@ impl Txt2Img {
         &self,
         request: &Txt2ImgRequest,
     ) -> anyhow::Result<ImgResponse<Txt2ImgRequest>> {
-        self.client
+        let response = self
+            .client
             .post(self.endpoint.clone())
             .json(&request)
             .send()
             .await
-            .context("failed to send request")?
-            .json()
+            .context("failed to send request")?;
+        if response.status().is_success() {
+            return response.json().await.context("failed to parse json");
+        }
+        let status = response.status();
+        let text = response
+            .text()
             .await
-            .context("failed to parse json")
+            .context("failed to get response text")?;
+        Err(anyhow::anyhow!(
+            "got error code: {}, message text: {}",
+            status,
+            text
+        ))
     }
 }
