@@ -82,7 +82,7 @@
           created = "now";
           contents = [pkgs.cacert];
           config = {
-            Cmd = ["${package}/bin/${package.name}"];
+            Entrypoint = ["${package}/bin/${package.name}"];
           };
         };
       streamedContainer = let
@@ -99,7 +99,7 @@
               "org.opencontainers.image.description" = "Stable Diffusion Bot";
               "org.opencontainers.image.licenses" = "MIT";
             };
-            Cmd = ["${package}/bin/${package.name}"];
+            Entrypoint = ["${package}/bin/${package.name}"];
           };
         };
     });
