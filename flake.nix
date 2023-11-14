@@ -80,6 +80,7 @@
           name = package.name;
           tag = package.version;
           created = "now";
+          contents = [pkgs.cacert];
           config = {
             Cmd = ["${package}/bin/${package.name}"];
           };
@@ -91,6 +92,7 @@
           name = package.name;
           tag = "latest";
           created = "now";
+          contents = [pkgs.cacert];
           config = {
             Labels = {
               "org.opencontainers.image.source" = "https://github.com/capslock/stable-diffusion-bot";
