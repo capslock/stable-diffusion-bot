@@ -83,10 +83,11 @@ If the above options don't suit you, you can use the pre-built docker container.
 Docker support is minimal right now, but you can quickly get up and running using
 `docker run` and specifying configuration through environment variables:
 
-```shell
+```console
 $ docker run \
   -e SD_TELEGRAM_API_KEY="your_api_key_here" \
   -e SD_TELEGRAM_ALLOWED_USERS="[list, of, allowed, users]" \
+  -e SD_TELEGRAM_SD_API_URL="http://localhost:7860" \
   ghcr.io/capslock/stable-diffusion-bot:latest
 ```
 
