@@ -62,32 +62,25 @@
             ]
             ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (macFrameworks pkgs);
         };
+        container = {
+          name = crate.name;
+          tag = "latest";
+          created = "now";
+          contents = [pkgs.cacert];
+          config = {
+            Labels = {
+              "org.opencontainers.image.source" = "https://github.com/capslock/stable-diffusion-bot";
+              "org.opencontainers.image.description" = "Stable Diffusion Bot";
+              "org.opencontainers.image.licenses" = "MIT";
+            };
+            Entrypoint = ["${crate}/bin/${crate.name}"];
+          };
+        };
       in {
         packages = {
           default = crate;
-          container = pkgs.dockerTools.buildLayeredImage {
-            name = crate.name;
-            tag = crate.version;
-            created = "now";
-            contents = [pkgs.cacert];
-            config = {
-              Entrypoint = ["${crate}/bin/${crate.name}"];
-            };
-          };
-          streamedContainer = pkgs.dockerTools.streamLayeredImage {
-            name = crate.name;
-            tag = "latest";
-            created = "now";
-            contents = [pkgs.cacert];
-            config = {
-              Labels = {
-                "org.opencontainers.image.source" = "https://github.com/capslock/stable-diffusion-bot";
-                "org.opencontainers.image.description" = "Stable Diffusion Bot";
-                "org.opencontainers.image.licenses" = "MIT";
-              };
-              Entrypoint = ["${crate}/bin/${crate.name}"];
-            };
-          };
+          container = pkgs.dockerTools.buildLayeredImage container;
+          streamedContainer = pkgs.dockerTools.streamLayeredImage container;
         };
         checks = {inherit crate;};
         apps.default = flake-utils.lib.mkApp {
