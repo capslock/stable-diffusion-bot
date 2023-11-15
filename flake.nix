@@ -159,8 +159,8 @@
               };
               package = mkOption {
                 type = types.package;
-                default = self.packages.${system}.default;
-                defaultText = literalExpression "self.packages.$\{system\}.default";
+                default = self.packages.${pkgs.system}.default;
+                defaultText = literalExpression "self.packages.$\{pkgs.system\}.default";
                 description = ''
                   stable-diffusion-bot package to use.
                 '';
