@@ -157,6 +157,14 @@
                   for supported settings.
                 '';
               };
+              package = mkOption {
+                type = types.package;
+                default = self.packages.${system}.default;
+                defaultText = literalExpression "self.packages.$\{system\}.default";
+                description = ''
+                  stable-diffusion-bot package to use.
+                '';
+              };
             };
           };
 
@@ -166,7 +174,7 @@
               after = ["network-online.target"];
               description = "Stable Diffusion Bot";
               serviceConfig = let
-                pkg = self.packages.${system}.default;
+                pkg = cfg.package;
                 configFile = settingsFormat.generate "sdbot-config.toml" cfg.settings;
                 configs = [configFile] ++ lib.optional (cfg.telegramApiKeyFile != null) "$\{CREDENTIALS_DIRECTORY\}/sdbot.toml";
                 args = lib.strings.concatMapStringsSep " " (file: "-c " + file) configs;
