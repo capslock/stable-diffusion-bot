@@ -47,22 +47,25 @@
         };
         rust = pkgs.rust-bin.stable.latest.default;
         craneLib = (crane.mkLib pkgs).overrideToolchain rust;
-        crate = craneLib.buildPackage {
-          pname = "stable-diffusion-bot";
-          version = "0.1.0";
-          src = craneLib.cleanCargoSource (craneLib.path ./.);
-          strictDeps = true;
-          nativeBuildInputs = [
-            pkgs.pkg-config
-          ];
-          buildInputs =
-            [
-              pkgs.openssl
-              pkgs.sqlite
-            ]
-            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (macFrameworks pkgs);
-        };
-        container = {
+        overridableCrate = pkgs.lib.makeOverridable ({toolchain}: let
+          craneLib = (crane.mkLib pkgs).overrideToolchain toolchain;
+        in
+          craneLib.buildPackage {
+            pname = "stable-diffusion-bot";
+            version = "0.1.0";
+            src = craneLib.cleanCargoSource (craneLib.path ./.);
+            strictDeps = true;
+            nativeBuildInputs = [
+              pkgs.pkg-config
+            ];
+            buildInputs =
+              [
+                pkgs.openssl
+                pkgs.sqlite
+              ]
+              ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (macFrameworks pkgs);
+          }) {toolchain = rust;};
+        container = crate: {
           name = crate.name;
           tag = "latest";
           created = "now";
@@ -78,13 +81,13 @@
         };
       in {
         packages = {
-          default = crate;
-          container = pkgs.dockerTools.buildLayeredImage container;
-          streamedContainer = pkgs.dockerTools.streamLayeredImage container;
+          default = overridableCrate;
+          container = pkgs.lib.makeOverridable ({crate}: pkgs.dockerTools.buildLayeredImage (container crate)) {crate = overridableCrate;};
+          streamedContainer = pkgs.lib.makeOverridable ({crate}: pkgs.dockerTools.streamLayeredImage (container crate)) {crate = overridableCrate;};
         };
-        checks = {inherit crate;};
+        checks = {inherit overridableCrate;};
         apps.default = flake-utils.lib.mkApp {
-          drv = crate;
+          drv = overridableCrate;
         };
         # Development environment output
         devShells.default = craneLib.devShell {
