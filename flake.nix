@@ -207,6 +207,7 @@
                 ProcSubset = "pid";
                 ProtectClock = true;
                 ProtectProc = "noaccess";
+                ProtectHostname = true;
                 SystemCallArchitectures = "native";
                 SystemCallFilter = ["@system-service" "~@resources" "~@privileged"];
                 UMask = "0077";
