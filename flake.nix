@@ -212,6 +212,7 @@
                 SystemCallFilter = ["@system-service" "~@resources" "~@privileged"];
                 UMask = "0077";
                 PrivateUsers = true;
+                MemoryDenyWriteExecute = true;
               };
             };
           };
