@@ -155,7 +155,7 @@ impl TryFrom<Txt2ImgRequest> for Settings {
     type Error = anyhow::Error;
 
     fn try_from(value: Txt2ImgRequest) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        Self::try_from(&value)
     }
 }
 
@@ -200,7 +200,7 @@ impl TryFrom<Img2ImgRequest> for Settings {
     type Error = anyhow::Error;
 
     fn try_from(value: Img2ImgRequest) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        Self::try_from(&value)
     }
 }
 
