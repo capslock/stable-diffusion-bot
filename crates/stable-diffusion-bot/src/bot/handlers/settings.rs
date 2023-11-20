@@ -525,18 +525,39 @@ async fn handle_invalid_setting_value(bot: Bot, msg: Message) -> anyhow::Result<
     Ok(())
 }
 
-pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
-    let settings_command_handler = Update::filter_message()
+pub(crate) fn settings_command_handler() -> UpdateHandler<anyhow::Error> {
+    Update::filter_message()
         .filter_command::<SettingsCommands>()
-        .endpoint(handle_settings_command);
-    let callback_handler = Update::filter_callback_query()
-        .chain(dptree::filter(|q: CallbackQuery| {
-            if let Some(data) = q.data {
-                data.starts_with("settings")
-            } else {
-                false
-            }
-        }))
+        .endpoint(handle_settings_command)
+}
+
+pub(crate) fn filter_settings_query() -> UpdateHandler<anyhow::Error> {
+    Update::filter_callback_query()
+        .filter(|q: CallbackQuery| q.data.is_some_and(|data| data.starts_with("settings")))
+}
+
+pub(crate) fn handle_invalid_message() -> UpdateHandler<anyhow::Error> {
+    dptree::entry()
+        .branch(
+            case![State::SettingsTxt2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(handle_invalid_setting_value),
+        )
+        .branch(
+            case![State::SettingsImg2Img {
+                selection,
+                txt2img,
+                img2img
+            }]
+            .endpoint(handle_invalid_setting_value),
+        )
+}
+
+pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
+    let callback_handler = filter_settings_query()
         .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_settings))
         .branch(
             case![State::SettingsImg2Img {
@@ -575,24 +596,10 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                     .endpoint(handle_settings_value),
                 ),
         )
-        .branch(
-            case![State::SettingsTxt2Img {
-                selection,
-                txt2img,
-                img2img
-            }]
-            .endpoint(handle_invalid_setting_value),
-        )
-        .branch(
-            case![State::SettingsImg2Img {
-                selection,
-                txt2img,
-                img2img
-            }]
-            .endpoint(handle_invalid_setting_value),
-        );
+        .chain(handle_invalid_message());
+
     dptree::entry()
-        .branch(settings_command_handler)
+        .branch(settings_command_handler())
         .branch(message_handler)
         .branch(callback_handler)
 }
