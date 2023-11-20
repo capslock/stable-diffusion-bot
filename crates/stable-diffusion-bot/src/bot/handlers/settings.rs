@@ -603,3 +603,115 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
         .branch(message_handler)
         .branch(callback_handler)
 }
+
+#[cfg(test)]
+mod tests {
+    use teloxide::types::{UpdateKind, User};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_filter_settings_query() {
+        let query = CallbackQuery {
+            id: "123456".to_string(),
+            from: User {
+                id: UserId(123456780),
+                is_bot: true,
+                first_name: "Stable Diffusion".to_string(),
+                last_name: None,
+                username: Some("sdbot".to_string()),
+                language_code: Some("en".to_string()),
+                is_premium: false,
+                added_to_attachment_menu: false,
+            },
+            message: None,
+            inline_message_id: None,
+            chat_instance: "123456".to_string(),
+            data: Some("settings".to_string()),
+            game_short_name: None,
+        };
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::CallbackQuery(query),
+        };
+
+        assert!(matches!(
+            filter_settings_query()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![update])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_filter_settings_query_none() {
+        let query = CallbackQuery {
+            id: "123456".to_string(),
+            from: User {
+                id: UserId(123456780),
+                is_bot: true,
+                first_name: "Stable Diffusion".to_string(),
+                last_name: None,
+                username: Some("sdbot".to_string()),
+                language_code: Some("en".to_string()),
+                is_premium: false,
+                added_to_attachment_menu: false,
+            },
+            message: None,
+            inline_message_id: None,
+            chat_instance: "123456".to_string(),
+            data: None,
+            game_short_name: None,
+        };
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::CallbackQuery(query),
+        };
+
+        assert!(matches!(
+            filter_settings_query()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![update])
+                .await,
+            ControlFlow::Continue(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_filter_settings_query_bad_data() {
+        let query = CallbackQuery {
+            id: "123456".to_string(),
+            from: User {
+                id: UserId(123456780),
+                is_bot: true,
+                first_name: "Stable Diffusion".to_string(),
+                last_name: None,
+                username: Some("sdbot".to_string()),
+                language_code: Some("en".to_string()),
+                is_premium: false,
+                added_to_attachment_menu: false,
+            },
+            message: None,
+            inline_message_id: None,
+            chat_instance: "123456".to_string(),
+            data: Some("bad_data".to_string()),
+            game_short_name: None,
+        };
+
+        let update = Update {
+            id: 1,
+            kind: UpdateKind::CallbackQuery(query),
+        };
+
+        assert!(matches!(
+            filter_settings_query()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![update])
+                .await,
+            ControlFlow::Continue(_)
+        ));
+    }
+}
