@@ -545,25 +545,26 @@ pub(crate) fn filter_settings_state() -> UpdateHandler<anyhow::Error> {
     })
 }
 
+pub(crate) fn filter_map_settings_state() -> UpdateHandler<anyhow::Error> {
+    dptree::entry().filter_map(|state: State| match state {
+        State::SettingsTxt2Img {
+            selection,
+            txt2img,
+            img2img,
+        } => Some((selection, txt2img, img2img)),
+        State::SettingsImg2Img {
+            selection,
+            txt2img,
+            img2img,
+        } => Some((selection, txt2img, img2img)),
+        _ => None,
+    })
+}
+
 pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
     let callback_handler = filter_settings_query()
         .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_settings))
-        .branch(
-            case![State::SettingsImg2Img {
-                selection,
-                txt2img,
-                img2img
-            }]
-            .endpoint(handle_settings_button),
-        )
-        .branch(
-            case![State::SettingsTxt2Img {
-                selection,
-                txt2img,
-                img2img
-            }]
-            .endpoint(handle_settings_button),
-        );
+        .branch(filter_map_settings_state().endpoint(handle_settings_button));
 
     let message_handler = Update::filter_message()
         .branch(
@@ -683,6 +684,59 @@ mod tests {
         assert!(matches!(
             filter_settings_state()
                 .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![State::New])
+                .await,
+            ControlFlow::Continue(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_filter_map_settings_state_txt2img() {
+        assert!(matches!(
+            filter_map_settings_state()
+                .endpoint(
+                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async move {
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![State::SettingsTxt2Img {
+                    selection: None,
+                    txt2img: Txt2ImgRequest::default(),
+                    img2img: Img2ImgRequest::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_filter_map_settings_state_img2img() {
+        assert!(matches!(
+            filter_map_settings_state()
+                .endpoint(
+                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async move {
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![State::SettingsImg2Img {
+                    selection: None,
+                    txt2img: Txt2ImgRequest::default(),
+                    img2img: Img2ImgRequest::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_filter_map_settings_state() {
+        assert!(matches!(
+            filter_map_settings_state()
+                .endpoint(
+                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async move {
+                        anyhow::Ok(())
+                    }
+                )
                 .dispatch(dptree::deps![State::New])
                 .await,
             ControlFlow::Continue(_)
