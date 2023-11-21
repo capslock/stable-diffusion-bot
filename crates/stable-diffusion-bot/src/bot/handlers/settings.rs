@@ -537,23 +537,12 @@ pub(crate) fn filter_settings_query() -> UpdateHandler<anyhow::Error> {
 }
 
 pub(crate) fn handle_invalid_message() -> UpdateHandler<anyhow::Error> {
-    dptree::entry()
-        .branch(
-            case![State::SettingsTxt2Img {
-                selection,
-                txt2img,
-                img2img
-            }]
-            .endpoint(handle_invalid_setting_value),
+    dptree::entry().filter(|state: State| {
+        matches!(
+            state,
+            State::SettingsTxt2Img { .. } | State::SettingsImg2Img { .. }
         )
-        .branch(
-            case![State::SettingsImg2Img {
-                selection,
-                txt2img,
-                img2img
-            }]
-            .endpoint(handle_invalid_setting_value),
-        )
+    })
 }
 
 pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
@@ -596,7 +585,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                     .endpoint(handle_settings_value),
                 ),
         )
-        .chain(handle_invalid_message());
+        .chain(handle_invalid_message().endpoint(handle_invalid_setting_value));
 
     dptree::entry()
         .branch(settings_command_handler())
@@ -670,6 +659,47 @@ mod tests {
             filter_settings_query()
                 .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![update])
+                .await,
+            ControlFlow::Continue(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_handle_invalid_message_settings_txt2img() {
+        assert!(matches!(
+            handle_invalid_message()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![State::SettingsTxt2Img {
+                    selection: None,
+                    txt2img: Txt2ImgRequest::default(),
+                    img2img: Img2ImgRequest::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_handle_invalid_message_settings_img2img() {
+        assert!(matches!(
+            handle_invalid_message()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![State::SettingsImg2Img {
+                    selection: None,
+                    txt2img: Txt2ImgRequest::default(),
+                    img2img: Img2ImgRequest::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_handle_invalid_message_settings() {
+        assert!(matches!(
+            handle_invalid_message()
+                .endpoint(|| async move { anyhow::Ok(()) })
+                .dispatch(dptree::deps![State::New])
                 .await,
             ControlFlow::Continue(_)
         ));
