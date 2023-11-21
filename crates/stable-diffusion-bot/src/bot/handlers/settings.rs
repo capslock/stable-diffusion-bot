@@ -536,7 +536,7 @@ pub(crate) fn filter_settings_query() -> UpdateHandler<anyhow::Error> {
         .filter(|q: CallbackQuery| q.data.is_some_and(|data| data.starts_with("settings")))
 }
 
-pub(crate) fn handle_invalid_message() -> UpdateHandler<anyhow::Error> {
+pub(crate) fn filter_settings_state() -> UpdateHandler<anyhow::Error> {
     dptree::entry().filter(|state: State| {
         matches!(
             state,
@@ -585,7 +585,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
                     .endpoint(handle_settings_value),
                 ),
         )
-        .chain(handle_invalid_message().endpoint(handle_invalid_setting_value));
+        .chain(filter_settings_state().endpoint(handle_invalid_setting_value));
 
     dptree::entry()
         .branch(settings_command_handler())
@@ -665,9 +665,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_invalid_message_settings_txt2img() {
+    async fn test_filter_settings_state_txt2img() {
         assert!(matches!(
-            handle_invalid_message()
+            filter_settings_state()
                 .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::SettingsTxt2Img {
                     selection: None,
@@ -680,9 +680,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_invalid_message_settings_img2img() {
+    async fn test_filter_settings_state_img2img() {
         assert!(matches!(
-            handle_invalid_message()
+            filter_settings_state()
                 .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::SettingsImg2Img {
                     selection: None,
@@ -695,9 +695,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_invalid_message_settings() {
+    async fn test_filter_settings_state() {
         assert!(matches!(
-            handle_invalid_message()
+            filter_settings_state()
                 .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::New])
                 .await,
