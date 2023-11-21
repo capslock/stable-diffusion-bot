@@ -480,14 +480,9 @@ async fn handle_settings_command(
     bot: Bot,
     dialogue: DiffusionDialogue,
     cmd: SettingsCommands,
+    state: State,
 ) -> anyhow::Result<()> {
-    let (txt2img, img2img) = match dialogue
-        .get()
-        .await
-        .map_err(|e| anyhow!(e))?
-        .unwrap_or_else(|| {
-            State::new_with_defaults(cfg.txt2img_defaults.clone(), cfg.img2img_defaults.clone())
-        }) {
+    let (txt2img, img2img) = match state {
         State::Ready { txt2img, img2img }
         | State::SettingsTxt2Img {
             txt2img, img2img, ..
@@ -542,6 +537,7 @@ async fn handle_invalid_setting_value(bot: Bot, msg: Message) -> anyhow::Result<
 pub(crate) fn settings_command_handler() -> UpdateHandler<anyhow::Error> {
     Update::filter_message()
         .filter_command::<SettingsCommands>()
+        .chain(state_or_default())
         .endpoint(handle_settings_command)
 }
 
