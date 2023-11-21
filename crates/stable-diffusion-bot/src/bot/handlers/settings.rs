@@ -8,6 +8,7 @@ use teloxide::{
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
 };
+use tracing::error;
 
 use crate::bot::ConfigParameters;
 
@@ -413,19 +414,27 @@ where
     Ok(())
 }
 
+pub(crate) fn state_or_default() -> UpdateHandler<anyhow::Error> {
+    dptree::entry().map_async(
+        |cfg: ConfigParameters, dialogue: DiffusionDialogue| async move {
+            let result = dialogue.get().await;
+            if let Err(ref err) = result {
+                error!("Failed to get state: {:?}", err);
+            }
+            result.ok().flatten().unwrap_or_else(|| {
+                State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults)
+            })
+        },
+    )
+}
+
 pub(crate) async fn handle_settings_value(
     bot: Bot,
-    cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
     msg: Message,
     text: String,
+    mut state: State,
 ) -> anyhow::Result<()> {
-    let mut state = dialogue
-        .get()
-        .await
-        .map_err(|e| anyhow!(e))?
-        .unwrap_or_else(|| State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults));
-
     let settings = match &mut state {
         State::SettingsTxt2Img {
             selection, txt2img, ..
@@ -581,7 +590,10 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
 
     let message_handler = Update::filter_message()
         .branch(
-            Message::filter_text().chain(filter_settings_state().endpoint(handle_settings_value)),
+            Message::filter_text()
+                .chain(filter_settings_state())
+                .chain(state_or_default())
+                .endpoint(handle_settings_value),
         )
         .branch(filter_settings_state().endpoint(handle_invalid_setting_value));
 
