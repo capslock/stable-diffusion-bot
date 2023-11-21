@@ -204,22 +204,25 @@ impl TryFrom<Img2ImgRequest> for Settings {
     }
 }
 
+pub(crate) fn filter_callback_query_message() -> UpdateHandler<anyhow::Error> {
+    dptree::entry().filter_map(|q: CallbackQuery| q.message)
+}
+
+pub(crate) async fn handle_message_expired(bot: Bot, q: CallbackQuery) -> anyhow::Result<()> {
+    bot.answer_callback_query(q.id)
+        .cache_time(60)
+        .text("Sorry, this message is no longer available.")
+        .await?;
+    Ok(())
+}
+
 pub(crate) async fn handle_settings(
     bot: Bot,
     dialogue: DiffusionDialogue,
     (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
     q: CallbackQuery,
+    message: Message,
 ) -> anyhow::Result<()> {
-    let message = if let Some(message) = q.message {
-        message
-    } else {
-        bot.answer_callback_query(q.id)
-            .cache_time(60)
-            .text("Sorry, this message is no longer available.")
-            .await?;
-        return Ok(());
-    };
-
     let chat_id = message.chat.id;
 
     let parent = if let Some(parent) = message.reply_to_message().cloned() {
@@ -531,7 +534,7 @@ pub(crate) fn settings_command_handler() -> UpdateHandler<anyhow::Error> {
         .endpoint(handle_settings_command)
 }
 
-pub(crate) fn filter_settings_query() -> UpdateHandler<anyhow::Error> {
+pub(crate) fn filter_settings_callback_query() -> UpdateHandler<anyhow::Error> {
     Update::filter_callback_query()
         .filter(|q: CallbackQuery| q.data.is_some_and(|data| data.starts_with("settings")))
 }
@@ -562,8 +565,12 @@ pub(crate) fn filter_map_settings_state() -> UpdateHandler<anyhow::Error> {
 }
 
 pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
-    let callback_handler = filter_settings_query()
-        .branch(case![State::Ready { txt2img, img2img }].endpoint(handle_settings))
+    let callback_handler = filter_settings_callback_query()
+        .branch(
+            case![State::Ready { txt2img, img2img }]
+                .branch(filter_callback_query_message().endpoint(handle_settings))
+                .endpoint(handle_message_expired),
+        )
         .branch(filter_map_settings_state().endpoint(handle_settings_button));
 
     let message_handler = Update::filter_message()
@@ -615,7 +622,7 @@ mod tests {
         let update = create_callback_query_update(Some("settings".to_string()));
 
         assert!(matches!(
-            filter_settings_query()
+            filter_settings_callback_query()
                 .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![update])
                 .await,
@@ -628,7 +635,7 @@ mod tests {
         let update = create_callback_query_update(None);
 
         assert!(matches!(
-            filter_settings_query()
+            filter_settings_callback_query()
                 .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![update])
                 .await,
@@ -641,7 +648,7 @@ mod tests {
         let update = create_callback_query_update(Some("bad_data".to_string()));
 
         assert!(matches!(
-            filter_settings_query()
+            filter_settings_callback_query()
                 .endpoint(|| async move { anyhow::Ok(()) })
                 .dispatch(dptree::deps![update])
                 .await,
