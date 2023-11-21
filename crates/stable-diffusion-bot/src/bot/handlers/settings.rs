@@ -204,8 +204,8 @@ impl TryFrom<Img2ImgRequest> for Settings {
     }
 }
 
-pub(crate) fn filter_callback_query_message() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().filter_map(|q: CallbackQuery| q.message)
+pub(crate) fn filter_callback_query_chat_id() -> UpdateHandler<anyhow::Error> {
+    dptree::entry().filter_map(|q: CallbackQuery| q.message.map(|m| m.chat.id))
 }
 
 pub(crate) async fn handle_message_expired(bot: Bot, q: CallbackQuery) -> anyhow::Result<()> {
@@ -216,25 +216,27 @@ pub(crate) async fn handle_message_expired(bot: Bot, q: CallbackQuery) -> anyhow
     Ok(())
 }
 
+pub(crate) fn filter_callback_query_parent() -> UpdateHandler<anyhow::Error> {
+    dptree::entry()
+        .filter_map(|q: CallbackQuery| q.message.and_then(|m| m.reply_to_message().cloned()))
+}
+
+pub(crate) async fn handle_parent_unavailable(bot: Bot, q: CallbackQuery) -> anyhow::Result<()> {
+    bot.answer_callback_query(q.id)
+        .cache_time(60)
+        .text("Oops, something went wrong.")
+        .await?;
+    Ok(())
+}
+
 pub(crate) async fn handle_settings(
     bot: Bot,
     dialogue: DiffusionDialogue,
     (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
     q: CallbackQuery,
-    message: Message,
+    chat_id: ChatId,
+    parent: Message,
 ) -> anyhow::Result<()> {
-    let chat_id = message.chat.id;
-
-    let parent = if let Some(parent) = message.reply_to_message().cloned() {
-        parent
-    } else {
-        bot.answer_callback_query(q.id)
-            .cache_time(60)
-            .text("Oops, something went wrong.")
-            .await?;
-        return Ok(());
-    };
-
     let settings = if parent.photo().is_some() {
         dialogue
             .update(State::SettingsImg2Img {
@@ -568,7 +570,11 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
     let callback_handler = filter_settings_callback_query()
         .branch(
             case![State::Ready { txt2img, img2img }]
-                .branch(filter_callback_query_message().endpoint(handle_settings))
+                .branch(
+                    filter_callback_query_chat_id()
+                        .branch(filter_callback_query_parent().endpoint(handle_settings))
+                        .endpoint(handle_parent_unavailable),
+                )
                 .endpoint(handle_message_expired),
         )
         .branch(filter_map_settings_state().endpoint(handle_settings_button));
