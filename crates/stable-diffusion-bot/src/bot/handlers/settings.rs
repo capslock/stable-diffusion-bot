@@ -610,8 +610,7 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_filter_settings_query() {
+    fn create_callback_query_update(data: Option<String>) -> Update {
         let query = CallbackQuery {
             id: "123456".to_string(),
             from: User {
@@ -627,14 +626,19 @@ mod tests {
             message: None,
             inline_message_id: None,
             chat_instance: "123456".to_string(),
-            data: Some("settings".to_string()),
+            data,
             game_short_name: None,
         };
 
-        let update = Update {
+        Update {
             id: 1,
             kind: UpdateKind::CallbackQuery(query),
-        };
+        }
+    }
+
+    #[tokio::test]
+    async fn test_filter_settings_query() {
+        let update = create_callback_query_update(Some("settings".to_string()));
 
         assert!(matches!(
             filter_settings_query()
@@ -647,29 +651,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_filter_settings_query_none() {
-        let query = CallbackQuery {
-            id: "123456".to_string(),
-            from: User {
-                id: UserId(123456780),
-                is_bot: true,
-                first_name: "Stable Diffusion".to_string(),
-                last_name: None,
-                username: Some("sdbot".to_string()),
-                language_code: Some("en".to_string()),
-                is_premium: false,
-                added_to_attachment_menu: false,
-            },
-            message: None,
-            inline_message_id: None,
-            chat_instance: "123456".to_string(),
-            data: None,
-            game_short_name: None,
-        };
-
-        let update = Update {
-            id: 1,
-            kind: UpdateKind::CallbackQuery(query),
-        };
+        let update = create_callback_query_update(None);
 
         assert!(matches!(
             filter_settings_query()
@@ -682,29 +664,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_filter_settings_query_bad_data() {
-        let query = CallbackQuery {
-            id: "123456".to_string(),
-            from: User {
-                id: UserId(123456780),
-                is_bot: true,
-                first_name: "Stable Diffusion".to_string(),
-                last_name: None,
-                username: Some("sdbot".to_string()),
-                language_code: Some("en".to_string()),
-                is_premium: false,
-                added_to_attachment_menu: false,
-            },
-            message: None,
-            inline_message_id: None,
-            chat_instance: "123456".to_string(),
-            data: Some("bad_data".to_string()),
-            game_short_name: None,
-        };
-
-        let update = Update {
-            id: 1,
-            kind: UpdateKind::CallbackQuery(query),
-        };
+        let update = create_callback_query_update(Some("bad_data".to_string()));
 
         assert!(matches!(
             filter_settings_query()
