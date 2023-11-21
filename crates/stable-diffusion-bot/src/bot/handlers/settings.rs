@@ -567,25 +567,9 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
 
     let message_handler = Update::filter_message()
         .branch(
-            Message::filter_text()
-                .branch(
-                    case![State::SettingsTxt2Img {
-                        selection,
-                        txt2img,
-                        img2img
-                    }]
-                    .endpoint(handle_settings_value),
-                )
-                .branch(
-                    case![State::SettingsImg2Img {
-                        selection,
-                        txt2img,
-                        img2img
-                    }]
-                    .endpoint(handle_settings_value),
-                ),
+            Message::filter_text().chain(filter_settings_state().endpoint(handle_settings_value)),
         )
-        .chain(filter_settings_state().endpoint(handle_invalid_setting_value));
+        .branch(filter_settings_state().endpoint(handle_invalid_setting_value));
 
     dptree::entry()
         .branch(settings_command_handler())
