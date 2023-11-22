@@ -474,15 +474,8 @@ pub(crate) async fn handle_settings_value(
     Ok(())
 }
 
-async fn handle_settings_command(
-    msg: Message,
-    cfg: ConfigParameters,
-    bot: Bot,
-    dialogue: DiffusionDialogue,
-    cmd: SettingsCommands,
-    state: State,
-) -> anyhow::Result<()> {
-    let (txt2img, img2img) = match state {
+pub(crate) fn map_settings() -> UpdateHandler<anyhow::Error> {
+    dptree::entry().map(|cfg: ConfigParameters, state: State| match state {
         State::Ready { txt2img, img2img }
         | State::SettingsTxt2Img {
             txt2img, img2img, ..
@@ -491,7 +484,16 @@ async fn handle_settings_command(
             txt2img, img2img, ..
         } => (txt2img, img2img),
         State::New => (cfg.txt2img_defaults, cfg.img2img_defaults),
-    };
+    })
+}
+
+async fn handle_settings_command(
+    msg: Message,
+    bot: Bot,
+    dialogue: DiffusionDialogue,
+    cmd: SettingsCommands,
+    (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
+) -> anyhow::Result<()> {
     match cmd {
         SettingsCommands::Img2ImgSettings => {
             dialogue
@@ -538,6 +540,7 @@ pub(crate) fn settings_command_handler() -> UpdateHandler<anyhow::Error> {
     Update::filter_message()
         .filter_command::<SettingsCommands>()
         .chain(state_or_default())
+        .chain(map_settings())
         .endpoint(handle_settings_command)
 }
 
