@@ -494,7 +494,7 @@ async fn handle_settings_command(
     cmd: SettingsCommands,
     (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
 ) -> anyhow::Result<()> {
-    match cmd {
+    let settings = match cmd {
         SettingsCommands::Img2ImgSettings => {
             dialogue
                 .update(State::SettingsImg2Img {
@@ -504,12 +504,7 @@ async fn handle_settings_command(
                 })
                 .await
                 .map_err(|e| anyhow!(e))?;
-            let settings = Settings::try_from(img2img)?;
-            bot.send_message(msg.chat.id, "Please make a selection.")
-                .reply_markup(settings.keyboard())
-                .send()
-                .await?;
-            Ok(())
+            Settings::try_from(img2img)?
         }
         SettingsCommands::Txt2ImgSettings => {
             dialogue
@@ -520,14 +515,14 @@ async fn handle_settings_command(
                 })
                 .await
                 .map_err(|e| anyhow!(e))?;
-            let settings = Settings::try_from(txt2img)?;
-            bot.send_message(msg.chat.id, "Please make a selection.")
-                .reply_markup(settings.keyboard())
-                .send()
-                .await?;
-            Ok(())
+            Settings::try_from(txt2img)?
         }
-    }
+    };
+    bot.send_message(msg.chat.id, "Please make a selection.")
+        .reply_markup(settings.keyboard())
+        .send()
+        .await?;
+    Ok(())
 }
 
 async fn handle_invalid_setting_value(bot: Bot, msg: Message) -> anyhow::Result<()> {
