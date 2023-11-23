@@ -428,50 +428,78 @@ pub(crate) fn state_or_default() -> UpdateHandler<anyhow::Error> {
     )
 }
 
-pub(crate) async fn handle_settings_value(
+pub(crate) async fn update_settings_value(
     bot: Bot,
     dialogue: DiffusionDialogue,
-    msg: Message,
-    text: String,
-    mut state: State,
+    chat_id: ChatId,
+    settings: Settings,
+    state: State,
 ) -> anyhow::Result<()> {
-    let settings = match &mut state {
-        State::SettingsTxt2Img {
-            selection, txt2img, ..
-        } => {
-            if let Some(setting) = selection {
-                if let Err(e) = update_txt2img_setting(txt2img, setting, text) {
-                    bot.send_message(msg.chat.id, format!("Please enter a valid value: {e:?}."))
-                        .await?;
-                    return Ok(());
-                }
-            }
-            *selection = None;
-            Settings::try_from(&*txt2img)?
-        }
-        State::SettingsImg2Img {
-            selection, img2img, ..
-        } => {
-            if let Some(setting) = selection {
-                if let Err(e) = update_img2img_setting(img2img, setting, text) {
-                    bot.send_message(msg.chat.id, format!("Please enter a valid value: {e:?}."))
-                        .await?;
-                    return Ok(());
-                }
-            }
-            *selection = None;
-            Settings::try_from(&*img2img)?
-        }
-        _ => return Err(anyhow!("Invalid settings state")),
-    };
-
     dialogue.update(state).await.map_err(|e| anyhow!(e))?;
 
-    bot.send_message(msg.chat.id, "Please make a selection.")
+    bot.send_message(chat_id, "Please make a selection.")
         .reply_markup(settings.keyboard())
         .await?;
 
     Ok(())
+}
+
+pub(crate) async fn handle_txt2img_settings_value(
+    bot: Bot,
+    dialogue: DiffusionDialogue,
+    msg: Message,
+    text: String,
+    (selection, mut txt2img, img2img): (Option<String>, Txt2ImgRequest, Img2ImgRequest),
+) -> anyhow::Result<()> {
+    if let Some(ref setting) = selection {
+        if let Err(e) = update_txt2img_setting(&mut txt2img, setting, text) {
+            bot.send_message(msg.chat.id, format!("Please enter a valid value: {e:?}."))
+                .await?;
+            return Ok(());
+        }
+    }
+
+    update_settings_value(
+        bot,
+        dialogue,
+        msg.chat.id,
+        Settings::try_from(&txt2img)?,
+        State::SettingsTxt2Img {
+            selection,
+            txt2img,
+            img2img,
+        },
+    )
+    .await
+}
+
+pub(crate) async fn handle_img2img_settings_value(
+    bot: Bot,
+    dialogue: DiffusionDialogue,
+    msg: Message,
+    text: String,
+    (selection, txt2img, mut img2img): (Option<String>, Txt2ImgRequest, Img2ImgRequest),
+) -> anyhow::Result<()> {
+    if let Some(ref setting) = selection {
+        if let Err(e) = update_img2img_setting(&mut img2img, setting, text) {
+            bot.send_message(msg.chat.id, format!("Please enter a valid value: {e:?}."))
+                .await?;
+            return Ok(());
+        }
+    }
+
+    update_settings_value(
+        bot,
+        dialogue,
+        msg.chat.id,
+        Settings::try_from(&img2img)?,
+        State::SettingsImg2Img {
+            selection,
+            txt2img,
+            img2img,
+        },
+    )
+    .await
 }
 
 pub(crate) fn map_settings() -> UpdateHandler<anyhow::Error> {
@@ -587,7 +615,23 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
             Message::filter_text()
                 .chain(filter_settings_state())
                 .chain(state_or_default())
-                .endpoint(handle_settings_value),
+                .branch(
+                    case![State::SettingsTxt2Img {
+                        selection,
+                        txt2img,
+                        img2img
+                    }]
+                    .endpoint(handle_txt2img_settings_value),
+                )
+                .branch(
+                    case![State::SettingsImg2Img {
+                        selection,
+                        txt2img,
+                        img2img
+                    }]
+                    .endpoint(handle_img2img_settings_value),
+                )
+                .endpoint(|| async { Err(anyhow!("Invalid settings state")) }),
         )
         .branch(filter_settings_state().endpoint(handle_invalid_setting_value));
 
