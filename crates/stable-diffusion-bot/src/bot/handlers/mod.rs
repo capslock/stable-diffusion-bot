@@ -95,7 +95,6 @@ pub(crate) fn authenticated_command_handler() -> UpdateHandler<anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
     use teloxide::types::{Me, UpdateKind, User};
 
     fn create_message(text: &str) -> Message {
@@ -145,10 +144,8 @@ mod tests {
     fn create_config(allowed_users: Vec<i64>, allow_all_users: bool) -> ConfigParameters {
         ConfigParameters {
             allowed_users: allowed_users.into_iter().map(ChatId).collect(),
-            api: stable_diffusion_api::Api::new(),
-            txt2img_defaults: Txt2ImgRequest::default(),
-            img2img_defaults: Img2ImgRequest::default(),
             allow_all_users,
+            ..Default::default()
         }
     }
 

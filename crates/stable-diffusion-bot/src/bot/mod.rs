@@ -168,7 +168,7 @@ impl StableDiffusionBot {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ConfigParameters {
     allowed_users: HashSet<ChatId>,
     api: Api,
