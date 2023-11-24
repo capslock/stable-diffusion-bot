@@ -643,6 +643,8 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use teloxide::types::{UpdateKind, User};
 
     use super::*;
@@ -803,6 +805,32 @@ mod tests {
                 .dispatch(dptree::deps![State::New])
                 .await,
             ControlFlow::Continue(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_map_settings_default() {
+        let cfg = ConfigParameters {
+            txt2img_defaults: Txt2ImgRequest::default(),
+            img2img_defaults: Img2ImgRequest::default(),
+            allowed_users: HashSet::new(),
+            api: stable_diffusion_api::Api::default(),
+            allow_all_users: false,
+        };
+        assert!(matches!(
+            map_settings()
+                .endpoint(
+                    |(txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest)| async move {
+                        assert!(
+                            (txt2img, img2img)
+                                == (Txt2ImgRequest::default(), Img2ImgRequest::default())
+                        );
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![cfg, State::New])
+                .await,
+            ControlFlow::Break(_)
         ));
     }
 }
