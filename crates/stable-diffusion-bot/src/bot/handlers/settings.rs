@@ -679,7 +679,7 @@ mod tests {
 
         assert!(matches!(
             filter_settings_callback_query()
-                .endpoint(|| async move { anyhow::Ok(()) })
+                .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![update])
                 .await,
             ControlFlow::Break(_)
@@ -692,7 +692,7 @@ mod tests {
 
         assert!(matches!(
             filter_settings_callback_query()
-                .endpoint(|| async move { anyhow::Ok(()) })
+                .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![update])
                 .await,
             ControlFlow::Continue(_)
@@ -705,7 +705,7 @@ mod tests {
 
         assert!(matches!(
             filter_settings_callback_query()
-                .endpoint(|| async move { anyhow::Ok(()) })
+                .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![update])
                 .await,
             ControlFlow::Continue(_)
@@ -716,7 +716,7 @@ mod tests {
     async fn test_filter_settings_state_txt2img() {
         assert!(matches!(
             filter_settings_state()
-                .endpoint(|| async move { anyhow::Ok(()) })
+                .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::SettingsTxt2Img {
                     selection: None,
                     txt2img: Txt2ImgRequest::default(),
@@ -731,7 +731,7 @@ mod tests {
     async fn test_filter_settings_state_img2img() {
         assert!(matches!(
             filter_settings_state()
-                .endpoint(|| async move { anyhow::Ok(()) })
+                .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::SettingsImg2Img {
                     selection: None,
                     txt2img: Txt2ImgRequest::default(),
@@ -746,7 +746,7 @@ mod tests {
     async fn test_filter_settings_state() {
         assert!(matches!(
             filter_settings_state()
-                .endpoint(|| async move { anyhow::Ok(()) })
+                .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::New])
                 .await,
             ControlFlow::Continue(_)
@@ -758,7 +758,7 @@ mod tests {
         assert!(matches!(
             filter_map_settings_state()
                 .endpoint(
-                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async move {
+                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async {
                         anyhow::Ok(())
                     }
                 )
@@ -777,7 +777,7 @@ mod tests {
         assert!(matches!(
             filter_map_settings_state()
                 .endpoint(
-                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async move {
+                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async {
                         anyhow::Ok(())
                     }
                 )
@@ -796,7 +796,7 @@ mod tests {
         assert!(matches!(
             filter_map_settings_state()
                 .endpoint(
-                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async move {
+                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async {
                         anyhow::Ok(())
                     }
                 )
@@ -811,7 +811,7 @@ mod tests {
         assert!(matches!(
             map_settings()
                 .endpoint(
-                    |(txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest)| async move {
+                    |(txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest)| async {
                         assert!(
                             (txt2img, img2img)
                                 == (Txt2ImgRequest::default(), Img2ImgRequest::default())
@@ -820,6 +820,45 @@ mod tests {
                     }
                 )
                 .dispatch(dptree::deps![ConfigParameters::default(), State::New])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_map_settings_ready() {
+        let txt2img = Txt2ImgRequest {
+            negative_prompt: Some("test".to_string()),
+            ..Txt2ImgRequest::default()
+        };
+        let img2img = Img2ImgRequest {
+            negative_prompt: Some("test".to_string()),
+            ..Img2ImgRequest::default()
+        };
+        assert!(matches!(
+            map_settings()
+                .endpoint(
+                    |(txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest)| async {
+                        assert!(
+                            (txt2img, img2img)
+                                == (
+                                    Txt2ImgRequest {
+                                        negative_prompt: Some("test".to_string()),
+                                        ..Txt2ImgRequest::default()
+                                    },
+                                    Img2ImgRequest {
+                                        negative_prompt: Some("test".to_string()),
+                                        ..Img2ImgRequest::default()
+                                    }
+                                )
+                        );
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![
+                    ConfigParameters::default(),
+                    State::Ready { txt2img, img2img }
+                ])
                 .await,
             ControlFlow::Break(_)
         ));
