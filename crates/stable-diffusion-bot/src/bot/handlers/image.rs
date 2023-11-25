@@ -106,6 +106,7 @@ impl Response {
                 let input_media = images.into_iter().map(|i| {
                     let mut media = InputMediaPhoto::new(InputFile::memory(i));
                     media.caption = caption.take();
+                    media.parse_mode = Some(teloxide::types::ParseMode::MarkdownV2);
                     InputMedia::Photo(media)
                 });
 
