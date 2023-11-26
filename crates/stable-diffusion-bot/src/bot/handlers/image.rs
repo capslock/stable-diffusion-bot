@@ -136,15 +136,16 @@ impl MessageText {
     pub fn new_with_infotxt(prompt: &str, infotxt: &str) -> Self {
         use teloxide::utils::markdown::escape;
         lazy_static! {
-            static ref RE: Regex = Regex::new(r"Seed: (?P<seed>\d+)").unwrap();
+            static ref RE: Regex = Regex::new(r"(?P<key>[^,]+): (?P<value>[^,]+),? ?").unwrap();
         }
         Self(format!(
-            "`{}`\n{}",
+            "`{}`\n\n{}",
             escape(prompt),
-            RE.replace(
-                escape(infotxt.strip_prefix(prompt).unwrap_or(infotxt).trim()).as_str(),
-                "Seed: `$seed`"
+            RE.replace_all(
+                escape(infotxt.strip_prefix(prompt).unwrap_or(infotxt)).as_str(),
+                "$key: `$value`\n",
             )
+            .trim()
         ))
     }
 
