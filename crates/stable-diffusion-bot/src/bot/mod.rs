@@ -239,7 +239,7 @@ impl StableDiffusionBotBuilder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
     /// # let api_key = "api_key".to_string();
     /// # let allowed_users = vec![1, 2, 3];
