@@ -130,13 +130,23 @@ impl StableDiffusionBot {
         .filter_map_async(
             |dialogue: Dialogue<State, S>, cfg: ConfigParameters| async move {
                 match dialogue.get().await {
-                    Ok(dialogue) => Some(dialogue.unwrap_or(State::new_with_defaults(
-                        cfg.txt2img_defaults,
-                        cfg.img2img_defaults,
-                    ))),
+                    Ok(dialogue) => Some(dialogue.unwrap_or_else(|| {
+                        State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults)
+                    })),
                     Err(err) => {
                         error!("dialogue.get() failed: {:?}", err);
-                        None
+                        let defaults =
+                            State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults);
+                        match dialogue.update(defaults.clone()).await {
+                            Ok(_) => {
+                                warn!("dialogue reset to default state: {:?}", defaults);
+                                Some(defaults)
+                            }
+                            Err(err) => {
+                                error!("dialogue.update() failed: {:?}", err);
+                                None
+                            }
+                        }
                     }
                 }
             },
