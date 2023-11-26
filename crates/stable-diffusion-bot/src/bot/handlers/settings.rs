@@ -206,7 +206,7 @@ impl TryFrom<Img2ImgRequest> for Settings {
 }
 
 pub(crate) fn filter_callback_query_chat_id() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().filter_map(|q: CallbackQuery| q.message.map(|m| m.chat.id))
+    dptree::filter_map(|q: CallbackQuery| q.message.map(|m| m.chat.id))
 }
 
 pub(crate) async fn handle_message_expired(bot: Bot, q: CallbackQuery) -> anyhow::Result<()> {
@@ -218,8 +218,7 @@ pub(crate) async fn handle_message_expired(bot: Bot, q: CallbackQuery) -> anyhow
 }
 
 pub(crate) fn filter_callback_query_parent() -> UpdateHandler<anyhow::Error> {
-    dptree::entry()
-        .filter_map(|q: CallbackQuery| q.message.and_then(|m| m.reply_to_message().cloned()))
+    dptree::filter_map(|q: CallbackQuery| q.message.and_then(|m| m.reply_to_message().cloned()))
 }
 
 pub(crate) async fn handle_parent_unavailable(bot: Bot, q: CallbackQuery) -> anyhow::Result<()> {
@@ -415,7 +414,7 @@ where
 }
 
 pub(crate) fn state_or_default() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().map_async(
+    dptree::map_async(
         |cfg: ConfigParameters, dialogue: DiffusionDialogue| async move {
             let result = dialogue.get().await;
             if let Err(ref err) = result {
@@ -503,7 +502,7 @@ pub(crate) async fn handle_img2img_settings_value(
 }
 
 pub(crate) fn map_settings() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().map(|cfg: ConfigParameters, state: State| match state {
+    dptree::map(|cfg: ConfigParameters, state: State| match state {
         State::Ready { txt2img, img2img }
         | State::SettingsTxt2Img {
             txt2img, img2img, ..
@@ -573,7 +572,7 @@ pub(crate) fn filter_settings_callback_query() -> UpdateHandler<anyhow::Error> {
 }
 
 pub(crate) fn filter_settings_state() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().filter(|state: State| {
+    dptree::filter(|state: State| {
         matches!(
             state,
             State::SettingsTxt2Img { .. } | State::SettingsImg2Img { .. }
@@ -582,7 +581,7 @@ pub(crate) fn filter_settings_state() -> UpdateHandler<anyhow::Error> {
 }
 
 pub(crate) fn filter_map_settings_state() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().filter_map(|state: State| match state {
+    dptree::filter_map(|state: State| match state {
         State::SettingsTxt2Img {
             selection,
             txt2img,
