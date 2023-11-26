@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use lazy_static::lazy_static;
 use regex::Regex;
-use stable_diffusion_api::{Img2ImgRequest, ImgResponse, Txt2ImgRequest};
+use stable_diffusion_api::{Img2ImgRequest, ImgInfo, ImgResponse, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
@@ -140,25 +140,58 @@ impl Response {
 struct MessageText(String);
 
 impl MessageText {
-    pub fn new_with_infotxt(prompt: &str, infotxt: &str) -> Self {
+    pub fn new_with_imginfo(prompt: &str, infotxt: &ImgInfo) -> Self {
         use teloxide::utils::markdown::escape;
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r"(?P<key>[^,]+): (?P<value>[^,]+),? ?").unwrap();
-        }
-        Self(format!(
-            "`{}`\n\n{}",
-            escape(prompt),
-            RE.replace_all(
-                escape(infotxt.strip_prefix(prompt).unwrap_or(infotxt)).as_str(),
-                "$key: `$value`\n",
-            )
-            .trim()
-        ))
-    }
 
-    pub fn new(prompt: &str) -> Self {
-        use teloxide::utils::markdown::escape;
-        Self(format!("`{}`", escape(prompt),))
+        lazy_static! {
+            static ref RE: Regex = Regex::new(r"Model: (.+?),").unwrap();
+        }
+
+        let model = RE
+            .captures(
+                infotxt
+                    .infotexts
+                    .clone()
+                    .unwrap_or_default()
+                    .first()
+                    .unwrap()
+                    .as_str(),
+            )
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str()
+            .to_string();
+
+        Self(format!(
+            "{}{}",
+            match infotxt.negative_prompt.clone() {
+                Some(n_prompt) if !n_prompt.is_empty() => {
+                    format!(
+                        "`{}`\n\nNegative prompt: `{}`\n",
+                        escape(prompt),
+                        escape(&n_prompt)
+                    )
+                }
+                _ => format!("`{}`\n\n", escape(prompt)),
+            },
+            [
+                format!("Steps: `{}`", infotxt.steps.unwrap(),),
+                format!("Sampler: `{}`", &infotxt.sampler_name.clone().unwrap(),),
+                format!("CFG scale: `{}`", infotxt.cfg_scale.unwrap(),),
+                format!("Seed: `{}`", infotxt.seed.unwrap(),),
+                format!(
+                    "Size: `{}`",
+                    format_args!("{}x{}", infotxt.width.unwrap(), infotxt.height.unwrap()),
+                ),
+                format!("Model: `{}`", model),
+                format!(
+                    "Denoising strength: `{}`",
+                    infotxt.denoising_strength.unwrap(),
+                ),
+            ]
+            .join("\n")
+        ))
     }
 }
 
@@ -175,17 +208,12 @@ impl<T> TryFrom<&ImgResponse<T>> for MessageText {
 
     fn try_from(resp: &ImgResponse<T>) -> Result<Self, Self::Error> {
         let info = resp.info()?;
-        let prompt = if let Some(prompt) = info.prompt {
+        let prompt = if let Some(prompt) = &info.prompt {
             prompt
         } else {
             return Err(anyhow!("No prompt in image info response"));
         };
-        if let Some(infos) = info.infotexts {
-            if let Some(info) = infos.first() {
-                return Ok(Self::new_with_infotxt(prompt.as_str(), info.as_str()));
-            }
-        }
-        return Ok(Self::new(prompt.as_str()));
+        Ok(Self::new_with_imginfo(prompt.as_str(), &info))
     }
 }
 
