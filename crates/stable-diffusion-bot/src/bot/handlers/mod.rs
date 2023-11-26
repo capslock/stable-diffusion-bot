@@ -1,6 +1,8 @@
 use anyhow::anyhow;
 use teloxide::{dispatching::UpdateHandler, prelude::*, utils::command::BotCommands};
 
+use crate::BotState;
+
 use super::{ConfigParameters, DiffusionDialogue, State};
 
 mod image;
@@ -50,6 +52,7 @@ pub(crate) async fn unauthenticated_commands_handler(
         UnauthenticatedCommands::Start => {
             dialogue
                 .update(State::Ready {
+                    bot_state: BotState::default(),
                     txt2img: cfg.txt2img_defaults,
                     img2img: cfg.img2img_defaults,
                 })
@@ -64,6 +67,22 @@ pub(crate) async fn unauthenticated_commands_handler(
     bot.send_message(msg.chat.id, text).await?;
 
     Ok(())
+}
+
+pub(crate) fn filter_map_bot_state() -> UpdateHandler<anyhow::Error> {
+    dptree::filter_map(|state: State| match state {
+        State::Ready { bot_state, .. } => Some(bot_state),
+        _ => None,
+    })
+}
+
+pub(crate) fn filter_map_settings() -> UpdateHandler<anyhow::Error> {
+    dptree::filter_map(|state: State| match state {
+        State::Ready {
+            txt2img, img2img, ..
+        } => Some((txt2img, img2img)),
+        _ => None,
+    })
 }
 
 pub(crate) fn auth_filter() -> UpdateHandler<anyhow::Error> {

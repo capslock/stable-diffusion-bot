@@ -66,7 +66,7 @@
               ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (macFrameworks pkgs);
           }) {toolchain = rust;};
         container = crate: {
-          name = crate.name;
+          name = crate.pname;
           tag = "latest";
           created = "now";
           contents = [pkgs.cacert];

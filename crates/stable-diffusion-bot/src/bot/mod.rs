@@ -26,16 +26,7 @@ pub enum State {
     #[default]
     New,
     Ready {
-        txt2img: Txt2ImgRequest,
-        img2img: Img2ImgRequest,
-    },
-    SettingsTxt2Img {
-        selection: Option<String>,
-        txt2img: Txt2ImgRequest,
-        img2img: Img2ImgRequest,
-    },
-    SettingsImg2Img {
-        selection: Option<String>,
+        bot_state: BotState,
         txt2img: Txt2ImgRequest,
         img2img: Img2ImgRequest,
     },
@@ -43,8 +34,24 @@ pub enum State {
 
 impl State {
     fn new_with_defaults(txt2img: Txt2ImgRequest, img2img: Img2ImgRequest) -> Self {
-        Self::Ready { txt2img, img2img }
+        Self::Ready {
+            txt2img,
+            img2img,
+            bot_state: BotState::Generate,
+        }
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub enum BotState {
+    #[default]
+    Generate,
+    SettingsTxt2Img {
+        selection: Option<String>,
+    },
+    SettingsImg2Img {
+        selection: Option<String>,
+    },
 }
 
 fn default_txt2img(txt2img: Txt2ImgRequest) -> Txt2ImgRequest {
@@ -123,13 +130,23 @@ impl StableDiffusionBot {
         .filter_map_async(
             |dialogue: Dialogue<State, S>, cfg: ConfigParameters| async move {
                 match dialogue.get().await {
-                    Ok(dialogue) => Some(dialogue.unwrap_or(State::Ready {
-                        txt2img: cfg.txt2img_defaults,
-                        img2img: cfg.img2img_defaults,
+                    Ok(dialogue) => Some(dialogue.unwrap_or_else(|| {
+                        State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults)
                     })),
                     Err(err) => {
                         error!("dialogue.get() failed: {:?}", err);
-                        None
+                        let defaults =
+                            State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults);
+                        match dialogue.update(defaults.clone()).await {
+                            Ok(_) => {
+                                warn!("dialogue reset to default state: {:?}", defaults);
+                                Some(defaults)
+                            }
+                            Err(err) => {
+                                error!("dialogue.update() failed: {:?}", err);
+                                None
+                            }
+                        }
                     }
                 }
             },
@@ -222,7 +239,7 @@ impl StableDiffusionBotBuilder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
     /// # let api_key = "api_key".to_string();
     /// # let allowed_users = vec![1, 2, 3];

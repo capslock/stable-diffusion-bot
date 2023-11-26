@@ -10,9 +10,9 @@ use teloxide::{
 };
 use tracing::error;
 
-use crate::bot::ConfigParameters;
+use crate::{bot::ConfigParameters, BotState};
 
-use super::{DiffusionDialogue, State};
+use super::{filter_map_bot_state, filter_map_settings, DiffusionDialogue, State};
 
 /// BotCommands for settings.
 #[derive(BotCommands, Clone)]
@@ -206,7 +206,7 @@ impl TryFrom<Img2ImgRequest> for Settings {
 }
 
 pub(crate) fn filter_callback_query_chat_id() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().filter_map(|q: CallbackQuery| q.message.map(|m| m.chat.id))
+    dptree::filter_map(|q: CallbackQuery| q.message.map(|m| m.chat.id))
 }
 
 pub(crate) async fn handle_message_expired(bot: Bot, q: CallbackQuery) -> anyhow::Result<()> {
@@ -218,8 +218,7 @@ pub(crate) async fn handle_message_expired(bot: Bot, q: CallbackQuery) -> anyhow
 }
 
 pub(crate) fn filter_callback_query_parent() -> UpdateHandler<anyhow::Error> {
-    dptree::entry()
-        .filter_map(|q: CallbackQuery| q.message.and_then(|m| m.reply_to_message().cloned()))
+    dptree::filter_map(|q: CallbackQuery| q.message.and_then(|m| m.reply_to_message().cloned()))
 }
 
 pub(crate) async fn handle_parent_unavailable(bot: Bot, q: CallbackQuery) -> anyhow::Result<()> {
@@ -239,27 +238,27 @@ pub(crate) async fn handle_settings(
     parent: Message,
 ) -> anyhow::Result<()> {
     let settings = if parent.photo().is_some() {
+        let settings = Settings::try_from(&img2img)?;
         dialogue
-            .update(State::SettingsImg2Img {
-                selection: None,
+            .update(State::Ready {
+                bot_state: BotState::SettingsImg2Img { selection: None },
                 txt2img,
-                img2img: img2img.clone(),
+                img2img,
             })
             .await
             .map_err(|e| anyhow!(e))?;
-
-        Settings::try_from(img2img)?
+        settings
     } else if parent.text().is_some() {
+        let settings = Settings::try_from(&txt2img)?;
         dialogue
-            .update(State::SettingsTxt2Img {
-                selection: None,
+            .update(State::Ready {
+                bot_state: BotState::SettingsTxt2Img { selection: None },
                 txt2img: txt2img.clone(),
                 img2img,
             })
             .await
             .map_err(|e| anyhow!(e))?;
-
-        Settings::try_from(txt2img)?
+        settings
     } else {
         bot.answer_callback_query(q.id)
             .cache_time(60)
@@ -311,7 +310,11 @@ pub(crate) async fn handle_settings_button(
 
     if setting == "back" {
         dialogue
-            .update(State::Ready { txt2img, img2img })
+            .update(State::Ready {
+                bot_state: BotState::Generate,
+                txt2img,
+                img2img,
+            })
             .await
             .map_err(|e| anyhow!(e))?;
         bot.answer_callback_query(q.id).text("Canceled.").await?;
@@ -327,9 +330,14 @@ pub(crate) async fn handle_settings_button(
         .map_err(|e| anyhow!(e))?
         .unwrap_or_else(|| State::new_with_defaults(cfg.txt2img_defaults, cfg.img2img_defaults));
     match &mut state {
-        State::SettingsTxt2Img { selection, .. } | State::SettingsImg2Img { selection, .. } => {
-            *selection = Some(setting.to_string())
+        State::Ready {
+            bot_state: BotState::SettingsTxt2Img { selection },
+            ..
         }
+        | State::Ready {
+            bot_state: BotState::SettingsImg2Img { selection },
+            ..
+        } => *selection = Some(setting.to_string()),
         _ => {
             bot.answer_callback_query(q.id)
                 .cache_time(60)
@@ -415,7 +423,7 @@ where
 }
 
 pub(crate) fn state_or_default() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().map_async(
+    dptree::map_async(
         |cfg: ConfigParameters, dialogue: DiffusionDialogue| async move {
             let result = dialogue.get().await;
             if let Err(ref err) = result {
@@ -459,13 +467,15 @@ pub(crate) async fn handle_txt2img_settings_value(
         }
     }
 
+    let bot_state = BotState::SettingsTxt2Img { selection };
+
     update_settings_value(
         bot,
         dialogue,
         msg.chat.id,
         Settings::try_from(&txt2img)?,
-        State::SettingsTxt2Img {
-            selection,
+        State::Ready {
+            bot_state,
             txt2img,
             img2img,
         },
@@ -488,13 +498,15 @@ pub(crate) async fn handle_img2img_settings_value(
         }
     }
 
+    let bot_state = BotState::SettingsImg2Img { selection };
+
     update_settings_value(
         bot,
         dialogue,
         msg.chat.id,
         Settings::try_from(&img2img)?,
-        State::SettingsImg2Img {
-            selection,
+        State::Ready {
+            bot_state,
             txt2img,
             img2img,
         },
@@ -503,49 +515,51 @@ pub(crate) async fn handle_img2img_settings_value(
 }
 
 pub(crate) fn map_settings() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().map(|cfg: ConfigParameters, state: State| match state {
-        State::Ready { txt2img, img2img }
-        | State::SettingsTxt2Img {
-            txt2img, img2img, ..
-        }
-        | State::SettingsImg2Img {
+    dptree::map(|cfg: ConfigParameters, state: State| match state {
+        State::Ready {
             txt2img, img2img, ..
         } => (txt2img, img2img),
         State::New => (cfg.txt2img_defaults, cfg.img2img_defaults),
     })
 }
 
-async fn handle_settings_command(
+async fn handle_img2img_settings_command(
     msg: Message,
     bot: Bot,
     dialogue: DiffusionDialogue,
-    cmd: SettingsCommands,
     (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
 ) -> anyhow::Result<()> {
-    let settings = match cmd {
-        SettingsCommands::Img2ImgSettings => {
-            dialogue
-                .update(State::SettingsImg2Img {
-                    selection: None,
-                    txt2img,
-                    img2img: img2img.clone(),
-                })
-                .await
-                .map_err(|e| anyhow!(e))?;
-            Settings::try_from(img2img)?
-        }
-        SettingsCommands::Txt2ImgSettings => {
-            dialogue
-                .update(State::SettingsTxt2Img {
-                    selection: None,
-                    txt2img: txt2img.clone(),
-                    img2img,
-                })
-                .await
-                .map_err(|e| anyhow!(e))?;
-            Settings::try_from(txt2img)?
-        }
-    };
+    let settings = Settings::try_from(&img2img)?;
+    dialogue
+        .update(State::Ready {
+            bot_state: BotState::SettingsImg2Img { selection: None },
+            txt2img,
+            img2img,
+        })
+        .await
+        .map_err(|e| anyhow!(e))?;
+    bot.send_message(msg.chat.id, "Please make a selection.")
+        .reply_markup(settings.keyboard())
+        .send()
+        .await?;
+    Ok(())
+}
+
+async fn handle_txt2img_settings_command(
+    msg: Message,
+    bot: Bot,
+    dialogue: DiffusionDialogue,
+    (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
+) -> anyhow::Result<()> {
+    let settings = Settings::try_from(&txt2img)?;
+    dialogue
+        .update(State::Ready {
+            bot_state: BotState::SettingsTxt2Img { selection: None },
+            txt2img,
+            img2img,
+        })
+        .await
+        .map_err(|e| anyhow!(e))?;
     bot.send_message(msg.chat.id, "Please make a selection.")
         .reply_markup(settings.keyboard())
         .send()
@@ -564,7 +578,8 @@ pub(crate) fn settings_command_handler() -> UpdateHandler<anyhow::Error> {
         .filter_command::<SettingsCommands>()
         .chain(state_or_default())
         .chain(map_settings())
-        .endpoint(handle_settings_command)
+        .branch(case![SettingsCommands::Txt2ImgSettings].endpoint(handle_txt2img_settings_command))
+        .branch(case![SettingsCommands::Img2ImgSettings].endpoint(handle_img2img_settings_command))
 }
 
 pub(crate) fn filter_settings_callback_query() -> UpdateHandler<anyhow::Error> {
@@ -573,34 +588,42 @@ pub(crate) fn filter_settings_callback_query() -> UpdateHandler<anyhow::Error> {
 }
 
 pub(crate) fn filter_settings_state() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().filter(|state: State| {
+    dptree::filter(|state: State| {
+        let bot_state = match state {
+            State::Ready { bot_state, .. } => bot_state,
+            _ => return false,
+        };
         matches!(
-            state,
-            State::SettingsTxt2Img { .. } | State::SettingsImg2Img { .. }
+            bot_state,
+            BotState::SettingsTxt2Img { .. } | BotState::SettingsImg2Img { .. }
         )
     })
 }
 
 pub(crate) fn filter_map_settings_state() -> UpdateHandler<anyhow::Error> {
-    dptree::entry().filter_map(|state: State| match state {
-        State::SettingsTxt2Img {
-            selection,
-            txt2img,
-            img2img,
-        } => Some((selection, txt2img, img2img)),
-        State::SettingsImg2Img {
-            selection,
-            txt2img,
-            img2img,
-        } => Some((selection, txt2img, img2img)),
-        _ => None,
+    dptree::filter_map(|state: State| {
+        let (bot_state, txt2img, img2img) = match state {
+            State::Ready {
+                bot_state,
+                txt2img,
+                img2img,
+            } => (bot_state, txt2img, img2img),
+            _ => return None,
+        };
+        match bot_state {
+            BotState::SettingsTxt2Img { selection } => Some((selection, txt2img, img2img)),
+            BotState::SettingsImg2Img { selection } => Some((selection, txt2img, img2img)),
+            _ => None,
+        }
     })
 }
 
 pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
     let callback_handler = filter_settings_callback_query()
         .branch(
-            case![State::Ready { txt2img, img2img }]
+            filter_map_bot_state()
+                .chain(case![BotState::Generate])
+                .chain(filter_map_settings())
                 .branch(
                     filter_callback_query_chat_id()
                         .branch(filter_callback_query_parent().endpoint(handle_settings))
@@ -613,23 +636,16 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
     let message_handler = Update::filter_message()
         .branch(
             Message::filter_text()
-                .chain(filter_settings_state())
+                .chain(filter_map_settings_state())
                 .chain(state_or_default())
+                .chain(filter_map_bot_state())
                 .branch(
-                    case![State::SettingsTxt2Img {
-                        selection,
-                        txt2img,
-                        img2img
-                    }]
-                    .endpoint(handle_txt2img_settings_value),
+                    case![BotState::SettingsTxt2Img { selection }]
+                        .endpoint(handle_txt2img_settings_value),
                 )
                 .branch(
-                    case![State::SettingsImg2Img {
-                        selection,
-                        txt2img,
-                        img2img
-                    }]
-                    .endpoint(handle_img2img_settings_value),
+                    case![BotState::SettingsImg2Img { selection }]
+                        .endpoint(handle_img2img_settings_value),
                 )
                 .endpoint(|| async { Err(anyhow!("Invalid settings state")) }),
         )
@@ -646,6 +662,7 @@ mod tests {
     use teloxide::types::{UpdateKind, User};
 
     use super::*;
+    use crate::BotState;
 
     fn create_callback_query_update(data: Option<String>) -> Update {
         let query = CallbackQuery {
@@ -717,8 +734,8 @@ mod tests {
         assert!(matches!(
             filter_settings_state()
                 .endpoint(|| async { anyhow::Ok(()) })
-                .dispatch(dptree::deps![State::SettingsTxt2Img {
-                    selection: None,
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsTxt2Img { selection: None },
                     txt2img: Txt2ImgRequest::default(),
                     img2img: Img2ImgRequest::default()
                 }])
@@ -732,8 +749,8 @@ mod tests {
         assert!(matches!(
             filter_settings_state()
                 .endpoint(|| async { anyhow::Ok(()) })
-                .dispatch(dptree::deps![State::SettingsImg2Img {
-                    selection: None,
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsImg2Img { selection: None },
                     txt2img: Txt2ImgRequest::default(),
                     img2img: Img2ImgRequest::default()
                 }])
@@ -762,8 +779,8 @@ mod tests {
                         anyhow::Ok(())
                     }
                 )
-                .dispatch(dptree::deps![State::SettingsTxt2Img {
-                    selection: None,
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsTxt2Img { selection: None },
                     txt2img: Txt2ImgRequest::default(),
                     img2img: Img2ImgRequest::default()
                 }])
@@ -781,8 +798,8 @@ mod tests {
                         anyhow::Ok(())
                     }
                 )
-                .dispatch(dptree::deps![State::SettingsImg2Img {
-                    selection: None,
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsImg2Img { selection: None },
                     txt2img: Txt2ImgRequest::default(),
                     img2img: Img2ImgRequest::default()
                 }])
@@ -857,7 +874,11 @@ mod tests {
                 )
                 .dispatch(dptree::deps![
                     ConfigParameters::default(),
-                    State::Ready { txt2img, img2img }
+                    State::Ready {
+                        bot_state: BotState::Generate,
+                        txt2img,
+                        img2img
+                    }
                 ])
                 .await,
             ControlFlow::Break(_)

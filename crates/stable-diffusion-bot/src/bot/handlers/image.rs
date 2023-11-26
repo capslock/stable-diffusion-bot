@@ -14,9 +14,12 @@ use teloxide::{
     },
 };
 
-use crate::bot::{helpers, State};
+use crate::{
+    bot::{helpers, State},
+    BotState,
+};
 
-use super::{ConfigParameters, DiffusionDialogue};
+use super::{filter_map_bot_state, filter_map_settings, ConfigParameters, DiffusionDialogue};
 
 /// BotCommands for generating images.
 #[derive(BotCommands, Clone)]
@@ -244,7 +247,11 @@ async fn handle_image(
         .await?;
 
     dialogue
-        .update(State::Ready { txt2img, img2img })
+        .update(State::Ready {
+            bot_state: BotState::default(),
+            txt2img,
+            img2img,
+        })
         .await
         .map_err(|e| anyhow!(e))?;
 
@@ -289,7 +296,11 @@ async fn handle_prompt(
         .await?;
 
     dialogue
-        .update(State::Ready { txt2img, img2img })
+        .update(State::Ready {
+            bot_state: BotState::default(),
+            txt2img,
+            img2img,
+        })
         .await
         .map_err(|e| anyhow!(e))?;
 
@@ -406,13 +417,21 @@ async fn handle_reuse(
     if parent.photo().is_some() {
         img2img.with_seed(seed);
         dialogue
-            .update(State::Ready { txt2img, img2img })
+            .update(State::Ready {
+                bot_state: BotState::default(),
+                txt2img,
+                img2img,
+            })
             .await
             .map_err(|e| anyhow!(e))?;
     } else if parent.text().is_some() {
         txt2img.with_seed(seed);
         dialogue
-            .update(State::Ready { txt2img, img2img })
+            .update(State::Ready {
+                bot_state: BotState::default(),
+                txt2img,
+                img2img,
+            })
             .await
             .map_err(|e| anyhow!(e))?;
     } else {
@@ -445,20 +464,31 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         .chain(dptree::filter_map(|GenCommands::Gen(s): GenCommands| {
             Some(s)
         }))
-        .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt));
+        .chain(filter_map_bot_state())
+        .chain(case![BotState::Generate])
+        .chain(filter_map_settings())
+        .endpoint(handle_prompt);
 
     let message_handler = Update::filter_message()
         .branch(
             Message::filter_photo()
-                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_image)),
+                .chain(filter_map_bot_state())
+                .chain(case![BotState::Generate])
+                .chain(filter_map_settings())
+                .endpoint(handle_image),
         )
         .branch(
             Message::filter_text()
-                .chain(case![State::Ready { txt2img, img2img }].endpoint(handle_prompt)),
+                .chain(filter_map_bot_state())
+                .chain(case![BotState::Generate])
+                .chain(filter_map_settings())
+                .endpoint(handle_prompt),
         );
 
     let callback_handler = Update::filter_callback_query()
-        .chain(case![State::Ready { txt2img, img2img }])
+        .chain(filter_map_bot_state())
+        .chain(case![BotState::Generate])
+        .chain(filter_map_settings())
         .branch(
             dptree::filter_map(|q: CallbackQuery| {
                 q.data
