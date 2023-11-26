@@ -514,37 +514,43 @@ pub(crate) fn map_settings() -> UpdateHandler<anyhow::Error> {
     })
 }
 
-async fn handle_settings_command(
+async fn handle_img2img_settings_command(
     msg: Message,
     bot: Bot,
     dialogue: DiffusionDialogue,
-    cmd: SettingsCommands,
     (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
 ) -> anyhow::Result<()> {
-    let settings = match cmd {
-        SettingsCommands::Img2ImgSettings => {
-            dialogue
-                .update(State::SettingsImg2Img {
-                    selection: None,
-                    txt2img,
-                    img2img: img2img.clone(),
-                })
-                .await
-                .map_err(|e| anyhow!(e))?;
-            Settings::try_from(img2img)?
-        }
-        SettingsCommands::Txt2ImgSettings => {
-            dialogue
-                .update(State::SettingsTxt2Img {
-                    selection: None,
-                    txt2img: txt2img.clone(),
-                    img2img,
-                })
-                .await
-                .map_err(|e| anyhow!(e))?;
-            Settings::try_from(txt2img)?
-        }
-    };
+    let settings = Settings::try_from(&img2img)?;
+    dialogue
+        .update(State::SettingsImg2Img {
+            selection: None,
+            txt2img,
+            img2img,
+        })
+        .await
+        .map_err(|e| anyhow!(e))?;
+    bot.send_message(msg.chat.id, "Please make a selection.")
+        .reply_markup(settings.keyboard())
+        .send()
+        .await?;
+    Ok(())
+}
+
+async fn handle_txt2img_settings_command(
+    msg: Message,
+    bot: Bot,
+    dialogue: DiffusionDialogue,
+    (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
+) -> anyhow::Result<()> {
+    let settings = Settings::try_from(&txt2img)?;
+    dialogue
+        .update(State::SettingsTxt2Img {
+            selection: None,
+            txt2img,
+            img2img,
+        })
+        .await
+        .map_err(|e| anyhow!(e))?;
     bot.send_message(msg.chat.id, "Please make a selection.")
         .reply_markup(settings.keyboard())
         .send()
@@ -563,7 +569,8 @@ pub(crate) fn settings_command_handler() -> UpdateHandler<anyhow::Error> {
         .filter_command::<SettingsCommands>()
         .chain(state_or_default())
         .chain(map_settings())
-        .endpoint(handle_settings_command)
+        .branch(case![SettingsCommands::Txt2ImgSettings].endpoint(handle_txt2img_settings_command))
+        .branch(case![SettingsCommands::Img2ImgSettings].endpoint(handle_img2img_settings_command))
 }
 
 pub(crate) fn filter_settings_callback_query() -> UpdateHandler<anyhow::Error> {
