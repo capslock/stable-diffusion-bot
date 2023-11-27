@@ -174,7 +174,7 @@ pub struct ImgInfo {
     /// The strength of the denoising applied during image generation.
     pub denoising_strength: Option<f64>,
     /// Extra parameters passed for image generation.
-    pub extra_generation_params: Option<serde_json::Value>,
+    pub extra_generation_params: Option<ExtraGenParams>,
     /// The index of the first image.
     pub index_of_first_image: Option<u32>,
     /// A vector of information texts about the generated images.
@@ -187,4 +187,16 @@ pub struct ImgInfo {
     pub clip_skip: Option<u32>,
     /// Whether or not inpainting conditioning was used for image generation.
     pub is_using_inpainting_conditioning: Option<bool>,
+}
+
+#[skip_serializing_none]
+#[derive(Default, Serialize, Deserialize, Debug)]
+/// Extra parameters describing image generation.
+pub struct ExtraGenParams {
+    /// Names and hashes of LORA models used for image generation.
+    #[serde(rename = "Lora hashes")]
+    pub lora_hashes: Option<String>,
+    /// Names and hashes of Textual Inversion models used for image generation.
+    #[serde(rename = "TI hashes")]
+    pub ti_hashes: Option<String>,
 }
