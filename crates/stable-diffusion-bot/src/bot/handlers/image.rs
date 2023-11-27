@@ -1,6 +1,4 @@
 use anyhow::{anyhow, Context};
-use lazy_static::lazy_static;
-use regex::Regex;
 use stable_diffusion_api::{Img2ImgRequest, ImgInfo, ImgResponse, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
@@ -143,53 +141,40 @@ impl MessageText {
     pub fn new_with_imginfo(prompt: &str, infotxt: &ImgInfo) -> Self {
         use teloxide::utils::markdown::escape;
 
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r"Model: (.+?),").unwrap();
-        }
-
-        let model = RE
-            .captures(
-                infotxt
-                    .infotexts
-                    .clone()
-                    .unwrap_or_default()
-                    .first()
-                    .unwrap()
-                    .as_str(),
-            )
-            .unwrap()
-            .get(1)
-            .unwrap()
-            .as_str()
-            .to_string();
-
         Self(format!(
-            "{}{}",
-            match infotxt.negative_prompt.clone() {
-                Some(n_prompt) if !n_prompt.is_empty() => {
-                    format!(
-                        "`{}`\n\nNegative prompt: `{}`\n",
-                        escape(prompt),
-                        escape(&n_prompt)
-                    )
-                }
-                _ => format!("`{}`\n\n", escape(prompt)),
-            },
+            "`{}`\n\n{}",
+            escape(prompt),
             [
-                format!("Steps: `{}`", infotxt.steps.unwrap(),),
-                format!("Sampler: `{}`", &infotxt.sampler_name.clone().unwrap(),),
-                format!("CFG scale: `{}`", infotxt.cfg_scale.unwrap(),),
-                format!("Seed: `{}`", infotxt.seed.unwrap(),),
-                format!(
-                    "Size: `{}`",
-                    format_args!("{}x{}", infotxt.width.unwrap(), infotxt.height.unwrap()),
-                ),
-                format!("Model: `{}`", model),
-                format!(
-                    "Denoising strength: `{}`",
-                    infotxt.denoising_strength.unwrap(),
-                ),
+                infotxt
+                    .negative_prompt
+                    .clone()
+                    .and_then(|s| if s.trim().is_empty() {
+                        None
+                    } else {
+                        Some(escape(&s))
+                    })
+                    .map(|s| format!("Negative prompt: `{s}`")),
+                infotxt.steps.map(|s| format!("Steps: `{s}`")),
+                infotxt
+                    .sampler_name
+                    .clone()
+                    .map(|s| format!("Sampler: `{s}`")),
+                infotxt.cfg_scale.map(|s| format!("CFG scale: `{s}`")),
+                infotxt.seed.map(|s| format!("Seed: `{s}`")),
+                infotxt.width.map(|s| format!("Width: `{s}`")),
+                infotxt.height.map(|s| format!("Height: `{s}`")),
+                infotxt
+                    .sd_model_name
+                    .clone()
+                    .map(|s| format!("Model: `{s}`")),
+                infotxt
+                    .denoising_strength
+                    .map(|s| format!("Denoising strength: `{s}`")),
             ]
+            .iter()
+            .flatten()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
             .join("\n")
         ))
     }
