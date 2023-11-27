@@ -181,4 +181,6 @@ pub struct ImgInfo {
     pub sd_model_hash: Option<String>,
     /// A vector of all the random seeds used for image generation.
     pub all_seeds: Option<Vec<i64>>,
+    /// The model name used when generating the image.
+    pub sd_model_name: Option<String>,
 }
