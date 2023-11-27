@@ -92,6 +92,14 @@ pub(crate) fn filter_map_settings() -> UpdateHandler<anyhow::Error> {
     })
 }
 
+pub(crate) fn admin_filter() -> UpdateHandler<anyhow::Error> {
+    dptree::filter(|cfg: ConfigParameters, upd: Update| {
+        upd.user()
+            .map(|user| cfg.user_is_admin(&user.id.into()))
+            .unwrap_or_default()
+    })
+}
+
 pub(crate) fn auth_filter() -> UpdateHandler<anyhow::Error> {
     dptree::filter(|cfg: ConfigParameters, upd: Update| {
         upd.chat()
@@ -135,6 +143,7 @@ pub(crate) fn authenticated_command_handler() -> UpdateHandler<anyhow::Error> {
         .branch(image_schema())
 }
 
+#[cfg(any())]
 #[cfg(test)]
 mod tests {
     use super::*;

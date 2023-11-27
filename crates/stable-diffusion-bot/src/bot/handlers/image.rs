@@ -85,15 +85,28 @@ impl Reply {
         })
     }
 
-    pub async fn send(self, bot: &Bot, chat_id: ChatId) -> anyhow::Result<()> {
+    pub async fn send(
+        self,
+        bot: &Bot,
+        chat_id: ChatId,
+        cfg: ConfigParameters,
+        user_id: Option<UserId>,
+    ) -> anyhow::Result<()> {
         match self.images {
             Photo::Single(image) => {
-                bot.send_photo(chat_id, InputFile::memory(image))
+                let mut message = bot
+                    .send_photo(chat_id, InputFile::memory(image))
                     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                     .caption(self.caption)
-                    .reply_markup(keyboard(self.seed))
-                    .reply_to_message_id(self.source)
-                    .await?;
+                    .reply_to_message_id(self.source);
+                if !cfg.ui.hide_all_buttons {
+                    message = message.reply_markup(keyboard(
+                        self.seed,
+                        cfg,
+                        user_id.map(Into::into).unwrap_or(chat_id),
+                    ))
+                }
+                message.await?;
             }
             Photo::Album(images) => {
                 let mut caption = Some(self.caption);
@@ -107,13 +120,19 @@ impl Reply {
                 bot.send_media_group(chat_id, input_media)
                     .reply_to_message_id(self.source)
                     .await?;
-                bot.send_message(
-                    chat_id,
-                    "What would you like to do? Select below, or enter a new prompt.",
-                )
-                .reply_markup(keyboard(self.seed))
-                .reply_to_message_id(self.source)
-                .await?;
+                if !cfg.ui.hide_all_buttons {
+                    bot.send_message(
+                        chat_id,
+                        "What would you like to do? Select below, or enter a new prompt.",
+                    )
+                    .reply_markup(keyboard(
+                        self.seed,
+                        cfg,
+                        user_id.map(Into::into).unwrap_or(chat_id),
+                    ))
+                    .reply_to_message_id(self.source)
+                    .await?;
+                }
             }
         }
 
@@ -124,6 +143,11 @@ impl Reply {
 struct MessageText(String);
 
 impl MessageText {
+    pub fn new(prompt: &str) -> Self {
+        use teloxide::utils::markdown::escape;
+        Self(format!("`{}`", escape(prompt)))
+    }
+
     pub fn new_with_image_params(prompt: &str, infotxt: &dyn ImageParams) -> Self {
         use teloxide::utils::markdown::escape;
 
@@ -240,12 +264,16 @@ async fn handle_image(
         resp.params.seed().unwrap_or(-1)
     };
 
-    let caption = MessageText::try_from(resp.params.as_ref())
-        .context("Failed to build caption from response")?;
+    let caption = if cfg.messages.hide_generation_info {
+        MessageText::new(&resp.params.prompt().unwrap_or_default())
+    } else {
+        MessageText::try_from(resp.params.as_ref())
+            .context("Failed to build caption from response")?
+    };
 
     Reply::new(caption.0, resp.images, seed, msg.id)
         .context("Failed to create response!")?
-        .send(&bot, msg.chat.id)
+        .send(&bot, msg.chat.id, cfg, msg.from().map(|f| f.id))
         .await?;
 
     dialogue
@@ -298,12 +326,16 @@ async fn handle_prompt(
         resp.params.seed().unwrap_or(-1)
     };
 
-    let caption = MessageText::try_from(resp.params.as_ref())
-        .context("Failed to build caption from response")?;
+    let caption = if cfg.messages.hide_generation_info {
+        MessageText::new(&resp.params.prompt().unwrap_or_default())
+    } else {
+        MessageText::try_from(resp.params.as_ref())
+            .context("Failed to build caption from response")?
+    };
 
     Reply::new(caption.0, resp.images, seed, msg.id)
         .context("Failed to create response!")?
-        .send(&bot, msg.chat.id)
+        .send(&bot, msg.chat.id, cfg, msg.from().map(|f| f.id))
         .await?;
 
     dialogue
@@ -318,17 +350,30 @@ async fn handle_prompt(
     Ok(())
 }
 
-fn keyboard(seed: i64) -> InlineKeyboardMarkup {
-    let seed_button = if seed == -1 {
-        InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")
+fn keyboard(seed: i64, cfg: ConfigParameters, user: ChatId) -> InlineKeyboardMarkup {
+    let settings_button = if (!cfg.settings.disable_user_settings || cfg.user_is_admin(&user))
+        && !cfg.ui.hide_settings_button
+    {
+        vec![InlineKeyboardButton::callback("⚙️ Settings", "settings")]
     } else {
-        InlineKeyboardButton::callback("♻️ Seed", format!("reuse/{seed}"))
+        vec![]
     };
-    InlineKeyboardMarkup::new([[
-        InlineKeyboardButton::callback("🔄 Rerun", "rerun"),
-        seed_button,
-        InlineKeyboardButton::callback("⚙️ Settings", "settings"),
-    ]])
+    let seed_button = if cfg.ui.hide_reuse_button {
+        vec![]
+    } else if seed == -1 {
+        vec![InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")]
+    } else {
+        vec![InlineKeyboardButton::callback(
+            "♻️ Seed",
+            format!("reuse/{seed}"),
+        )]
+    };
+    let rerun_button = if cfg.ui.hide_rerun_button {
+        vec![]
+    } else {
+        vec![InlineKeyboardButton::callback("🔄 Rerun", "rerun")]
+    };
+    InlineKeyboardMarkup::new([[rerun_button, seed_button, settings_button].concat()])
 }
 
 #[instrument(skip_all)]
@@ -437,6 +482,7 @@ async fn handle_reuse(
     (mut txt2img, mut img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
     q: CallbackQuery,
     seed: i64,
+    cfg: ConfigParameters,
 ) -> anyhow::Result<()> {
     let message = if let Some(message) = q.message {
         message
@@ -505,7 +551,11 @@ async fn handle_reuse(
             warn!("Failed to answer set seed callback query: {}", e)
         }
         bot.edit_message_reply_markup(chat_id, id)
-            .reply_markup(keyboard(-1))
+            .reply_markup(keyboard(
+                -1,
+                cfg,
+                message.from().map(|f| f.id.into()).unwrap_or(chat_id),
+            ))
             .send()
             .await?;
     }

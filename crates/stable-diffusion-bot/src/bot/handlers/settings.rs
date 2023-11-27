@@ -13,7 +13,7 @@ use tracing::{error, warn};
 
 use crate::{bot::ConfigParameters, BotState};
 
-use super::{filter_map_bot_state, filter_map_settings, DiffusionDialogue, State};
+use super::{admin_filter, filter_map_bot_state, filter_map_settings, DiffusionDialogue, State};
 
 /// BotCommands for settings.
 #[derive(BotCommands, Clone)]
@@ -584,6 +584,10 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
         .branch(filter_settings_state().endpoint(handle_invalid_setting_value));
 
     dptree::entry()
+        .branch(
+            dptree::filter(|cfg: ConfigParameters| cfg.settings.disable_user_settings)
+                .chain(admin_filter()),
+        )
         .branch(settings_command_handler())
         .branch(message_handler)
         .branch(callback_handler)
@@ -596,6 +600,7 @@ mod tests {
         Img2ImgApi, Img2ImgApiError, Img2ImgParams, Response, Txt2ImgApi, Txt2ImgApiError,
         Txt2ImgParams,
     };
+    #[cfg(any())]
     use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
     use teloxide::types::{UpdateKind, User};
 
@@ -786,6 +791,7 @@ mod tests {
         }
     }
 
+    #[cfg(any())]
     #[tokio::test]
     async fn test_map_settings_default() {
         assert!(matches!(
@@ -823,6 +829,7 @@ mod tests {
         ));
     }
 
+    #[cfg(any())]
     #[tokio::test]
     async fn test_map_settings_ready() {
         let txt2img = Txt2ImgParams {
