@@ -28,6 +28,12 @@ pub(crate) enum GenCommands {
     /// Command to generate an image
     #[command(description = "generate an image")]
     Gen(String),
+    /// Alias for `gen`. Hidden from help to avoid confusion.
+    #[command(description = "off")]
+    G(String),
+    /// Alias for `gen`. Hidden from help to avoid confusion.
+    #[command(description = "off")]
+    Generate(String),
 }
 
 enum Photo {
@@ -462,8 +468,8 @@ async fn handle_reuse(
 pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
     let gen_command_handler = Update::filter_message()
         .filter_command::<GenCommands>()
-        .chain(dptree::filter_map(|GenCommands::Gen(s): GenCommands| {
-            Some(s)
+        .chain(dptree::filter_map(|g: GenCommands| match g {
+            GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => Some(s),
         }))
         .chain(filter_map_bot_state())
         .chain(case![BotState::Generate])
