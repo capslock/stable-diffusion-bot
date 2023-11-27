@@ -467,7 +467,7 @@ pub(crate) async fn handle_txt2img_settings_value(
         }
     }
 
-    let bot_state = BotState::SettingsTxt2Img { selection };
+    let bot_state = BotState::SettingsTxt2Img { selection: None };
 
     update_settings_value(
         bot,
@@ -498,7 +498,7 @@ pub(crate) async fn handle_img2img_settings_value(
         }
     }
 
-    let bot_state = BotState::SettingsImg2Img { selection };
+    let bot_state = BotState::SettingsImg2Img { selection: None };
 
     update_settings_value(
         bot,
