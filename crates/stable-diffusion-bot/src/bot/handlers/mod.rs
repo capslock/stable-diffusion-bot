@@ -1,5 +1,10 @@
 use anyhow::anyhow;
-use teloxide::{dispatching::UpdateHandler, prelude::*, utils::command::BotCommands};
+use teloxide::{
+    dispatching::UpdateHandler,
+    prelude::*,
+    types::ParseMode,
+    utils::{command::BotCommands, markdown},
+};
 
 use crate::BotState;
 
@@ -64,7 +69,9 @@ pub(crate) async fn unauthenticated_commands_handler(
         UnauthenticatedCommands::Settings => "Sorry, not yet implemented.".to_owned(),
     };
 
-    bot.send_message(msg.chat.id, text).await?;
+    bot.send_message(msg.chat.id, markdown::escape(&text))
+        .parse_mode(ParseMode::MarkdownV2)
+        .await?;
 
     Ok(())
 }
