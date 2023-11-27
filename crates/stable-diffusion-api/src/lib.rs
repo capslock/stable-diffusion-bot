@@ -125,62 +125,66 @@ impl<T> ImgResponse<T> {
 #[derive(Default, Serialize, Deserialize, Debug)]
 /// Information about the generated images.
 pub struct ImgInfo {
-    /// The number of images generated in one batch.
-    pub batch_size: Option<u32>,
+    /// The prompt used when generating the image.
+    pub prompt: Option<String>,
     /// A vector of all the prompts used for image generation.
     pub all_prompts: Option<Vec<String>>,
-    /// A vector of the styles used for image generation.
-    pub styles: Option<Vec<String>>,
+    /// The negative prompt used when generating the image.
+    pub negative_prompt: Option<String>,
+    /// A vector of all negative prompts used when generating the image.
+    pub all_negative_prompts: Option<Vec<String>>,
+    /// The random seed used for image generation.
+    pub seed: Option<i64>,
+    /// A vector of all the random seeds used for image generation.
+    pub all_seeds: Option<Vec<i64>>,
+    /// The subseed used when generating the image.
+    pub subseed: Option<i64>,
+    /// A vector of all the subseeds used for image generation.
+    pub all_subseeds: Option<Vec<i64>>,
+    /// The strength of the subseed used when generating the image.
+    pub subseed_strength: Option<u32>,
     /// The width of the generated image.
     pub width: Option<i32>,
     /// The height of the generated image.
     pub height: Option<i32>,
-    /// Extra parameters passed for image generation.
-    pub extra_generation_params: Option<serde_json::Value>,
     /// The name of the sampler used for image generation.
     pub sampler_name: Option<String>,
+    /// The cfg scale factor used when generating the image.
+    pub cfg_scale: Option<f64>,
+    /// The number of steps taken when generating the image.
+    pub steps: Option<u32>,
+    /// The number of images generated in one batch.
+    pub batch_size: Option<u32>,
     /// Whether or not face restoration was used.
     pub restore_faces: Option<bool>,
+    /// The face restoration model used when generating the image.
+    pub face_restoration_model: Option<serde_json::Value>,
+    /// The name of the sd model used when generating the image.
+    pub sd_model_name: Option<String>,
+    /// The hash of the sd model used for image generation.
+    pub sd_model_hash: Option<String>,
+    /// The name of the VAE used when generating the image.
+    pub sd_vae_name: Option<String>,
+    /// The hash of the VAE used for image generation.
+    pub sd_vae_hash: Option<String>,
     /// The width used when resizing the image seed.
     pub seed_resize_from_w: Option<i32>,
     /// The height used when resizing the image seed.
     pub seed_resize_from_h: Option<i32>,
-    /// A vector of all negative prompts used when generating the image.
-    pub all_negative_prompts: Option<Vec<String>>,
-    /// The cfg scale factor used when generating the image.
-    pub cfg_scale: Option<f64>,
+    /// The strength of the denoising applied during image generation.
+    pub denoising_strength: Option<f64>,
+    /// Extra parameters passed for image generation.
+    pub extra_generation_params: Option<serde_json::Value>,
     /// The index of the first image.
     pub index_of_first_image: Option<u32>,
     /// A vector of information texts about the generated images.
     pub infotexts: Option<Vec<String>>,
-    /// The prompt used when generating the image.
-    pub prompt: Option<String>,
-    /// The negative prompt used when generating the image.
-    pub negative_prompt: Option<String>,
-    /// The random seed used for image generation.
-    pub seed: Option<i64>,
-    /// The strength of the denoising applied during image generation.
-    pub denoising_strength: Option<f64>,
-    /// Whether or not inpainting conditioning was used for image generation.
-    pub is_using_inpainting_conditioning: Option<bool>,
-    /// The subseed used when generating the image.
-    pub subseed: Option<i64>,
-    /// The strength of the subseed used when generating the image.
-    pub subseed_strength: Option<u32>,
-    /// A vector of all the subseeds used for image generation.
-    pub all_subseeds: Option<Vec<i64>>,
-    /// The number of steps taken when generating the image.
-    pub steps: Option<u32>,
-    /// The face restoration model used when generating the image.
-    pub face_restoration_model: Option<serde_json::Value>,
+    /// A vector of the styles used for image generation.
+    pub styles: Option<Vec<String>>,
     /// The timestamp of when the job was started.
     pub job_timestamp: Option<String>,
     /// The number of clip layers skipped during image generation.
     pub clip_skip: Option<u32>,
-    /// The hash of the sd model used for image generation.
-    pub sd_model_hash: Option<String>,
-    /// A vector of all the random seeds used for image generation.
-    pub all_seeds: Option<Vec<i64>>,
-    /// The model name used when generating the image.
-    pub sd_model_name: Option<String>,
+    /// Whether or not inpainting conditioning was used for image generation.
+    pub is_using_inpainting_conditioning: Option<bool>,
 }
