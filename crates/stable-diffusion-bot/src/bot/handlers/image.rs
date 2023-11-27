@@ -13,6 +13,7 @@ use teloxide::{
         InputMediaPhoto, MessageId, PhotoSize,
     },
 };
+use tracing::info;
 
 use crate::{
     bot::{helpers, State},
@@ -477,6 +478,18 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         .endpoint(handle_prompt);
 
     let message_handler = Update::filter_message()
+        .branch(
+            dptree::filter(|msg: Message| {
+                msg.text().map(|t| t.starts_with('/')).unwrap_or_default()
+            })
+            .endpoint(|msg: Message| async move {
+                info!(
+                    "Ignoring unknown command: {}",
+                    msg.text().unwrap_or_default()
+                );
+                Ok(())
+            }),
+        )
         .branch(
             Message::filter_photo()
                 .chain(filter_map_bot_state())
