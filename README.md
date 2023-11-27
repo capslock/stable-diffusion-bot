@@ -34,7 +34,7 @@ If you are using the Nix package manager with flakes enabled, you can invoke the
 bot directly from the provided flake:
 
 ```shell
-nix run github:capslock/stable-diffusion-bot#stable-diffusion-bot
+nix run github:capslock/stable-diffusion-bot
 ```
 
 #### Using NixOS with Flakes
@@ -67,11 +67,11 @@ Then simply configure and enable the service in your `configuration.nix`:
 ```nix
 services.stableDiffusionBot = {
   enable = true;
-  telegram_api_key = "your telegram api key here";
+  telegram_api_key_file = "/path/to/your/api/key/file.toml";
   settings = {
     # All other settings, as described below
     allowed_users = [ list of telegram ids ];
-    db_path = "/somedirectory/db.sqlite";
+    db_path = "/path/to/your/db.sqlite";
     sd_api_url = "http://localhost:7860";
   };
 };
