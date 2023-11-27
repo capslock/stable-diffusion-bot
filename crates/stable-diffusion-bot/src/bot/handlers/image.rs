@@ -147,33 +147,29 @@ impl MessageText {
             [
                 infotxt
                     .negative_prompt
-                    .clone()
-                    .and_then(|s| if s.trim().is_empty() {
-                        None
-                    } else {
-                        Some(escape(&s))
-                    })
+                    .as_ref()
+                    .and_then(|s| (!s.trim().is_empty()).then(|| escape(s)))
                     .map(|s| format!("Negative prompt: `{s}`")),
                 infotxt.steps.map(|s| format!("Steps: `{s}`")),
                 infotxt
                     .sampler_name
-                    .clone()
+                    .as_ref()
                     .map(|s| format!("Sampler: `{s}`")),
                 infotxt.cfg_scale.map(|s| format!("CFG scale: `{s}`")),
                 infotxt.seed.map(|s| format!("Seed: `{s}`")),
-                infotxt.width.map(|s| format!("Width: `{s}`")),
-                infotxt.height.map(|s| format!("Height: `{s}`")),
+                infotxt
+                    .width
+                    .and_then(|w| infotxt.height.map(|h| format!("Size: `{w}×{h}`"))),
                 infotxt
                     .sd_model_name
-                    .clone()
+                    .as_ref()
                     .map(|s| format!("Model: `{s}`")),
                 infotxt
                     .denoising_strength
                     .map(|s| format!("Denoising strength: `{s}`")),
             ]
-            .iter()
+            .into_iter()
             .flatten()
-            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join("\n")
         ))
