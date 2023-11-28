@@ -107,6 +107,7 @@ impl StableDiffusionBot {
     /// Creates an UpdateHandler for the bot
     fn schema() -> UpdateHandler<anyhow::Error> {
         Self::enter::<Update, ErasedStorage<State>, _>()
+            .chain(dptree::filter_async(Self::set_my_commands))
             .branch(unauth_command_handler())
             .branch(authenticated_command_handler())
     }
@@ -184,6 +185,32 @@ impl StableDiffusionBot {
         )
     }
 
+    async fn set_my_commands(bot: Bot, cfg: ConfigParameters, upd: Update) -> bool {
+        let (chat, user) = match (upd.chat(), upd.user()) {
+            (Some(c), Some(u)) => (c, u),
+            _ => return true,
+        };
+        let mut commands = UnauthenticatedCommands::bot_commands();
+        if !cfg.settings.disable_user_settings || cfg.user_is_admin(&user.id.into()) {
+            commands.extend(SettingsCommands::bot_commands());
+        }
+        commands.extend(GenCommands::bot_commands());
+        let scope = if chat.id == user.id.into() {
+            teloxide::types::BotCommandScope::Chat {
+                chat_id: teloxide::types::Recipient::Id(chat.id),
+            }
+        } else {
+            teloxide::types::BotCommandScope::ChatMember {
+                chat_id: teloxide::types::Recipient::Id(chat.id),
+                user_id: user.id,
+            }
+        };
+        if let Err(e) = bot.set_my_commands(commands).scope(scope).await {
+            error!("Failed to set commands: {e:?}");
+        }
+        true
+    }
+
     /// Runs the StableDiffusionBot
     pub async fn run(self) -> anyhow::Result<()> {
         let StableDiffusionBot {
@@ -193,7 +220,6 @@ impl StableDiffusionBot {
         } = self;
 
         let mut commands = UnauthenticatedCommands::bot_commands();
-        commands.extend(SettingsCommands::bot_commands());
         commands.extend(GenCommands::bot_commands());
         bot.set_my_commands(commands)
             .scope(teloxide::types::BotCommandScope::Default)

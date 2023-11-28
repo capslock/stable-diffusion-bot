@@ -13,7 +13,7 @@ use tracing::{error, warn};
 
 use crate::{bot::ConfigParameters, BotState};
 
-use super::{admin_filter, filter_map_bot_state, filter_map_settings, DiffusionDialogue, State};
+use super::{filter_map_bot_state, filter_map_settings, DiffusionDialogue, State};
 
 /// BotCommands for settings.
 #[derive(BotCommands, Clone)]
@@ -584,10 +584,13 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
         .branch(filter_settings_state().endpoint(handle_invalid_setting_value));
 
     dptree::entry()
-        .branch(
-            dptree::filter(|cfg: ConfigParameters| cfg.settings.disable_user_settings)
-                .chain(admin_filter()),
-        )
+        .chain(dptree::filter(|cfg: ConfigParameters, upd: Update| {
+            !cfg.settings.disable_user_settings
+                || upd
+                    .user()
+                    .map(|user| cfg.user_is_admin(&user.id.into()))
+                    .unwrap_or_default()
+        }))
         .branch(settings_command_handler())
         .branch(message_handler)
         .branch(callback_handler)

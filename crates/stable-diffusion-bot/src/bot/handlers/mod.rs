@@ -19,12 +19,12 @@ pub(crate) use settings::*;
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", description = "Simple commands")]
 pub(crate) enum UnauthenticatedCommands {
-    #[command(description = "show help message.")]
-    Help,
     #[command(description = "start the bot.")]
     Start,
     #[command(description = "change settings.")]
     Settings,
+    #[command(description = "show help message.")]
+    Help,
 }
 
 pub(crate) async fn unauthenticated_commands_handler(
@@ -35,17 +35,25 @@ pub(crate) async fn unauthenticated_commands_handler(
     cmd: UnauthenticatedCommands,
     dialogue: DiffusionDialogue,
 ) -> anyhow::Result<()> {
+    let chat = msg.chat.id;
+    let user = msg.from().unwrap().id;
     let text = match cmd {
         UnauthenticatedCommands::Help => {
-            if cfg.chat_is_allowed(&msg.chat.id)
-                || cfg.chat_is_allowed(&msg.from().unwrap().id.into())
-            {
-                format!(
-                    "{}\n\n{}\n\n{}",
-                    UnauthenticatedCommands::descriptions(),
-                    SettingsCommands::descriptions(),
-                    GenCommands::descriptions()
-                )
+            if cfg.chat_is_allowed(&chat) || cfg.chat_is_allowed(&user.into()) {
+                let unauth = vec![UnauthenticatedCommands::descriptions()];
+                let settings =
+                    if !cfg.settings.disable_user_settings || cfg.user_is_admin(&user.into()) {
+                        vec![SettingsCommands::descriptions()]
+                    } else {
+                        vec![]
+                    };
+                let gen = vec![GenCommands::descriptions()];
+                [unauth, settings, gen]
+                    .iter()
+                    .flatten()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("\n\n")
             } else if msg.chat.is_group() || msg.chat.is_supergroup() {
                 UnauthenticatedCommands::descriptions()
                     .username_from_me(&me)
@@ -89,14 +97,6 @@ pub(crate) fn filter_map_settings() -> UpdateHandler<anyhow::Error> {
             txt2img, img2img, ..
         } => Some((txt2img, img2img)),
         _ => None,
-    })
-}
-
-pub(crate) fn admin_filter() -> UpdateHandler<anyhow::Error> {
-    dptree::filter(|cfg: ConfigParameters, upd: Update| {
-        upd.user()
-            .map(|user| cfg.user_is_admin(&user.id.into()))
-            .unwrap_or_default()
     })
 }
 
