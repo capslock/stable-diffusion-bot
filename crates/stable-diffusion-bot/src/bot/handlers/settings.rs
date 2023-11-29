@@ -319,9 +319,12 @@ pub(crate) async fn handle_settings_button(
             .await
             .map_err(|e| anyhow!(e))?;
         bot.answer_callback_query(q.id).text("Canceled.").await?;
-        bot.edit_message_text(message.chat.id, message.id, "Please enter a prompt.")
-            .reply_markup(InlineKeyboardMarkup::new([[]]))
-            .await?;
+        if let Err(e) = bot.delete_message(message.chat.id, message.id).await {
+            error!("Failed to delete message: {:?}", e);
+            bot.edit_message_text(message.chat.id, message.id, "Please enter a prompt.")
+                .reply_markup(InlineKeyboardMarkup::new([[]]))
+                .await?;
+        }
         return Ok(());
     }
 
