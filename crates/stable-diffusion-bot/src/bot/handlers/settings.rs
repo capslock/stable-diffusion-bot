@@ -267,6 +267,7 @@ pub(crate) async fn handle_settings(
         return Ok(());
     };
 
+    bot.answer_callback_query(q.id).await?;
     bot.send_message(chat_id, "Please make a selection.")
         .reply_markup(settings.keyboard())
         .send()
