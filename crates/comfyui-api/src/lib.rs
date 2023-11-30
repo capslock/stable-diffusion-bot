@@ -1,10 +1,16 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
+
+use futures_util::Stream;
 
 mod prompt;
 pub use prompt::*;
+
+mod websocket;
+pub use websocket::*;
 
 /// Struct representing a connection to a Stable Diffusion WebUI API.
 #[derive(Clone, Debug)]
@@ -73,6 +79,16 @@ impl Api {
             self.url
                 .join("prompt")
                 .context("Failed to parse comfyUI endpoint")?,
+        ))
+    }
+
+    pub fn websocket(&self) -> anyhow::Result<Websocket> {
+        let mut url = self.url.clone();
+        url.set_scheme("ws")
+            .map_err(|_| anyhow!("Failed to set scheme: ws://"))?;
+        Ok(Websocket::new_with_url(
+            url.join(format!("ws?clientId={}", uuid::Uuid::new_v4()).as_str())
+                .context("Failed to parse websocket endpoint")?,
         ))
     }
 }
@@ -180,11 +196,6 @@ pub struct ExtraGenParams {
     pub ti_hashes: Option<String>,
 }
 
-pub struct Comfy {
-    client: reqwest::Client,
-    endpoint: Url,
-}
-
 mod request {
     use serde::{Deserialize, Serialize};
 
@@ -194,6 +205,11 @@ mod request {
     pub(crate) struct Prompt {
         pub prompt: prompt::Prompt,
     }
+}
+
+pub struct Comfy {
+    client: reqwest::Client,
+    endpoint: Url,
 }
 
 impl Comfy {
@@ -259,5 +275,52 @@ impl Comfy {
             status,
             text
         ))
+    }
+}
+
+pub struct Websocket {
+    endpoint: Url,
+}
+
+impl Websocket {
+    /// Constructs a new Txt2Img client with a given `reqwest::Client` and Stable Diffusion API
+    /// endpoint `String`.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - A `reqwest::Client` used to send requests.
+    /// * `endpoint` - A `String` representation of the endpoint url.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a new Txt2Img instance on success, or an error if url parsing failed.
+    pub fn new(endpoint: String) -> anyhow::Result<Self> {
+        Ok(Self::new_with_url(
+            Url::parse(&endpoint).context("failed to parse endpoint url")?,
+        ))
+    }
+
+    /// Constructs a new Txt2Img client with a given `reqwest::Client` and endpoint `Url`.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - A `reqwest::Client` used to send requests.
+    /// * `endpoint` - A `Url` representing the endpoint url.
+    ///
+    /// # Returns
+    ///
+    /// A new Txt2Img instance.
+    pub fn new_with_url(endpoint: Url) -> Self {
+        Self { endpoint }
+    }
+
+    pub async fn connect(
+        &self,
+    ) -> anyhow::Result<impl Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>>
+    {
+        let (connection, _) = connect_async(&self.endpoint)
+            .await
+            .context("WebSocket connection failed")?;
+        Ok(connection)
     }
 }

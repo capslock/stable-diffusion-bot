@@ -1,4 +1,5 @@
-use comfyui_api::{Api, Prompt};
+use comfyui_api::{Api, Prompt, UpdateOrUnknown};
+use futures_util::stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -35,15 +36,15 @@ async fn main() -> anyhow::Result<()> {
         "4": {
             "class_type": "CheckpointLoaderSimple",
             "inputs": {
-                "ckpt_name": "sd\\v1-5-pruned-emaonly.ckpt"
+                "ckpt_name": "sd\\sd_xl_base_1.0.safetensors"
             }
         },
         "5": {
             "class_type": "EmptyLatentImage",
             "inputs": {
                 "batch_size": 1,
-                "height": 512,
-                "width": 512
+                "height": 1024,
+                "width": 1024
             }
         },
         "6": {
@@ -98,8 +99,23 @@ async fn main() -> anyhow::Result<()> {
 
     let api = Api::default();
     let prompt_api = api.prompt()?;
+
+    let websocket = api.websocket()?;
+    let stream = websocket.connect().await?;
+
     let response = prompt_api.send(prompt).await?;
     println!("{:#?}", response);
+
+    stream
+        .for_each(|msg| async move {
+            println!(
+                "{:#?}",
+                msg.map(
+                    |m| serde_json::from_str::<UpdateOrUnknown>(&m.into_text().unwrap()).unwrap()
+                )
+            );
+        })
+        .await;
 
     Ok(())
 }
