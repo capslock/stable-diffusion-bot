@@ -4,12 +4,13 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use futures_util::Stream;
+use futures_util::{Stream, StreamExt};
 
 mod prompt;
 pub use prompt::*;
 
 mod websocket;
+use tracing::warn;
 pub use websocket::*;
 
 /// Struct representing a connection to a Stable Diffusion WebUI API.
@@ -17,6 +18,7 @@ pub use websocket::*;
 pub struct Api {
     client: reqwest::Client,
     url: Url,
+    client_id: uuid::Uuid,
 }
 
 impl Default for Api {
@@ -24,6 +26,7 @@ impl Default for Api {
         Self {
             client: reqwest::Client::new(),
             url: Url::parse("http://localhost:8188").expect("Failed to parse default URL"),
+            client_id: uuid::Uuid::new_v4(),
         }
     }
 }
@@ -70,6 +73,7 @@ impl Api {
         Ok(Self {
             client,
             url: Url::parse(url.as_ref()).context("Failed to parse URL")?,
+            ..Default::default()
         })
     }
 
@@ -79,6 +83,7 @@ impl Api {
             self.url
                 .join("prompt")
                 .context("Failed to parse comfyUI endpoint")?,
+            self.client_id,
         ))
     }
 
@@ -87,7 +92,7 @@ impl Api {
         url.set_scheme("ws")
             .map_err(|_| anyhow!("Failed to set scheme: ws://"))?;
         Ok(Websocket::new_with_url(
-            url.join(format!("ws?clientId={}", uuid::Uuid::new_v4()).as_str())
+            url.join(format!("ws?clientId={}", self.client_id).as_str())
                 .context("Failed to parse websocket endpoint")?,
         ))
     }
@@ -198,18 +203,22 @@ pub struct ExtraGenParams {
 
 mod request {
     use serde::{Deserialize, Serialize};
+    use serde_with::skip_serializing_none;
 
     use crate::prompt;
 
     #[derive(Default, Serialize, Deserialize, Debug)]
+    #[skip_serializing_none]
     pub(crate) struct Prompt {
         pub prompt: prompt::Prompt,
+        pub client_id: Option<uuid::Uuid>,
     }
 }
 
 pub struct Comfy {
     client: reqwest::Client,
     endpoint: Url,
+    client_id: uuid::Uuid,
 }
 
 impl Comfy {
@@ -224,10 +233,15 @@ impl Comfy {
     /// # Returns
     ///
     /// A `Result` containing a new Txt2Img instance on success, or an error if url parsing failed.
-    pub fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
+    pub fn new(
+        client: reqwest::Client,
+        endpoint: String,
+        client_id: uuid::Uuid,
+    ) -> anyhow::Result<Self> {
         Ok(Self::new_with_url(
             client,
             Url::parse(&endpoint).context("failed to parse endpoint url")?,
+            client_id,
         ))
     }
 
@@ -241,8 +255,12 @@ impl Comfy {
     /// # Returns
     ///
     /// A new Txt2Img instance.
-    pub fn new_with_url(client: reqwest::Client, endpoint: Url) -> Self {
-        Self { client, endpoint }
+    pub fn new_with_url(client: reqwest::Client, endpoint: Url, client_id: uuid::Uuid) -> Self {
+        Self {
+            client,
+            endpoint,
+            client_id,
+        }
     }
 
     /// Sends an image request using the Txt2Img client.
@@ -258,7 +276,10 @@ impl Comfy {
         let response = self
             .client
             .post(self.endpoint.clone())
-            .json(&request::Prompt { prompt })
+            .json(&request::Prompt {
+                prompt,
+                client_id: Some(self.client_id),
+            })
             .send()
             .await
             .context("failed to send request")?;
@@ -316,11 +337,28 @@ impl Websocket {
 
     pub async fn connect(
         &self,
-    ) -> anyhow::Result<impl Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>>
-    {
+    ) -> anyhow::Result<impl Stream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
         let (connection, _) = connect_async(&self.endpoint)
             .await
             .context("WebSocket connection failed")?;
-        Ok(connection)
+        Ok(connection.filter_map(|m| async {
+            match m {
+                Ok(m) => match m {
+                    Message::Text(t) => Some(
+                        serde_json::from_str::<UpdateOrUnknown>(t.as_str())
+                            .context("failed to parse websocket message text")
+                            .map(PreviewOrUpdate::Update),
+                    ),
+                    Message::Binary(_) => {
+                        Some(Ok(PreviewOrUpdate::Preview(Preview(m.into_data()))))
+                    }
+                    _ => {
+                        warn!("unexpected websocket message type");
+                        None
+                    }
+                },
+                Err(e) => Some(Err(anyhow!("websocket error: {}", e))),
+            }
+        }))
     }
 }
