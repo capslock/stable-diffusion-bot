@@ -185,6 +185,17 @@ pub struct Comfy {
     endpoint: Url,
 }
 
+mod request {
+    use serde::{Deserialize, Serialize};
+
+    use crate::prompt;
+
+    #[derive(Default, Serialize, Deserialize, Debug)]
+    pub(crate) struct Prompt {
+        pub prompt: prompt::Prompt,
+    }
+}
+
 impl Comfy {
     /// Constructs a new Txt2Img client with a given `reqwest::Client` and Stable Diffusion API
     /// endpoint `String`.
@@ -227,11 +238,11 @@ impl Comfy {
     /// # Returns
     ///
     /// A `Result` containing an `ImgResponse<Txt2ImgRequest>` on success, or an error if one occurred.
-    pub async fn send(&self, request: &Prompt) -> anyhow::Result<()> {
+    pub async fn send(&self, prompt: Prompt) -> anyhow::Result<Response> {
         let response = self
             .client
             .post(self.endpoint.clone())
-            .json(&request)
+            .json(&request::Prompt { prompt })
             .send()
             .await
             .context("failed to send request")?;
