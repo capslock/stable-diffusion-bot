@@ -1,16 +1,18 @@
 use anyhow::{anyhow, Context};
+use futures_util::{Stream, StreamExt};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-
-use futures_util::{Stream, StreamExt};
+use tracing::warn;
 
 mod prompt;
 pub use prompt::*;
 
+mod history;
+pub use history::*;
+
 mod websocket;
-use tracing::warn;
 pub use websocket::*;
 
 /// Struct representing a connection to a Stable Diffusion WebUI API.
@@ -87,6 +89,15 @@ impl Api {
         ))
     }
 
+    pub fn history(&self) -> anyhow::Result<History> {
+        Ok(History::new_with_url(
+            self.client.clone(),
+            self.url
+                .join("history/")
+                .context("Failed to parse history endpoint")?,
+        ))
+    }
+
     pub fn websocket(&self) -> anyhow::Result<Websocket> {
         let mut url = self.url.clone();
         url.set_scheme("ws")
@@ -96,109 +107,6 @@ impl Api {
                 .context("Failed to parse websocket endpoint")?,
         ))
     }
-}
-
-/// A struct that represents the response from the Stable Diffusion WebUI API endpoint.
-#[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
-pub struct ImgResponse<T> {
-    /// A vector of strings containing base64-encoded images.
-    pub images: Vec<String>,
-    /// The parameters that were provided for the generation request.
-    pub parameters: T,
-    /// A string containing JSON representing information about the request.
-    pub info: String,
-}
-
-impl<T> ImgResponse<T> {
-    /// Parses and returns a new `ImgInfo` instance from the `info` field of the `ImgResponse`.
-    ///
-    /// # Errors
-    ///
-    /// If the `info` field fails to parse, an error will be returned.
-    pub fn info(&self) -> anyhow::Result<ImgInfo> {
-        serde_json::from_str(&self.info).context("failed to parse info")
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
-/// Information about the generated images.
-pub struct ImgInfo {
-    /// The prompt used when generating the image.
-    pub prompt: Option<String>,
-    /// A vector of all the prompts used for image generation.
-    pub all_prompts: Option<Vec<String>>,
-    /// The negative prompt used when generating the image.
-    pub negative_prompt: Option<String>,
-    /// A vector of all negative prompts used when generating the image.
-    pub all_negative_prompts: Option<Vec<String>>,
-    /// The random seed used for image generation.
-    pub seed: Option<i64>,
-    /// A vector of all the random seeds used for image generation.
-    pub all_seeds: Option<Vec<i64>>,
-    /// The subseed used when generating the image.
-    pub subseed: Option<i64>,
-    /// A vector of all the subseeds used for image generation.
-    pub all_subseeds: Option<Vec<i64>>,
-    /// The strength of the subseed used when generating the image.
-    pub subseed_strength: Option<u32>,
-    /// The width of the generated image.
-    pub width: Option<i32>,
-    /// The height of the generated image.
-    pub height: Option<i32>,
-    /// The name of the sampler used for image generation.
-    pub sampler_name: Option<String>,
-    /// The cfg scale factor used when generating the image.
-    pub cfg_scale: Option<f64>,
-    /// The number of steps taken when generating the image.
-    pub steps: Option<u32>,
-    /// The number of images generated in one batch.
-    pub batch_size: Option<u32>,
-    /// Whether or not face restoration was used.
-    pub restore_faces: Option<bool>,
-    /// The face restoration model used when generating the image.
-    pub face_restoration_model: Option<serde_json::Value>,
-    /// The name of the sd model used when generating the image.
-    pub sd_model_name: Option<String>,
-    /// The hash of the sd model used for image generation.
-    pub sd_model_hash: Option<String>,
-    /// The name of the VAE used when generating the image.
-    pub sd_vae_name: Option<String>,
-    /// The hash of the VAE used for image generation.
-    pub sd_vae_hash: Option<String>,
-    /// The width used when resizing the image seed.
-    pub seed_resize_from_w: Option<i32>,
-    /// The height used when resizing the image seed.
-    pub seed_resize_from_h: Option<i32>,
-    /// The strength of the denoising applied during image generation.
-    pub denoising_strength: Option<f64>,
-    /// Extra parameters passed for image generation.
-    pub extra_generation_params: Option<ExtraGenParams>,
-    /// The index of the first image.
-    pub index_of_first_image: Option<u32>,
-    /// A vector of information texts about the generated images.
-    pub infotexts: Option<Vec<String>>,
-    /// A vector of the styles used for image generation.
-    pub styles: Option<Vec<String>>,
-    /// The timestamp of when the job was started.
-    pub job_timestamp: Option<String>,
-    /// The number of clip layers skipped during image generation.
-    pub clip_skip: Option<u32>,
-    /// Whether or not inpainting conditioning was used for image generation.
-    pub is_using_inpainting_conditioning: Option<bool>,
-}
-
-#[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
-/// Extra parameters describing image generation.
-pub struct ExtraGenParams {
-    /// Names and hashes of LORA models used for image generation.
-    #[serde(rename = "Lora hashes")]
-    pub lora_hashes: Option<String>,
-    /// Names and hashes of Textual Inversion models used for image generation.
-    #[serde(rename = "TI hashes")]
-    pub ti_hashes: Option<String>,
 }
 
 mod request {
@@ -337,11 +245,11 @@ impl Websocket {
 
     pub async fn connect(
         &self,
-    ) -> anyhow::Result<impl Stream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
+    ) -> anyhow::Result<impl Stream<Item = Result<PreviewOrUpdate, anyhow::Error>> + Unpin> {
         let (connection, _) = connect_async(&self.endpoint)
             .await
             .context("WebSocket connection failed")?;
-        Ok(connection.filter_map(|m| async {
+        Ok(Box::pin(connection.filter_map(|m| async {
             match m {
                 Ok(m) => match m {
                     Message::Text(t) => Some(
@@ -359,6 +267,72 @@ impl Websocket {
                 },
                 Err(e) => Some(Err(anyhow!("websocket error: {}", e))),
             }
-        }))
+        })))
+    }
+}
+
+pub struct History {
+    client: reqwest::Client,
+    endpoint: Url,
+}
+
+impl History {
+    /// Constructs a new Txt2Img client with a given `reqwest::Client` and Stable Diffusion API
+    /// endpoint `String`.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - A `reqwest::Client` used to send requests.
+    /// * `endpoint` - A `String` representation of the endpoint url.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a new Txt2Img instance on success, or an error if url parsing failed.
+    pub fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
+        Ok(Self::new_with_url(
+            client,
+            Url::parse(&endpoint).context("failed to parse endpoint url")?,
+        ))
+    }
+
+    /// Constructs a new Txt2Img client with a given `reqwest::Client` and endpoint `Url`.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - A `reqwest::Client` used to send requests.
+    /// * `endpoint` - A `Url` representing the endpoint url.
+    ///
+    /// # Returns
+    ///
+    /// A new Txt2Img instance.
+    pub fn new_with_url(client: reqwest::Client, endpoint: Url) -> Self {
+        Self { client, endpoint }
+    }
+
+    pub async fn get(&self, prompt_id: uuid::Uuid) -> anyhow::Result<HistoryOrUnknown> {
+        let response = self
+            .client
+            .get(
+                self.endpoint
+                    .clone()
+                    .join(prompt_id.to_string().as_str())
+                    .context("failed to parse url")?,
+            )
+            .send()
+            .await
+            .context("failed to send request")?;
+        if response.status().is_success() {
+            return response.json().await.context("failed to parse json");
+        }
+        let status = response.status();
+        let text = response
+            .text()
+            .await
+            .context("failed to get response text")?;
+        Err(anyhow::anyhow!(
+            "got error code: {}, message text: {}",
+            status,
+            text
+        ))
     }
 }
