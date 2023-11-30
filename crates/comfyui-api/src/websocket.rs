@@ -47,24 +47,24 @@ pub struct ExecInfo {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionStartData {
-    prompt_id: String,
+    pub prompt_id: uuid::Uuid,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionCachedData {
-    prompt_id: String,
-    nodes: Vec<String>,
+    pub prompt_id: uuid::Uuid,
+    pub nodes: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutingData {
-    pub prompt_id: String,
+    pub prompt_id: uuid::Uuid,
     pub node: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutedData {
-    pub prompt_id: String,
+    pub prompt_id: uuid::Uuid,
     pub node: String,
     pub output: Output,
 }
