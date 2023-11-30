@@ -1,6 +1,7 @@
-use comfyui_api::Prompt;
+use comfyui_api::{Api, Prompt};
 
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let prompt: Prompt = serde_json::from_str(
         r#"
     {
@@ -34,7 +35,7 @@ fn main() {
         "4": {
             "class_type": "CheckpointLoaderSimple",
             "inputs": {
-                "ckpt_name": "v1-5-pruned-emaonly.ckpt"
+                "ckpt_name": "sd\\v1-5-pruned-emaonly.ckpt"
             }
         },
         "5": {
@@ -94,4 +95,11 @@ fn main() {
     .unwrap();
     println!("{:#?}", prompt);
     println!("{}", serde_json::to_string_pretty(&prompt).unwrap());
+
+    let api = Api::default();
+    let prompt_api = api.prompt()?;
+    let response = prompt_api.send(prompt).await?;
+    println!("{:#?}", response);
+
+    Ok(())
 }

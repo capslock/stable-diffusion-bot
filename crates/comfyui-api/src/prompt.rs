@@ -53,3 +53,10 @@ pub struct EmptyLatentImageInputs {
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Response {
+    pub prompt_id: uuid::Uuid,
+    pub number: u64,
+    pub node_errors: HashMap<String, serde_json::Value>,
+}
