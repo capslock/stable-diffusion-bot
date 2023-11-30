@@ -22,6 +22,8 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 stable-diffusion-api = { path = "../stable-diffusion-api" }
 clap = { version = "4.4.7", features = ["derive"] }
 tracing-journald = "0.3.0"
+aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.4.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libsystemd = "0.7.0"

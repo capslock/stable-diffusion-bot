@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use anyhow::{anyhow, Context};
+use futures::{stream::FuturesUnordered, StreamExt};
 use stable_diffusion_api::{Img2ImgRequest, ImgInfo, ImgResponse, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
@@ -7,11 +10,12 @@ use teloxide::{
     payloads::setters::*,
     prelude::*,
     types::{
-        ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, InputMedia,
-        InputMediaPhoto, MessageId, PhotoSize,
+        ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResult,
+        InlineQueryResultPhoto, InputFile, InputMedia, InputMediaPhoto, MessageId, PhotoSize,
     },
 };
-use tracing::info;
+use tokio::join;
+use tracing::{info, warn};
 
 use crate::{
     bot::{helpers, State},
@@ -324,6 +328,99 @@ async fn handle_prompt(
     Ok(())
 }
 
+pub(crate) async fn handle_inline_query(
+    bot: Bot,
+    cfg: ConfigParameters,
+    InlineQuery { id, query, .. }: InlineQuery,
+    client: Option<aws_sdk_s3::Client>,
+) -> anyhow::Result<()> {
+    let (client, bucket_id) = match (client, &cfg.aws_bucket_id) {
+        (Some(client), Some(bucket_id)) => (client, bucket_id),
+        _ => {
+            bot.answer_inline_query(id, vec![]).await?;
+            return Ok(());
+        }
+    };
+
+    let mut txt2img = cfg.txt2img_defaults.clone();
+    txt2img.with_batch_size(2).with_steps(1);
+
+    let resp = do_txt2img(query.as_str(), &cfg, &mut txt2img).await?;
+    let info = resp.info().unwrap();
+    let images = Photo::album(resp.images)?;
+
+    let presigning_config = aws_sdk_s3::presigning::PresigningConfig::builder()
+        .expires_in(Duration::from_secs(300))
+        .build()?;
+
+    let upload = match images {
+        Photo::Album(images) => images.into_iter().enumerate().map(|(i, image)| {
+            client
+                .put_object()
+                .key(info.all_seeds.as_ref().unwrap()[i].to_string() + ".png")
+                .bucket(bucket_id.clone())
+                .body(image.into())
+                .send()
+        }),
+        _ => return Ok(()),
+    }
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>();
+
+    let urls = info
+        .all_seeds
+        .as_ref()
+        .unwrap()
+        .iter()
+        .map(|s| {
+            client
+                .get_object()
+                .key(s.to_string() + ".png")
+                .bucket(bucket_id.clone())
+                .presigned(presigning_config.clone())
+        })
+        .collect::<FuturesUnordered<_>>()
+        .collect::<Vec<_>>();
+
+    let (upload_result, url_result) = join!(upload, urls);
+
+    let output = upload_result
+        .into_iter()
+        .zip(url_result.into_iter())
+        .filter_map(|result| match result {
+            (Ok(_), Ok(url)) => Some(url),
+            (Ok(_), Err(e)) => {
+                warn!("Error getting presigned url: {}", e);
+                None
+            }
+            (Err(e), Ok(_)) => {
+                warn!("Error during upload: {}", e);
+                None
+            }
+            (Err(e1), Err(e2)) => {
+                warn!("Error during upload: {}", e1);
+                warn!("Error getting presigned url: {}", e2);
+                None
+            }
+        });
+
+    let photos = output.into_iter().enumerate().filter_map(|(i, resp)| {
+        let url = match reqwest::Url::parse(resp.uri()).context("Failed to parse URL") {
+            Ok(url) => url,
+            Err(_) => return None,
+        };
+        Some(InlineQueryResult::Photo(InlineQueryResultPhoto::new(
+            info.all_seeds.as_ref().unwrap()[i].to_string(),
+            url.clone(),
+            url,
+        )))
+    });
+
+    bot.answer_inline_query(id, photos).await?;
+
+    Ok(())
+}
+
 fn keyboard(seed: i64) -> InlineKeyboardMarkup {
     let seed_button = if seed == -1 {
         InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")
@@ -531,8 +628,13 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
                 .endpoint(handle_rerun),
         );
 
+    let inline_query_handler = Update::filter_inline_query()
+        .chain(filter_map_settings())
+        .endpoint(handle_inline_query);
+
     dptree::entry()
         .branch(gen_command_handler)
         .branch(message_handler)
         .branch(callback_handler)
+        .branch(inline_query_handler)
 }

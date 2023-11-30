@@ -103,6 +103,7 @@ pub struct StableDiffusionBot {
     bot: Bot,
     storage: DialogueStorage,
     config: ConfigParameters,
+    aws_client: Option<aws_sdk_s3::Client>,
 }
 
 impl StableDiffusionBot {
@@ -159,6 +160,7 @@ impl StableDiffusionBot {
             bot,
             storage,
             config,
+            aws_client,
         } = self;
 
         let mut commands = UnauthenticatedCommands::bot_commands();
@@ -167,19 +169,25 @@ impl StableDiffusionBot {
         bot.set_my_commands(commands)
             .scope(teloxide::types::BotCommandScope::Default)
             .await?;
+        let inline_query_handler = Update::filter_inline_query().endpoint(handle_inline_query);
 
-        Dispatcher::builder(bot, Self::schema())
-            .dependencies(dptree::deps![config, storage])
-            .default_handler(|upd| async move {
-                warn!("Unhandled update: {:?}", upd);
-            })
-            .error_handler(LoggingErrorHandler::with_custom_text(
-                "An error has occurred in the dispatcher",
-            ))
-            .enable_ctrlc_handler()
-            .build()
-            .dispatch()
-            .await;
+        Dispatcher::builder(
+            bot,
+            dptree::entry()
+                .branch(Self::schema())
+                .branch(inline_query_handler),
+        )
+        .dependencies(dptree::deps![config, storage, aws_client])
+        .default_handler(|upd| async move {
+            warn!("Unhandled update: {:?}", upd);
+        })
+        .error_handler(LoggingErrorHandler::with_custom_text(
+            "An error has occurred in the dispatcher",
+        ))
+        .enable_ctrlc_handler()
+        .build()
+        .dispatch()
+        .await;
 
         Ok(())
     }
@@ -192,6 +200,7 @@ pub(crate) struct ConfigParameters {
     txt2img_defaults: Txt2ImgRequest,
     img2img_defaults: Img2ImgRequest,
     allow_all_users: bool,
+    aws_bucket_id: Option<String>,
 }
 
 impl ConfigParameters {
@@ -210,6 +219,8 @@ pub struct StableDiffusionBotBuilder {
     txt2img_defaults: Option<Txt2ImgRequest>,
     img2img_defaults: Option<Img2ImgRequest>,
     allow_all_users: bool,
+    aws_client: Option<aws_sdk_s3::Client>,
+    aws_bucket_id: Option<String>,
 }
 
 impl StableDiffusionBotBuilder {
@@ -228,6 +239,8 @@ impl StableDiffusionBotBuilder {
             txt2img_defaults: None,
             img2img_defaults: None,
             allow_all_users,
+            aws_client: None,
+            aws_bucket_id: None,
         }
     }
 
@@ -320,6 +333,16 @@ impl StableDiffusionBotBuilder {
         self
     }
 
+    pub fn aws_client(mut self, client: aws_sdk_s3::Client) -> Self {
+        self.aws_client = Some(client);
+        self
+    }
+
+    pub fn aws_bucket_id(mut self, bucket_id: String) -> Self {
+        self.aws_bucket_id = Some(bucket_id);
+        self
+    }
+
     /// Consumes the builder and builds a `StableDiffusionBot` instance.
     ///
     /// # Examples
@@ -355,18 +378,33 @@ impl StableDiffusionBotBuilder {
         let api = Api::new_with_client_and_url(client, self.sd_api_url.clone())
             .context("Failed to initialize sd api")?;
 
+        let (aws_client, aws_bucket_id) = match (self.aws_client, self.aws_bucket_id) {
+            (Some(client), Some(bucket_id)) => (Some(client), Some(bucket_id)),
+            (Some(_), None) => {
+                warn!("AWS client provided but no bucket ID");
+                (None, None)
+            }
+            (None, Some(_)) => {
+                warn!("AWS bucket ID provided but no client");
+                (None, None)
+            }
+            (None, None) => (None, None),
+        };
+
         let parameters = ConfigParameters {
             allowed_users,
             api,
             txt2img_defaults: default_txt2img(self.txt2img_defaults.unwrap_or_default()),
             img2img_defaults: default_img2img(self.img2img_defaults.unwrap_or_default()),
             allow_all_users: self.allow_all_users,
+            aws_bucket_id,
         };
 
         Ok(StableDiffusionBot {
             bot,
             storage,
             config: parameters,
+            aws_client,
         })
     }
 }
