@@ -94,6 +94,112 @@ async fn main() -> anyhow::Result<()> {
     "#,
     )
     .unwrap();
+    let prompt = serde_json::from_str::<Prompt>(r#"{
+  "5": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 4
+    },
+    "class_type": "EmptyLatentImage"
+  },
+  "6": {
+    "inputs": {
+      "text": "a water color of a corgi wearing a tophat",
+      "clip": [
+        "20",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode"
+  },
+  "7": {
+    "inputs": {
+      "text": "text, watermark, ugly, worst quality",
+      "clip": [
+        "20",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode"
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "13",
+        0
+      ],
+      "vae": [
+        "20",
+        2
+      ]
+    },
+    "class_type": "VAEDecode"
+  },
+  "13": {
+    "inputs": {
+      "add_noise": true,
+      "noise_seed": 0,
+      "cfg": 1,
+      "model": [
+        "20",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "sampler": [
+        "14",
+        0
+      ],
+      "sigmas": [
+        "22",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "SamplerCustom"
+  },
+  "14": {
+    "inputs": {
+      "sampler_name": "dpmpp_3m_sde_gpu"
+    },
+    "class_type": "KSamplerSelect"
+  },
+  "20": {
+    "inputs": {
+      "ckpt_name": "downloaded\\sdxl-turbo\\turbovisionxlSuperFastXLBasedOnNew_alphaV0101Bakedvae.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple"
+  },
+  "22": {
+    "inputs": {
+      "steps": 4,
+      "model": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "SDTurboScheduler"
+  },
+  "25": {
+    "inputs": {
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "PreviewImage"
+  }
+}"#).unwrap();
     println!("{:#?}", prompt);
     println!("{}", serde_json::to_string_pretty(&prompt).unwrap());
 
@@ -108,12 +214,7 @@ async fn main() -> anyhow::Result<()> {
 
     stream
         .for_each(|msg| async move {
-            println!(
-                "{:#?}",
-                msg.map(
-                    |m| serde_json::from_str::<UpdateOrUnknown>(&m.into_text().unwrap()).unwrap()
-                )
-            );
+            println!("{:#?}", msg);
         })
         .await;
 
