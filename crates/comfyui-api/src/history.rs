@@ -14,13 +14,13 @@ pub enum HistoryOrUnknown {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(transparent)]
 pub struct History {
-    pub prompts: HashMap<uuid::Uuid, Info>,
+    pub tasks: HashMap<uuid::Uuid, Task>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Info {
+pub struct Task {
     pub outputs: Outputs,
-    pub prompt: PromptData,
+    pub prompt: PromptResult,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -41,61 +41,58 @@ pub struct NodeOutput {
     pub images: Vec<Image>,
 }
 
-//#[derive(Serialize, Deserialize, Debug)]
-//pub struct PromptData(u64, uuid::Uuid, Prompt, ClientInfo, OutputNodes);
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(from = "(u64, uuid::Uuid, Prompt, ClientInfo, OutputNodes)")]
-#[serde(into = "(u64, uuid::Uuid, Prompt, ClientInfo, OutputNodes)")]
-pub struct PromptData {
+#[serde(from = "(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)")]
+#[serde(into = "(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)")]
+pub struct PromptResult {
     pub num: u64,
     pub id: uuid::Uuid,
     pub prompt: Prompt,
-    pub client_info: ClientInfo,
-    pub output_nodes: OutputNodes,
+    pub extra_data: ExtraData,
+    pub outputs_to_execute: OutputsToExecute,
 }
 
-impl From<(u64, uuid::Uuid, Prompt, ClientInfo, OutputNodes)> for PromptData {
+impl From<(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)> for PromptResult {
     fn from(
         (num, id, prompt, client_info, output_nodes): (
             u64,
             uuid::Uuid,
             Prompt,
-            ClientInfo,
-            OutputNodes,
+            ExtraData,
+            OutputsToExecute,
         ),
     ) -> Self {
         Self {
             num,
             id,
             prompt,
-            client_info,
-            output_nodes,
+            extra_data: client_info,
+            outputs_to_execute: output_nodes,
         }
     }
 }
 
-impl From<PromptData> for (u64, uuid::Uuid, Prompt, ClientInfo, OutputNodes) {
+impl From<PromptResult> for (u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute) {
     fn from(
-        PromptData {
+        PromptResult {
             num,
             id,
             prompt,
-            client_info,
-            output_nodes,
-        }: PromptData,
+            extra_data: client_info,
+            outputs_to_execute: output_nodes,
+        }: PromptResult,
     ) -> Self {
         (num, id, prompt, client_info, output_nodes)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ClientInfo {
+pub struct ExtraData {
     pub client_id: uuid::Uuid,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(transparent)]
-pub struct OutputNodes {
+pub struct OutputsToExecute {
     pub nodes: Vec<String>,
 }

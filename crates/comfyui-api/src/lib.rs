@@ -1,8 +1,6 @@
 use anyhow::{anyhow, Context};
 use futures_util::{Stream, StreamExt};
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::warn;
 
