@@ -22,7 +22,7 @@ use comfyui_api::*;
 
 ## Usage
 
-TODO
+See `examples/simple.rs` for a full-featured usage example.
 
 ## License
 
