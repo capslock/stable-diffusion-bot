@@ -3,8 +3,8 @@
 [![CI](https://github.com/capslock/stable-diffusion-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/capslock/stable-diffusion-bot/actions?query=workflow%3ACI+event%3Apush)
 
 A Telegram bot written in Rust that can be connected to a
-[Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
-backend to generate images.
+[Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui) or
+[ComfyUI](https://github.com/comfyanonymous/ComfyUI) backend to generate images.
 
 ## Usage
 
@@ -226,13 +226,14 @@ for all of the available options.
 
 ### Using the sub-crates.
 
-This projects consists of two crates:
+This projects consists of three crates:
 * the `stable-diffusion-bot` crate containing the main program and bot
   implementation.
 * the `stable-diffusion-api` crate containing a wrapper around the Stable
   Diffusion web UI API.
+* the `comfyui-api` crate containing a wrapper around the ComfyUI API.
 
-Both can be used as a standalone library:
+All can be used as standalone libraries:
 
 #### stable-diffusion-bot
 
@@ -255,4 +256,15 @@ the Stable Diffusion web UI API.
 
 ```shell
 cargo add --git https://github.com/capslock/stable-diffusion-bot stable-diffusion-api
+```
+
+#### comfyui-api
+
+[Crate Documentation](https://capslock.github.io/stable-diffusion-bot/comfyui_api/index.html)
+
+You can use these simple API bindings to build another application that utilizes
+the ComfyUI API.
+
+```shell
+cargo add --git https://github.com/capslock/stable-diffusion-bot comfyui-api
 ```
