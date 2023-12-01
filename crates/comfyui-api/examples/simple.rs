@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     let mut stream = websocket.updates().await?;
 
     println!("Sending prompt...");
-    let response = prompt_api.send(prompt).await?;
+    let response = prompt_api.send(&prompt).await?;
 
     println!("Prompt sent: {:#?}", response.prompt_id);
     // println!("{:#?}", response);
@@ -44,18 +44,28 @@ async fn main() -> anyhow::Result<()> {
                     //println!("{:#?}", data);
                     let _image = view_api.get(&data.output.images[0]).await?;
                     println!("\nGenerated image: {:#?}", data.output.images[0]);
-                    let task = history.get_prompt(&data.prompt_id).await?;
-                    println!("Number: {}", task.prompt.num);
+                    // let task = history.get_prompt(&data.prompt_id).await?;
+                    // println!("Number: {}", task.prompt.num);
                     // println!(
                     //     "{:#?}\n{} bytes",
                     //     history.get(&data.prompt_id).await?,
                     //     image.len()
                     // )
-                    break;
+                    // break;
                 }
                 Update::ExecutionCached(data) => {
                     println!("\nExecution cached: {:#?}", data.nodes);
-                    break;
+                    //break;
+                }
+                Update::Executing(data) => {
+                    if let Some(node) = data.node {
+                        println!("Executing: {:?}", prompt.workflow[&node]);
+                    } else {
+                        println!("Nothing left to execute.");
+                        let task = history.get_prompt(&data.prompt_id).await?;
+                        println!("Number: {}", task.prompt.num);
+                        break;
+                    }
                 }
                 _ => {
                     print!(".");
