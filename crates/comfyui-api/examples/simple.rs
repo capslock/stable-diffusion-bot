@@ -3,7 +3,7 @@ use std::io::{self, stdout, Read, Write};
 use anyhow::Context;
 use futures_util::stream::StreamExt;
 
-use comfyui_api::{Api, Prompt, Update, UpdateOrUnknown};
+use comfyui_api::{Api, Prompt, Update};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     let websocket = api.websocket()?;
     println!("Websocket API created");
-    let mut stream = websocket.connect().await?;
+    let mut stream = websocket.updates().await?;
 
     println!("Sending prompt...");
     let response = prompt_api.send(prompt).await?;
@@ -40,9 +40,7 @@ async fn main() -> anyhow::Result<()> {
     while let Some(msg) = stream.next().await {
         match msg {
             Ok(msg) => match msg {
-                comfyui_api::PreviewOrUpdate::Update(UpdateOrUnknown::Update(
-                    Update::Executed(data),
-                )) => {
+                Update::Executed(data) => {
                     //println!("{:#?}", data);
                     let _image = view_api.get(&data.output.images[0]).await?;
                     println!("\nGenerated image: {:#?}", data.output.images[0]);
@@ -55,9 +53,7 @@ async fn main() -> anyhow::Result<()> {
                     // )
                     break;
                 }
-                comfyui_api::PreviewOrUpdate::Update(UpdateOrUnknown::Update(
-                    Update::ExecutionCached(data),
-                )) => {
+                Update::ExecutionCached(data) => {
                     println!("\nExecution cached: {:#?}", data.nodes);
                     break;
                 }

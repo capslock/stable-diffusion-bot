@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Context};
-use futures_util::{Stream, StreamExt};
+use futures_util::{stream::FusedStream, StreamExt};
 use reqwest::Url;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::warn;
 
-use crate::{Preview, PreviewOrUpdate, UpdateOrUnknown};
+use crate::{Preview, PreviewOrUpdate, Update};
 
 /// Struct representing a connection to the ComfyUI API `ws` endpoint.
 pub struct WebsocketApi {
@@ -40,23 +40,17 @@ impl WebsocketApi {
         Self { endpoint }
     }
 
-    /// Connects to the websocket endpoint and returns a stream of `PreviewOrUpdate` values.
-    ///
-    /// # Returns
-    ///
-    /// A `Stream` of `PreviewOrUpdate` values. These are either `Update` values, which contain
-    /// progress updates for a task, or `Preview` values, which contain a preview image.
-    pub async fn connect(
+    async fn connect_impl(
         &self,
-    ) -> anyhow::Result<impl Stream<Item = Result<PreviewOrUpdate, anyhow::Error>> + Unpin> {
+    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
         let (connection, _) = connect_async(&self.endpoint)
             .await
             .context("WebSocket connection failed")?;
-        Ok(Box::pin(connection.filter_map(|m| async {
+        Ok(connection.filter_map(|m| async {
             match m {
                 Ok(m) => match m {
                     Message::Text(t) => Some(
-                        serde_json::from_str::<UpdateOrUnknown>(t.as_str())
+                        serde_json::from_str::<Update>(t.as_str())
                             .context("failed to parse websocket message text")
                             .map(PreviewOrUpdate::Update),
                     ),
@@ -69,6 +63,53 @@ impl WebsocketApi {
                     }
                 },
                 Err(e) => Some(Err(anyhow!("websocket error: {}", e))),
+            }
+        }))
+    }
+
+    /// Connects to the websocket endpoint and returns a stream of `PreviewOrUpdate` values.
+    ///
+    /// # Returns
+    ///
+    /// A `Stream` of `PreviewOrUpdate` values. These are either `Update` values, which contain
+    /// progress updates for a task, or `Preview` values, which contain a preview image.
+    pub async fn connect(
+        &self,
+    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>> + Unpin>
+    {
+        self.connect_impl().await.map(Box::pin)
+    }
+
+    /// Connects to the websocket endpoint and returns a stream of `Update` values.
+    ///
+    /// # Returns
+    ///
+    /// A `Stream` of `Update` values. These contain progress updates for a task.
+    pub async fn updates(
+        &self,
+    ) -> anyhow::Result<impl FusedStream<Item = Result<Update, anyhow::Error>> + Unpin> {
+        Ok(Box::pin(self.connect_impl().await?.filter_map(|m| async {
+            match m {
+                Ok(PreviewOrUpdate::Update(u)) => Some(Ok(u)),
+                Ok(PreviewOrUpdate::Preview(_)) => None,
+                Err(e) => Some(Err(e)),
+            }
+        })))
+    }
+
+    /// Connects to the websocket endpoint and returns a stream of `Preview` values.
+    ///
+    /// # Returns
+    ///
+    /// A `Stream` of `Preview` values. These contain preview images.
+    pub async fn previews(
+        &self,
+    ) -> anyhow::Result<impl FusedStream<Item = Result<Preview, anyhow::Error>> + Unpin> {
+        Ok(Box::pin(self.connect_impl().await?.filter_map(|m| async {
+            match m {
+                Ok(PreviewOrUpdate::Update(_)) => None,
+                Ok(PreviewOrUpdate::Preview(p)) => Some(Ok(p)),
+                Err(e) => Some(Err(e)),
             }
         })))
     }
