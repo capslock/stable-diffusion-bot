@@ -1,14 +1,14 @@
 use anyhow::Context;
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_with::skip_serializing_none;
 
 use crate::{Prompt, Response};
 
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Serialize, Debug)]
 #[skip_serializing_none]
-struct PromptWrapper {
-    prompt: Prompt,
+struct PromptWrapper<'a> {
+    prompt: &'a Prompt,
     client_id: Option<uuid::Uuid>,
 }
 
@@ -70,7 +70,7 @@ impl PromptApi {
     /// # Returns
     ///
     /// A `Result` containing a `Response` on success, or an error if the request failed.
-    pub async fn send(&self, prompt: Prompt) -> anyhow::Result<Response> {
+    pub async fn send(&self, prompt: &Prompt) -> anyhow::Result<Response> {
         let response = self
             .client
             .post(self.endpoint.clone())
