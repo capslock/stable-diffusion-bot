@@ -21,22 +21,22 @@ pub enum UpdateOrUnknown {
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum Update {
-    Progress(ProgressData),
-    Status { status: StatusData },
-    ExecutionStart(ExecutionStartData),
-    ExecutionCached(ExecutionCachedData),
-    Executing(ExecutingData),
-    Executed(ExecutedData),
+    Progress(Progress),
+    Status { status: Status },
+    ExecutionStart(ExecutionStart),
+    ExecutionCached(ExecutionCached),
+    Executing(Executing),
+    Executed(Executed),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ProgressData {
+pub struct Progress {
     pub value: u64,
     pub max: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct StatusData {
+pub struct Status {
     pub exec_info: ExecInfo,
 }
 
@@ -46,24 +46,24 @@ pub struct ExecInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutionStartData {
+pub struct ExecutionStart {
     pub prompt_id: uuid::Uuid,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutionCachedData {
+pub struct ExecutionCached {
     pub prompt_id: uuid::Uuid,
     pub nodes: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutingData {
+pub struct Executing {
     pub prompt_id: uuid::Uuid,
     pub node: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutedData {
+pub struct Executed {
     pub prompt_id: uuid::Uuid,
     pub node: String,
     pub output: Output,
