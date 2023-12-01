@@ -8,7 +8,7 @@ pub mod prompt;
 pub mod view;
 pub mod websocket;
 
-/// Struct representing a connection to a Stable Diffusion WebUI API.
+/// Struct representing a connection to a ComfyUI API.
 #[derive(Clone, Debug)]
 pub struct Api {
     client: reqwest::Client,
@@ -36,7 +36,7 @@ impl Api {
     ///
     /// # Arguments
     ///
-    /// * `url` - A string that specifies the Stable Diffusion WebUI API URL endpoint.
+    /// * `url` - A string that specifies the ComfyUI API URL endpoint.
     ///
     /// # Errors
     ///
@@ -56,7 +56,7 @@ impl Api {
     /// # Arguments
     ///
     /// * `client` - An instance of `reqwest::Client`.
-    /// * `url` - A string that specifies the Stable Diffusion WebUI API URL endpoint.
+    /// * `url` - A string that specifies the ComfyUI API URL endpoint.
     ///
     /// # Errors
     ///
@@ -72,6 +72,12 @@ impl Api {
         })
     }
 
+    /// Returns a new instance of `PromptApi` with the API's cloned
+    /// `reqwest::Client` and the URL for the `prompt` endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
     pub fn prompt(&self) -> anyhow::Result<PromptApi> {
         Ok(PromptApi::new_with_url(
             self.client.clone(),
@@ -82,6 +88,12 @@ impl Api {
         ))
     }
 
+    /// Returns a new instance of `HistoryApi` with the API's cloned
+    /// `reqwest::Client` and the URL for the `history` endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
     pub fn history(&self) -> anyhow::Result<HistoryApi> {
         Ok(HistoryApi::new_with_url(
             self.client.clone(),
@@ -91,6 +103,12 @@ impl Api {
         ))
     }
 
+    /// Returns a new instance of `ViewApi` with the API's cloned
+    /// `reqwest::Client` and the URL for the `view` endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
     pub fn view(&self) -> anyhow::Result<ViewApi> {
         Ok(ViewApi::new_with_url(
             self.client.clone(),
@@ -100,6 +118,13 @@ impl Api {
         ))
     }
 
+    /// Returns a new instance of `WebsocketApi` with the API's cloned
+    /// `reqwest::Client` and the URL for the `ws` endpoint.
+    ///
+    /// # Errors
+    ///
+    /// * If the URL fails to parse, an error will be returned.
+    /// * On failure to set the `ws://` scheme on the URL, an error will be returned.
     pub fn websocket(&self) -> anyhow::Result<WebsocketApi> {
         let mut url = self.url.clone();
         url.set_scheme("ws")

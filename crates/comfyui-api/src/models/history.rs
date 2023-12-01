@@ -47,7 +47,7 @@ pub struct PromptResult {
 
 impl From<(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)> for PromptResult {
     fn from(
-        (num, id, prompt, client_info, output_nodes): (
+        (num, id, prompt, extra_data, outputs_to_execute): (
             u64,
             uuid::Uuid,
             Prompt,
@@ -59,8 +59,8 @@ impl From<(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)> for PromptResu
             num,
             id,
             prompt,
-            extra_data: client_info,
-            outputs_to_execute: output_nodes,
+            extra_data,
+            outputs_to_execute,
         }
     }
 }
@@ -71,11 +71,11 @@ impl From<PromptResult> for (u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecut
             num,
             id,
             prompt,
-            extra_data: client_info,
-            outputs_to_execute: output_nodes,
+            extra_data,
+            outputs_to_execute,
         }: PromptResult,
     ) -> Self {
-        (num, id, prompt, client_info, output_nodes)
+        (num, id, prompt, extra_data, outputs_to_execute)
     }
 }
 
