@@ -41,7 +41,7 @@ impl HistoryApi {
         Self { client, endpoint }
     }
 
-    pub async fn get(&self, prompt_id: uuid::Uuid) -> anyhow::Result<History> {
+    pub async fn get(&self, prompt_id: &uuid::Uuid) -> anyhow::Result<History> {
         let response = self
             .client
             .get(

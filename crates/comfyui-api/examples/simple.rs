@@ -1,113 +1,41 @@
-use comfyui_api::{Api, Prompt, Update, UpdateOrUnknown};
+use std::io::{self, stdout, Read, Write};
+
+use anyhow::Context;
 use futures_util::stream::StreamExt;
+
+use comfyui_api::{Api, Prompt, Update, UpdateOrUnknown};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let prompt: Prompt = serde_json::from_str(
-        r#"
-    {
-        "3": {
-            "class_type": "KSampler",
-            "inputs": {
-                "cfg": 8,
-                "denoise": 1,
-                "latent_image": [
-                    "5",
-                    0
-                ],
-                "model": [
-                    "4",
-                    0
-                ],
-                "negative": [
-                    "7",
-                    0
-                ],
-                "positive": [
-                    "6",
-                    0
-                ],
-                "sampler_name": "euler",
-                "scheduler": "normal",
-                "seed": 8566256,
-                "steps": 20
-            }
-        },
-        "4": {
-            "class_type": "CheckpointLoaderSimple",
-            "inputs": {
-                "ckpt_name": "sd\\sd_xl_base_1.0.safetensors"
-            }
-        },
-        "5": {
-            "class_type": "EmptyLatentImage",
-            "inputs": {
-                "batch_size": 1,
-                "height": 1024,
-                "width": 1024
-            }
-        },
-        "6": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "clip": [
-                    "4",
-                    1
-                ],
-                "text": "masterpiece best quality girl"
-            }
-        },
-        "7": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "clip": [
-                    "4",
-                    1
-                ],
-                "text": "bad hands"
-            }
-        },
-        "8": {
-            "class_type": "VAEDecode",
-            "inputs": {
-                "samples": [
-                    "3",
-                    0
-                ],
-                "vae": [
-                    "4",
-                    2
-                ]
-            }
-        },
-        "9": {
-            "class_type": "SaveImage",
-            "inputs": {
-                "filename_prefix": "ComfyUI",
-                "images": [
-                    "8",
-                    0
-                ]
-            }
-        }
-    }
-    "#,
-    )
-    .unwrap();
-    println!("{:#?}", prompt);
-    println!("{}", serde_json::to_string_pretty(&prompt).unwrap());
+    let mut prompt = String::new();
+    io::stdin()
+        .read_to_string(&mut prompt)
+        .context("failed to read prompt")?;
+
+    let prompt: Prompt = serde_json::from_str(prompt.as_str()).unwrap();
+
+    // println!("{:#?}", prompt);
+    // println!("{}", serde_json::to_string_pretty(&prompt).unwrap());
 
     let api = Api::default();
+    println!("API created with default host/port");
     let prompt_api = api.prompt()?;
+    println!("Prompt API created");
     let history = api.history()?;
+    println!("History API created");
+    let view_api = api.view()?;
+    println!("View API created");
 
     let websocket = api.websocket()?;
+    println!("Websocket API created");
     let mut stream = websocket.connect().await?;
 
+    println!("Sending prompt...");
     let response = prompt_api.send(prompt).await?;
-    println!("{:#?}", response);
 
-    let view_api = api.view()?;
+    println!("Prompt sent: {:#?}", response.prompt_id);
+    // println!("{:#?}", response);
+    println!("Waiting for updates...");
 
     while let Some(msg) = stream.next().await {
         match msg {
@@ -115,19 +43,38 @@ async fn main() -> anyhow::Result<()> {
                 comfyui_api::PreviewOrUpdate::Update(UpdateOrUnknown::Update(
                     Update::Executed(data),
                 )) => {
-                    let image = view_api.get(&data.output.images[0]).await?;
-                    println!(
-                        "{:#?}\n{} bytes",
-                        history.get(data.prompt_id).await?,
-                        image.len()
-                    )
+                    //println!("{:#?}", data);
+                    let _image = view_api.get(&data.output.images[0]).await?;
+                    println!("\nGenerated image: {:#?}", data.output.images[0]);
+                    if let Some(task) = history
+                        .get(&data.prompt_id)
+                        .await?
+                        .tasks
+                        .get(&data.prompt_id)
+                    {
+                        println!("Number: {}", task.prompt.num)
+                    }
+                    // println!(
+                    //     "{:#?}\n{} bytes",
+                    //     history.get(&data.prompt_id).await?,
+                    //     image.len()
+                    // )
+                    break;
+                }
+                comfyui_api::PreviewOrUpdate::Update(UpdateOrUnknown::Update(
+                    Update::ExecutionCached(data),
+                )) => {
+                    println!("\nExecution cached: {:#?}", data.nodes);
+                    break;
                 }
                 _ => {
-                    println!("{:#?}", msg);
+                    print!(".");
+                    stdout().flush().context("failed to flush stdout")?;
+                    //println!("{:#?}", msg);
                 }
             },
             Err(e) => {
-                println!("{:#?}", e);
+                println!("Error occurred: {:#?}", e);
             }
         }
     }
