@@ -5,13 +5,6 @@ use serde::{Deserialize, Serialize};
 use crate::{Image, Prompt};
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum HistoryOrUnknown {
-    History(History),
-    Unknown(serde_json::Value),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 #[serde(transparent)]
 pub struct History {
     pub tasks: HashMap<uuid::Uuid, Task>,
