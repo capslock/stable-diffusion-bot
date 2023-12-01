@@ -46,14 +46,8 @@ async fn main() -> anyhow::Result<()> {
                     //println!("{:#?}", data);
                     let _image = view_api.get(&data.output.images[0]).await?;
                     println!("\nGenerated image: {:#?}", data.output.images[0]);
-                    if let Some(task) = history
-                        .get(&data.prompt_id)
-                        .await?
-                        .tasks
-                        .get(&data.prompt_id)
-                    {
-                        println!("Number: {}", task.prompt.num)
-                    }
+                    let task = history.get_prompt(&data.prompt_id).await?;
+                    println!("Number: {}", task.prompt.num);
                     // println!(
                     //     "{:#?}\n{} bytes",
                     //     history.get(&data.prompt_id).await?,

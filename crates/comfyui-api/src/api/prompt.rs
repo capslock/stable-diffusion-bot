@@ -7,11 +7,12 @@ use crate::{Prompt, Response};
 
 #[derive(Default, Serialize, Deserialize, Debug)]
 #[skip_serializing_none]
-pub(crate) struct PromptWrapper {
-    pub prompt: Prompt,
-    pub client_id: Option<uuid::Uuid>,
+struct PromptWrapper {
+    prompt: Prompt,
+    client_id: Option<uuid::Uuid>,
 }
 
+/// Struct representing a connection to the ComfyUI API `prompt` endpoint.
 pub struct PromptApi {
     client: reqwest::Client,
     endpoint: Url,
@@ -19,7 +20,7 @@ pub struct PromptApi {
 }
 
 impl PromptApi {
-    /// Constructs a new Txt2Img client with a given `reqwest::Client` and Stable Diffusion API
+    /// Constructs a new `PromptApi` client with a given `reqwest::Client` and ComfyUI API
     /// endpoint `String`.
     ///
     /// # Arguments
@@ -29,7 +30,7 @@ impl PromptApi {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new Txt2Img instance on success, or an error if url parsing failed.
+    /// A `Result` containing a new `PromptApi` instance on success, or an error if url parsing failed.
     pub fn new(
         client: reqwest::Client,
         endpoint: String,
@@ -42,7 +43,7 @@ impl PromptApi {
         ))
     }
 
-    /// Constructs a new Txt2Img client with a given `reqwest::Client` and endpoint `Url`.
+    /// Constructs a new `PromptApi` client with a given `reqwest::Client` and endpoint `Url`.
     ///
     /// # Arguments
     ///
@@ -51,7 +52,7 @@ impl PromptApi {
     ///
     /// # Returns
     ///
-    /// A new Txt2Img instance.
+    /// A new `PromptApi` instance.
     pub fn new_with_url(client: reqwest::Client, endpoint: Url, client_id: uuid::Uuid) -> Self {
         Self {
             client,
@@ -60,15 +61,15 @@ impl PromptApi {
         }
     }
 
-    /// Sends an image request using the Txt2Img client.
+    /// Sends a prompt request using the `PromptApi` client.
     ///
     /// # Arguments
     ///
-    /// * `request` - An Txt2ImgRequest containing the parameters for the image request.
+    /// * `prompt` - A `Prompt` to send to the ComfyUI API.
     ///
     /// # Returns
     ///
-    /// A `Result` containing an `ImgResponse<Txt2ImgRequest>` on success, or an error if one occurred.
+    /// A `Result` containing a `Response` on success, or an error if the request failed.
     pub async fn send(&self, prompt: Prompt) -> anyhow::Result<Response> {
         let response = self
             .client

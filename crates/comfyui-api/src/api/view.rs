@@ -3,13 +3,14 @@ use reqwest::Url;
 
 use crate::Image;
 
+/// Struct representing a connection to the ComfyUI API `view` endpoint.
 pub struct ViewApi {
     client: reqwest::Client,
     endpoint: Url,
 }
 
 impl ViewApi {
-    /// Constructs a new Txt2Img client with a given `reqwest::Client` and Stable Diffusion API
+    /// Constructs a new `ViewApi` client with a given `reqwest::Client` and ComfyUI API
     /// endpoint `String`.
     ///
     /// # Arguments
@@ -19,7 +20,7 @@ impl ViewApi {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a new Txt2Img instance on success, or an error if url parsing failed.
+    /// A `Result` containing a new `ViewApi` instance on success, or an error if url parsing failed.
     pub fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
         Ok(Self::new_with_url(
             client,
@@ -27,7 +28,7 @@ impl ViewApi {
         ))
     }
 
-    /// Constructs a new Txt2Img client with a given `reqwest::Client` and endpoint `Url`.
+    /// Constructs a new `ViewApi` client with a given `reqwest::Client` and endpoint `Url`.
     ///
     /// # Arguments
     ///
@@ -36,11 +37,21 @@ impl ViewApi {
     ///
     /// # Returns
     ///
-    /// A new Txt2Img instance.
+    /// A new `ViewApi` instance.
     pub fn new_with_url(client: reqwest::Client, endpoint: Url) -> Self {
         Self { client, endpoint }
     }
 
+    /// Sends a view request using the `ViewApi` client.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` - An `Image` struct containing the information about the image to view.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Vec<u8>` representation of the image on
+    /// success, or an error if the request failed.
     pub async fn get(&self, image: &Image) -> anyhow::Result<Vec<u8>> {
         let response = self
             .client
