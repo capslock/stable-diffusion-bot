@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
                 ],
                 "sampler_name": "euler",
                 "scheduler": "normal",
-                "seed": 18566256,
+                "seed": 8566256,
                 "steps": 20
             }
         },
@@ -107,12 +107,21 @@ async fn main() -> anyhow::Result<()> {
     let response = prompt_api.send(prompt).await?;
     println!("{:#?}", response);
 
+    let view_api = api.view()?;
+
     while let Some(msg) = stream.next().await {
         match msg {
             Ok(msg) => match msg {
                 comfyui_api::PreviewOrUpdate::Update(UpdateOrUnknown::Update(
                     Update::Executed(data),
-                )) => println!("{:#?}", history.get(data.prompt_id).await?),
+                )) => {
+                    let image = view_api.get(&data.output.images[0]).await?;
+                    println!(
+                        "{:#?}\n{} bytes",
+                        history.get(data.prompt_id).await?,
+                        image.len()
+                    )
+                }
                 _ => {
                     println!("{:#?}", msg);
                 }
