@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Image, Prompt};
+use super::{Image, Prompt};
 
 /// Struct containing task results from the ComfyUI API `history` endpoint.
 #[derive(Serialize, Deserialize, Debug)]

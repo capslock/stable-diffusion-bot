@@ -3,7 +3,7 @@ use reqwest::Url;
 use serde::Serialize;
 use serde_with::skip_serializing_none;
 
-use crate::{Prompt, Response};
+use crate::models::{Prompt, Response};
 
 #[derive(Serialize, Debug)]
 #[skip_serializing_none]
@@ -13,6 +13,7 @@ struct PromptWrapper<'a> {
 }
 
 /// Struct representing a connection to the ComfyUI API `prompt` endpoint.
+#[derive(Clone, Debug)]
 pub struct PromptApi {
     client: reqwest::Client,
     endpoint: Url,

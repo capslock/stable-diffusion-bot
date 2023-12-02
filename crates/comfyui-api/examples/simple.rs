@@ -3,7 +3,8 @@ use std::io::{self, stdout, Read, Write};
 use anyhow::Context;
 use futures_util::stream::StreamExt;
 
-use comfyui_api::{Api, Prompt, Update};
+use comfyui_api::api::Api;
+use comfyui_api::models::{NodeOutputOrUnknown, Prompt, Update};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -13,9 +14,6 @@ async fn main() -> anyhow::Result<()> {
         .context("failed to read prompt")?;
 
     let prompt: Prompt = serde_json::from_str(prompt.as_str()).unwrap();
-
-    // println!("{:#?}", prompt);
-    // println!("{}", serde_json::to_string_pretty(&prompt).unwrap());
 
     let api = Api::default();
     println!("API created with default host/port");
@@ -33,44 +31,60 @@ async fn main() -> anyhow::Result<()> {
     println!("Sending prompt...");
     let response = prompt_api.send(&prompt).await?;
 
-    println!("Prompt sent: {:#?}", response.prompt_id);
-    // println!("{:#?}", response);
+    println!("Prompt sent, id: {}", response.prompt_id);
     println!("Waiting for updates...");
 
     while let Some(msg) = stream.next().await {
         match msg {
             Ok(msg) => match msg {
-                Update::Executed(data) => {
-                    //println!("{:#?}", data);
-                    let _image = view_api.get(&data.output.images[0]).await?;
-                    println!("\nGenerated image: {:#?}", data.output.images[0]);
-                    // let task = history.get_prompt(&data.prompt_id).await?;
-                    // println!("Number: {}", task.prompt.num);
-                    // println!(
-                    //     "{:#?}\n{} bytes",
-                    //     history.get(&data.prompt_id).await?,
-                    //     image.len()
-                    // )
-                    // break;
-                }
-                Update::ExecutionCached(data) => {
-                    println!("\nExecution cached: {:#?}", data.nodes);
-                    //break;
+                Update::ExecutionStart(data) => {
+                    println!("Execution started: {:?}", data);
                 }
                 Update::Executing(data) => {
                     if let Some(node) = data.node {
-                        println!("Executing: {:?}", prompt.workflow[&node]);
+                        println!("Executing: {:#?}", prompt.workflow[&node]);
                     } else {
                         println!("Nothing left to execute.");
                         let task = history.get_prompt(&data.prompt_id).await?;
                         println!("Number: {}", task.prompt.num);
+                        for (key, value) in task.outputs.nodes.iter() {
+                            if let NodeOutputOrUnknown::NodeOutput(output) = value {
+                                println!("Node: {}", key);
+                                for image in output.images.iter() {
+                                    println!("Generated image: {:?}", image);
+                                }
+                            }
+                        }
                         break;
                     }
                 }
-                _ => {
-                    print!(".");
-                    stdout().flush().context("failed to flush stdout")?;
-                    //println!("{:#?}", msg);
+                Update::ExecutionCached(data) => {
+                    println!("Execution cached: {:?}", data.nodes);
+                }
+                Update::Executed(data) => {
+                    let _image = view_api.get(&data.output.images[0]).await?;
+                    for image in data.output.images.iter() {
+                        println!("Generated image: {:?}", image);
+                    }
+                }
+                Update::ExecutionInterrupted(data) => {
+                    println!("Execution interrupted: {:#?}", data);
+                    break;
+                }
+                Update::ExecutionError(data) => {
+                    println!("Execution error: {:#?}", data);
+                    break;
+                }
+                Update::Progress(data) => {
+                    if data.value == data.max {
+                        println!(".")
+                    } else {
+                        print!(".");
+                        stdout().flush().context("failed to flush stdout")?;
+                    }
+                }
+                Update::Status { status } => {
+                    println!("Status: {} queued.", status.exec_info.queue_remaining);
                 }
             },
             Err(e) => {

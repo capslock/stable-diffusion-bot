@@ -1,9 +1,10 @@
 use anyhow::Context;
 use reqwest::Url;
 
-use crate::{History, Task};
+use crate::models::{History, Task};
 
 /// Struct representing a connection to the ComfyUI API `history` endpoint.
+#[derive(Clone, Debug)]
 pub struct HistoryApi {
     client: reqwest::Client,
     endpoint: Url,
