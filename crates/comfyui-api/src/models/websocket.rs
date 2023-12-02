@@ -82,9 +82,9 @@ pub struct ExecutionCached {
 /// Struct representing an executing update.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Executing {
-    /// The prompt id.
-    pub prompt_id: uuid::Uuid,
-    /// The node that is executing.
+    /// The prompt id. None if reconnecting to a session.
+    pub prompt_id: Option<uuid::Uuid>,
+    /// The node that is executing. None if execution is finished.
     pub node: Option<String>,
 }
 

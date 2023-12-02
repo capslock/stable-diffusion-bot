@@ -334,6 +334,7 @@ name = "comfyui-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "base64 0.21.5",
  "futures-util",
  "reqwest",

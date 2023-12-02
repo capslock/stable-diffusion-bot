@@ -52,7 +52,7 @@ impl WebsocketApi {
                 Ok(m) => match m {
                     Message::Text(t) => Some(
                         serde_json::from_str::<Update>(t.as_str())
-                            .context("failed to parse websocket message text")
+                            .context(format!("failed to parse websocket message text: {}", t))
                             .map(PreviewOrUpdate::Update),
                     ),
                     Message::Binary(_) => {
@@ -76,9 +76,8 @@ impl WebsocketApi {
     /// progress updates for a task, or `Preview` values, which contain a preview image.
     pub async fn connect(
         &self,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>> + Unpin>
-    {
-        self.connect_impl().await.map(Box::pin)
+    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
+        self.connect_impl().await
     }
 
     /// Connects to the websocket endpoint and returns a stream of `Update` values.
@@ -88,14 +87,14 @@ impl WebsocketApi {
     /// A `Stream` of `Update` values. These contain progress updates for a task.
     pub async fn updates(
         &self,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<Update, anyhow::Error>> + Unpin> {
-        Ok(Box::pin(self.connect_impl().await?.filter_map(|m| async {
+    ) -> anyhow::Result<impl FusedStream<Item = Result<Update, anyhow::Error>>> {
+        Ok(self.connect_impl().await?.filter_map(|m| async {
             match m {
                 Ok(PreviewOrUpdate::Update(u)) => Some(Ok(u)),
                 Ok(PreviewOrUpdate::Preview(_)) => None,
                 Err(e) => Some(Err(e)),
             }
-        })))
+        }))
     }
 
     /// Connects to the websocket endpoint and returns a stream of `Preview` values.
@@ -105,13 +104,13 @@ impl WebsocketApi {
     /// A `Stream` of `Preview` values. These contain preview images.
     pub async fn previews(
         &self,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<Preview, anyhow::Error>> + Unpin> {
-        Ok(Box::pin(self.connect_impl().await?.filter_map(|m| async {
+    ) -> anyhow::Result<impl FusedStream<Item = Result<Preview, anyhow::Error>>> {
+        Ok(self.connect_impl().await?.filter_map(|m| async {
             match m {
                 Ok(PreviewOrUpdate::Update(_)) => None,
                 Ok(PreviewOrUpdate::Preview(p)) => Some(Ok(p)),
                 Err(e) => Some(Err(e)),
             }
-        })))
+        }))
     }
 }
