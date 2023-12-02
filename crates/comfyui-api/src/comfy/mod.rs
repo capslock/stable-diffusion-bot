@@ -269,6 +269,7 @@ struct ImageInfoVisitor<'a> {
     pub seed: Option<i64>,
 }
 
+/// Information about the generated image.
 #[derive(Debug, Clone)]
 pub struct ImageInfo {
     pub prompt: String,
@@ -280,6 +281,16 @@ pub struct ImageInfo {
 }
 
 impl ImageInfo {
+    /// Returns a new `ImageInfo` instance based on the given `Prompt` and output node.
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - A `Prompt` describing the workflow used to generate an image.
+    /// * `output_node` - The output node that produced the image.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a new `ImageInfo` instance on success, or an error if the output node was not found.
     pub fn new_from_prompt(prompt: &Prompt, output_node: &str) -> anyhow::Result<ImageInfo> {
         if prompt.workflow.get(output_node).is_none() {
             return Err(anyhow!("Output node not found: {}", output_node));
