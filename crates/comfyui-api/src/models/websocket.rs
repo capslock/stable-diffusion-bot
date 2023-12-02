@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// An enum representing a websocket message.
+#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum PreviewOrUpdate {
@@ -125,7 +128,7 @@ pub struct ExecutionInterrupted {
     /// The type of the node.
     pub node_type: String,
     /// What was executed prior to interruption.
-    pub executed: Vec<serde_json::Value>,
+    pub executed: Vec<String>,
 }
 
 /// Struct representing an execution error update.
@@ -133,15 +136,31 @@ pub struct ExecutionInterrupted {
 pub struct ExecutionError {
     /// The state of execution that was interrupted.
     #[serde(flatten)]
-    pub status: ExecutionInterrupted,
+    pub execution_status: ExecutionInterrupted,
     /// The exception message.
     pub exception_message: String,
     /// The exception type.
     pub exception_type: String,
     /// The traceback.
-    pub traceback: String,
+    pub traceback: Vec<String>,
     /// The current inputs.
-    pub current_inputs: serde_json::Value,
+    pub current_inputs: CurrentInputs,
     /// The current outputs.
-    pub current_outputs: serde_json::Value,
+    pub current_outputs: CurrentOutputs,
+}
+
+/// Struct representing the current inputs when the execution error occurred.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(transparent)]
+pub struct CurrentInputs {
+    /// Hashmap of inputs keyed by input name.
+    pub inputs: HashMap<String, serde_json::Value>,
+}
+
+/// Struct representing the current outputs when the execution error occurred.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(transparent)]
+pub struct CurrentOutputs {
+    /// Hashmap of outputs keyed by node id.
+    pub outputs: HashMap<String, Vec<serde_json::Value>>,
 }

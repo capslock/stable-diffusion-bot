@@ -4,9 +4,10 @@ use reqwest::Url;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::warn;
 
-use crate::{Preview, PreviewOrUpdate, Update};
+use crate::models::{Preview, PreviewOrUpdate, Update};
 
 /// Struct representing a connection to the ComfyUI API `ws` endpoint.
+#[derive(Clone, Debug)]
 pub struct WebsocketApi {
     endpoint: Url,
 }

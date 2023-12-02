@@ -1,12 +1,15 @@
 use anyhow::{anyhow, Context};
 use reqwest::Url;
 
-use crate::{HistoryApi, PromptApi, ViewApi, WebsocketApi};
-
 pub mod history;
 pub mod prompt;
 pub mod view;
 pub mod websocket;
+
+pub use history::*;
+pub use prompt::*;
+pub use view::*;
+pub use websocket::*;
 
 /// Struct representing a connection to a ComfyUI API.
 #[derive(Clone, Debug)]

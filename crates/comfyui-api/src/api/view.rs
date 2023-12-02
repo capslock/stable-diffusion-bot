@@ -1,9 +1,10 @@
 use anyhow::Context;
 use reqwest::Url;
 
-use crate::Image;
+use crate::models::Image;
 
 /// Struct representing a connection to the ComfyUI API `view` endpoint.
+#[derive(Clone, Debug)]
 pub struct ViewApi {
     client: reqwest::Client,
     endpoint: Url,
