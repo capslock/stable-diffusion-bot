@@ -1,7 +1,7 @@
 use std::io::{self, Read};
 
 use anyhow::Context;
-use comfyui_api::comfy::Comfy;
+use comfyui_api::comfy::{Comfy, ImageInfo};
 use futures_util::StreamExt;
 
 #[tokio::main]
@@ -17,7 +17,10 @@ async fn main() -> anyhow::Result<()> {
     let mut stream = comfy.stream_prompt(&prompt).await?.boxed();
     while let Some(image) = stream.next().await {
         match image {
-            Ok(_image) => println!("Generated image."),
+            Ok((node, _image)) => {
+                let image_info = ImageInfo::new_from_prompt(&prompt, &node)?;
+                println!("Generated image: {:#?}.", image_info);
+            }
             Err(err) => println!("Error: {:?}", err),
         }
     }
