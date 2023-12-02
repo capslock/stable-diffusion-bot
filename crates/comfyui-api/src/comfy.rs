@@ -1,15 +1,22 @@
-use anyhow::Context;
-use futures_util::{future::join_all, StreamExt};
+use std::collections::HashSet;
+
+use async_stream::stream;
+use futures_util::{stream::FusedStream, Stream, StreamExt};
 
 use crate::{api::*, models::*};
 
-/// Struct representing a connection to a ComfyUI API.
+/// Higher-level API for interacting with the ComfyUI API.
 #[derive(Clone, Debug)]
 pub struct Comfy {
     prompt: PromptApi,
     view: ViewApi,
     websocket: WebsocketApi,
     history: HistoryApi,
+}
+
+enum State {
+    Executing(String, Vec<Image>),
+    Finished(Vec<(String, Vec<Image>)>),
 }
 
 impl Comfy {
@@ -69,66 +76,108 @@ impl Comfy {
         })
     }
 
-    pub async fn execute_prompt(&self, prompt: &Prompt) -> anyhow::Result<Vec<Vec<u8>>> {
-        let mut stream = self.websocket.updates().await?;
-        let _response = self.prompt.send(prompt).await?;
-
-        while let Some(msg) = stream.next().await {
-            match msg {
-                Ok(msg) => match msg {
-                    Update::ExecutionStart(_) => {}
-                    Update::Executing(data) => {
-                        if data.node.is_none() {
-                            let task = self.history.get_prompt(&data.prompt_id).await?;
-                            let images = task
-                                .outputs
-                                .nodes
-                                .into_values()
-                                .filter_map(|value| {
-                                    if let NodeOutputOrUnknown::NodeOutput(output) = value {
-                                        Some(output.images)
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .flatten()
-                                .collect::<Vec<Image>>();
-                            return join_all(
-                                images
-                                    .into_iter()
-                                    .map(|image| async move { self.view.get(&image).await })
-                                    .collect::<Vec<_>>(),
-                            )
-                            .await
+    async fn filter_update(&self, update: Update) -> anyhow::Result<Option<State>> {
+        match update {
+            Update::Executing(data) => {
+                if data.node.is_none() {
+                    if let Some(prompt_id) = data.prompt_id {
+                        let task = self.history.get_prompt(&prompt_id).await.unwrap();
+                        let images = task
+                            .outputs
+                            .nodes
                             .into_iter()
-                            .try_fold(vec![], |mut acc, image| {
-                                acc.push(image.context("Failed to get image")?);
-                                Ok::<Vec<Vec<u8>>, anyhow::Error>(acc)
-                            });
+                            .filter_map(|(key, value)| {
+                                if let NodeOutputOrUnknown::NodeOutput(output) = value {
+                                    Some((key, output.images))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<(String, Vec<Image>)>>();
+                        return Ok(Some(State::Finished(images)));
+                    }
+                }
+                Ok(None)
+            }
+            Update::Executed(data) => Ok(Some(State::Executing(data.node, data.output.images))),
+            Update::ExecutionInterrupted(data) => {
+                Err(anyhow::anyhow!("Execution interrupted: {:?}", data))
+            }
+            Update::ExecutionError(data) => Err(anyhow::anyhow!("Execution error: {:?}", data)),
+            _ => Ok(None),
+        }
+    }
+
+    async fn prompt_impl<'a>(
+        &'a self,
+        prompt: &'a Prompt,
+    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<State>> + 'a> {
+        let stream = self.websocket.updates().await?;
+        let _response = self.prompt.send(prompt).await?;
+        Ok(stream.filter_map(move |msg| async {
+            match msg {
+                Ok(msg) => match self.filter_update(msg).await {
+                    Ok(Some(images)) => Some(Ok(images)),
+                    Ok(None) => None,
+                    Err(e) => Some(Err(e)),
+                },
+                Err(e) => Some(Err(anyhow::anyhow!("Error occurred: {:?}", e))),
+            }
+        }))
+    }
+
+    pub async fn stream_prompt<'a>(
+        &'a self,
+        prompt: &'a Prompt,
+    ) -> anyhow::Result<impl FusedStream<Item = anyhow::Result<Vec<u8>>> + 'a> {
+        Ok(stream! {
+            let mut executed = HashSet::new();
+            let stream = self.prompt_impl(prompt).await?;
+            for await msg in stream {
+                match msg {
+                    Ok(State::Executing(node, images)) => {
+                        executed.insert(node);
+                        for image in images {
+                            let image = self.view.get(&image).await?;
+                            yield Ok(image);
                         }
                     }
-                    Update::ExecutionCached(_) => {}
-                    Update::Executed(_data) => {
-                        //let _image = self.view.get(&data.output.images[0]).await?;
-                        //for image in data.output.images.iter() {
-                        //    println!("Generated image: {:?}", image);
-                        //}
+                    Ok(State::Finished(images)) => {
+                        for (node, images) in images {
+                            if executed.contains(&node) {
+                                continue;
+                            }
+                            for image in images {
+                                let image = self.view.get(&image).await?;
+                                yield Ok(image);
+                            }
+                        }
+                        return;
                     }
-                    Update::ExecutionInterrupted(data) => {
-                        return Err(anyhow::anyhow!("Execution interrupted: {:?}", data))
-                    }
+                    Err(e) => Err(e)?,
+                }
+            }
+        })
+    }
 
-                    Update::ExecutionError(data) => {
-                        return Err(anyhow::anyhow!("Execution error: {:?}", data))
-                    }
-
-                    Update::Progress(_) => {}
-                    Update::Status { .. } => {}
-                },
-                Err(e) => return Err(anyhow::anyhow!("Error occurred: {:?}", e)),
+    /// Executes a prompt and returns the generated images.
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - A `Prompt` to send to the ComfyUI API.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Vec<Vec<u8>>` of images on success, or an error if the request failed.
+    pub async fn execute_prompt(&self, prompt: &Prompt) -> anyhow::Result<Vec<Vec<u8>>> {
+        let mut images = vec![];
+        let mut stream = self.stream_prompt(prompt).await?.boxed();
+        while let Some(image) = stream.next().await {
+            match image {
+                Ok(image) => images.push(image),
+                Err(e) => return Err(e),
             }
         }
-
-        Ok(vec![])
+        Ok(images)
     }
 }

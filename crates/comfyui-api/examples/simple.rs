@@ -5,6 +5,7 @@ use futures_util::stream::StreamExt;
 
 use comfyui_api::api::Api;
 use comfyui_api::models::{NodeOutputOrUnknown, Prompt, Update};
+use tokio::pin;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -26,13 +27,15 @@ async fn main() -> anyhow::Result<()> {
 
     let websocket = api.websocket()?;
     println!("Websocket API created");
-    let mut stream = websocket.updates().await?;
+    let stream = websocket.updates().await?;
 
     println!("Sending prompt...");
     let response = prompt_api.send(&prompt).await?;
 
     println!("Prompt sent, id: {}", response.prompt_id);
     println!("Waiting for updates...");
+
+    pin!(stream);
 
     while let Some(msg) = stream.next().await {
         match msg {
@@ -43,9 +46,9 @@ async fn main() -> anyhow::Result<()> {
                 Update::Executing(data) => {
                     if let Some(node) = data.node {
                         println!("Executing: {:#?}", prompt.workflow[&node]);
-                    } else {
+                    } else if let Some(ref prompt_id) = data.prompt_id {
                         println!("Nothing left to execute.");
-                        let task = history.get_prompt(&data.prompt_id).await?;
+                        let task = history.get_prompt(prompt_id).await?;
                         println!("Number: {}", task.prompt.num);
                         for (key, value) in task.outputs.nodes.iter() {
                             if let NodeOutputOrUnknown::NodeOutput(output) = value {
