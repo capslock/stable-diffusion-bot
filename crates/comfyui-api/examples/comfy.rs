@@ -1,7 +1,7 @@
 use std::io::{self, Read};
 
 use anyhow::Context;
-use comfyui_api::comfy::{Comfy, ImageInfo};
+use comfyui_api::comfy::{Comfy, ImageInfo, NodeOutput, PromptBuilder};
 use futures_util::StreamExt;
 use tokio::pin;
 
@@ -21,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
 
     while let Some(image) = stream.next().await {
         match image {
-            Ok((node, _image)) => {
+            Ok(NodeOutput { node, .. }) => {
                 let image_info = ImageInfo::new_from_prompt(&prompt, &node)?;
                 println!("Generated image: {:#?}.", image_info);
             }
@@ -29,9 +29,16 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let images = comfy.execute_prompt(&prompt).await?;
+    let new_prompt = PromptBuilder::new(&prompt, None).seed(1, None).build()?;
+
+    let images = comfy.execute_prompt(&new_prompt).await?;
 
     println!("Generated {} images.", images.len());
+
+    for NodeOutput { node, .. } in images {
+        let image_info = ImageInfo::new_from_prompt(&new_prompt, &node)?;
+        println!("Generated image: {:#?}.", image_info);
+    }
 
     Ok(())
 }

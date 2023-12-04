@@ -107,7 +107,7 @@ pub struct Output {
 }
 
 /// Struct representing an image.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Image {
     /// The filename of the image.
     pub filename: String,

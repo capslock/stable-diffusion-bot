@@ -1,9 +1,10 @@
 use std::{any::Any, collections::HashMap};
 
+use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 
 /// Struct representing a prompt workflow.
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct Prompt {
     /// The prompt workflow, indexed by node id.
     #[serde(flatten)]
@@ -18,11 +19,41 @@ impl Prompt {
             _ => None,
         }
     }
+
+    pub fn get_node_by_id_mut(&mut self, id: &str) -> Option<&mut dyn Node> {
+        match self.workflow.get_mut(id) {
+            Some(NodeOrUnknown::Node(node)) => Some(node.as_mut()),
+            Some(NodeOrUnknown::GenericNode(node)) => Some(node),
+            _ => None,
+        }
+    }
+
+    pub fn get_nodes_by_type<T: Node + 'static>(&self) -> impl Iterator<Item = (&str, &T)> {
+        self.workflow.iter().filter_map(|(key, node)| match node {
+            NodeOrUnknown::Node(node) => as_node::<T>(node.as_ref()).map(|n| (key.as_str(), n)),
+            NodeOrUnknown::GenericNode(node) => as_node::<T>(node).map(|n| (key.as_str(), n)),
+        })
+    }
+
+    pub fn get_nodes_by_type_mut<T: Node + 'static>(
+        &mut self,
+    ) -> impl Iterator<Item = (&str, &mut T)> {
+        self.workflow
+            .iter_mut()
+            .filter_map(|(key, node)| match node {
+                NodeOrUnknown::Node(node) => {
+                    as_node_mut::<T>(node.as_mut()).map(|n| (key.as_str(), n))
+                }
+                NodeOrUnknown::GenericNode(node) => {
+                    as_node_mut::<T>(node).map(|n| (key.as_str(), n))
+                }
+            })
+    }
 }
 
 /// Enum capturing all possible node types.
 #[allow(clippy::large_enum_variant)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum NodeOrUnknown {
     /// Enum variant representing a known node.
@@ -35,12 +66,18 @@ impl<T: Any> AsAny for T {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }
 
 /// Trait to allow downcasting to `dyn Any`.
 pub trait AsAny {
     /// Get a reference to `dyn Any`.
     fn as_any(&self) -> &dyn Any;
+
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 /// Get a reference to a node of a specific type.
@@ -56,8 +93,23 @@ pub fn as_node<T: Node + 'static>(node: &dyn Node) -> Option<&T> {
     node.as_any().downcast_ref::<T>()
 }
 
+/// Get a mutable reference to a node of a specific type.
+///
+/// # Arguments
+///
+/// * `node` - The node to get a reference to.
+///
+/// # Returns
+///
+/// A reference to the node of the specified type if the node is of the specified type, otherwise `None`.
+pub fn as_node_mut<T: Node + 'static>(node: &mut dyn Node) -> Option<&mut T> {
+    node.as_any_mut().downcast_mut::<T>()
+}
+
+dyn_clone::clone_trait_object!(Node);
+
 #[typetag::serde(tag = "class_type", content = "inputs")]
-pub trait Node: std::fmt::Debug + AsAny {
+pub trait Node: std::fmt::Debug + AsAny + DynClone {
     fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_>;
 }
 
@@ -147,6 +199,14 @@ pub enum Input<T> {
 impl<T> Input<T> {
     /// Get the value of the input.
     pub fn value(&self) -> Option<&T> {
+        match self {
+            Input::NodeConnection(_) => None,
+            Input::Value(value) => Some(value),
+        }
+    }
+
+    /// Get a mutable value of the input.
+    pub fn value_mut(&mut self) -> Option<&mut T> {
         match self {
             Input::NodeConnection(_) => None,
             Input::Value(value) => Some(value),
