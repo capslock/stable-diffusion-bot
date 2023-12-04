@@ -28,6 +28,37 @@ or a specific version:
 cargo install --git https://github.com/capslock/stable-diffusion-bot --tag v0.1.0
 ```
 
+##### Building from source
+
+If you don't already have Rust installed, see the above section.
+
+Check out the project source:
+
+```console
+git clone https://github.com/capslock/stable-diffusion-bot.git
+```
+
+And build the project:
+
+```console
+cd stable-diffusion-bot
+cargo build
+```
+
+Or `cargo build --release` for a release build.
+
+Output will be in the `target/debug` (or `target/release`) directory:
+
+```console
+./target/debug/stable-diffusion-bot --help
+```
+
+After making changes, you can install your custom version using `cargo`:
+
+```console
+cargo install --path .
+```
+
 #### Using Nix Flakes
 
 If you are using the Nix package manager with flakes enabled, you can invoke the
