@@ -391,81 +391,12 @@ impl From<(u32, u32)> for SizeSetter {
     }
 }
 
-/// A `Setter` for setting the seed.
-pub struct SeedSetter {
-    /// The seed.
-    pub seed: i64,
-}
-
-impl Setter<i64, KSampler> for SeedSetter {
-    fn set(&self, prompt: &mut Prompt) -> anyhow::Result<()> {
-        if let Ok(()) = SeedSetterT::<KSampler>::from(self.seed).set(prompt) {
-            Ok(())
-        } else if let Ok(()) = SeedSetterT::<SamplerCustom>::from(self.seed).set(prompt) {
-            Ok(())
-        } else {
-            Err(anyhow!("Failed to set seed"))
-        }
-    }
-
-    fn set_from(&self, prompt: &mut Prompt, output_node: &str) -> anyhow::Result<()> {
-        if let Ok(()) = SeedSetterT::<KSampler>::from(self.seed).set_from(prompt, output_node) {
-            Ok(())
-        } else if let Ok(()) =
-            SeedSetterT::<SamplerCustom>::from(self.seed).set_from(prompt, output_node)
-        {
-            Ok(())
-        } else {
-            Err(anyhow!("Failed to set seed"))
-        }
-    }
-
-    fn set_node(&self, prompt: &mut Prompt, node: &str) -> anyhow::Result<()> {
-        if let Ok(()) = SeedSetterT::<KSampler>::from(self.seed).set_node(prompt, node) {
-            Ok(())
-        } else if let Ok(()) = SeedSetterT::<SamplerCustom>::from(self.seed).set_node(prompt, node)
-        {
-            Ok(())
-        } else {
-            Err(anyhow!("Failed to set seed"))
-        }
-    }
-
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        if let Ok(()) = SeedSetterT::<KSampler>::from(self.seed).set_value(node) {
-            Ok(())
-        } else if let Ok(()) = SeedSetterT::<SamplerCustom>::from(self.seed).set_value(node) {
-            Ok(())
-        } else {
-            Err(anyhow!("Failed to set seed"))
-        }
-    }
-
-    fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
-        if let Some(node) = find_node::<KSampler>(prompt, output_node) {
-            if let Ok(node) = prompt.get_node(&node) as anyhow::Result<&KSampler> {
-                return Some(node.positive.node_id.clone());
-            }
-        }
-        if let Some(node) = find_node::<SamplerCustom>(prompt, output_node) {
-            if let Ok(node) = prompt.get_node(&node) as anyhow::Result<&SamplerCustom> {
-                return Some(node.positive.node_id.clone());
-            }
-        }
-        None
-    }
-}
-
-impl From<i64> for SeedSetter {
-    fn from(seed: i64) -> Self {
-        Self { seed }
-    }
-}
-
-struct SeedSetterT<N>
+/// A `Setter` for setting the seed. Generic over the node type.
+pub struct SeedSetterT<N>
 where
     N: Node + 'static,
 {
+    /// The seed.
     pub seed: i64,
     pub _phantom: std::marker::PhantomData<N>,
 }
@@ -499,6 +430,94 @@ where
     fn from(seed: i64) -> Self {
         Self {
             seed,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+/// A `Setter` for setting the seed.
+pub type SeedSetter = DelegatingSetter<
+    SeedSetterT<KSampler>,
+    SeedSetterT<SamplerCustom>,
+    i64,
+    KSampler,
+    SamplerCustom,
+>;
+
+/// A `Setter` that delegates to two other `Setter`s.
+pub struct DelegatingSetter<S1, S2, T, N1, N2>
+where
+    S1: Setter<T, N1>,
+    S2: Setter<T, N2>,
+    N1: Node + 'static,
+    N2: Node + 'static,
+    T: Clone,
+{
+    /// The value to set.
+    value: T,
+    _phantom: std::marker::PhantomData<(S1, S2, N1, N2)>,
+}
+
+impl<S1, S2, T, N1, N2> Setter<T, N1> for DelegatingSetter<S1, S2, T, N1, N2>
+where
+    S1: Setter<T, N1>,
+    S2: Setter<T, N2>,
+    N1: Node + 'static,
+    N2: Node + 'static,
+    T: Clone,
+{
+    fn set(&self, prompt: &mut Prompt) -> anyhow::Result<()> {
+        S1::from(self.value.clone()).set(prompt).or_else(|_| {
+            S2::from(self.value.clone())
+                .set(prompt)
+                .context("Failed to set value")
+        })
+    }
+
+    fn set_from(&self, prompt: &mut Prompt, output_node: &str) -> anyhow::Result<()> {
+        S1::from(self.value.clone())
+            .set_from(prompt, output_node)
+            .or_else(|_| {
+                S2::from(self.value.clone())
+                    .set_from(prompt, output_node)
+                    .context("Failed to set value")
+            })
+    }
+
+    fn set_node(&self, prompt: &mut Prompt, node: &str) -> anyhow::Result<()> {
+        S1::from(self.value.clone())
+            .set_node(prompt, node)
+            .or_else(|_| {
+                S2::from(self.value.clone())
+                    .set_node(prompt, node)
+                    .context("Failed to set value")
+            })
+    }
+
+    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
+        S1::from(self.value.clone()).set_value(node).or_else(|_| {
+            S2::from(self.value.clone())
+                .set_value(node)
+                .context("Failed to set value")
+        })
+    }
+
+    fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
+        find_node::<N1>(prompt, output_node).or_else(|| find_node::<N2>(prompt, output_node))
+    }
+}
+
+impl<S1, S2, T, N1, N2> From<T> for DelegatingSetter<S1, S2, T, N1, N2>
+where
+    S1: Setter<T, N1>,
+    S2: Setter<T, N2>,
+    N1: Node + 'static,
+    N2: Node + 'static,
+    T: Clone,
+{
+    fn from(value: T) -> Self {
+        Self {
+            value,
             _phantom: std::marker::PhantomData,
         }
     }
