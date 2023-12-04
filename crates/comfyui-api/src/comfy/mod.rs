@@ -247,6 +247,133 @@ impl ImageInfo {
     }
 }
 
+pub trait Setter<T, N>
+where
+    N: Node + 'static,
+{
+    fn set(&self, prompt: &mut Prompt, value: T) -> anyhow::Result<()> {
+        let node = if let Some(node) = guess_node::<N>(prompt, None) {
+            node
+        } else {
+            return Err(anyhow!("Failed to find node"));
+        };
+        self.set_value(node, value)
+    }
+
+    fn set_from(&self, prompt: &mut Prompt, output_node: &str, value: T) -> anyhow::Result<()> {
+        let node = if let Some(node) = find_node::<N>(prompt, Some(output_node)) {
+            prompt
+                .get_node_by_id_mut(&node)
+                .context("Failed to find node")?
+        } else {
+            return Err(anyhow!("Failed to find node"));
+        };
+        self.set_value(node, value)
+    }
+
+    fn set_node(&self, prompt: &mut Prompt, node: &str, value: T) -> anyhow::Result<()> {
+        let node = prompt.get_node_by_id_mut(node).unwrap();
+        self.set_value(node, value)
+    }
+
+    fn set_value(&self, node: &mut dyn Node, value: T) -> anyhow::Result<()>;
+}
+
+fn start_node(prompt: &Prompt) -> Option<String> {
+    if let Some((node, _)) = prompt.get_nodes_by_type::<PreviewImage>().next() {
+        Some(node.to_string())
+    } else if let Some((node, _)) = prompt.get_nodes_by_type::<SaveImage>().next() {
+        Some(node.to_string())
+    } else {
+        None
+    }
+}
+
+fn find_node<T: Node + 'static>(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
+    let output_node = if let Some(node) = output_node {
+        node.to_string()
+    } else {
+        start_node(prompt)?
+    };
+    let mut find_node = FindNode::<T>::new(output_node.clone());
+    find_node.visit(prompt, prompt.get_node_by_id(&output_node).unwrap());
+    find_node.found
+}
+
+fn guess_node<'a, T: Node + 'static>(
+    prompt: &'a mut Prompt,
+    output_node: Option<&str>,
+) -> Option<&'a mut dyn Node> {
+    if let Some(node) = find_node::<T>(prompt, output_node) {
+        prompt.get_node_by_id_mut(&node)
+    } else if let Some((_, node)) = prompt.get_nodes_by_type_mut::<T>().next() {
+        Some(node)
+    } else {
+        None
+    }
+}
+
+struct PromptSetter {}
+
+impl Setter<String, CLIPTextEncode> for PromptSetter {
+    fn set_value(&self, node: &mut dyn Node, value: String) -> anyhow::Result<()> {
+        *as_node_mut::<CLIPTextEncode>(node)
+            .context("Failed to cast node")?
+            .text
+            .value_mut()
+            .context("Failed to get text value")? = value;
+        Ok(())
+    }
+}
+
+struct ModelSetter {}
+
+impl Setter<String, CheckpointLoaderSimple> for ModelSetter {
+    fn set_value(&self, node: &mut dyn Node, value: String) -> anyhow::Result<()> {
+        *as_node_mut::<CheckpointLoaderSimple>(node)
+            .context("Failed to cast node")?
+            .ckpt_name
+            .value_mut()
+            .context("Failed to get ckpt_name value")? = value;
+        Ok(())
+    }
+}
+
+struct SizeSetter {}
+
+impl Setter<(u32, u32), EmptyLatentImage> for SizeSetter {
+    fn set_value(&self, node: &mut dyn Node, value: (u32, u32)) -> anyhow::Result<()> {
+        if value.0 > 0 {
+            *as_node_mut::<EmptyLatentImage>(node)
+                .context("Failed to cast node")?
+                .width
+                .value_mut()
+                .context("Failed to get width value")? = value.0;
+        }
+        if value.1 > 0 {
+            *as_node_mut::<EmptyLatentImage>(node)
+                .context("Failed to cast node")?
+                .height
+                .value_mut()
+                .context("Failed to get height value")? = value.1;
+        }
+        Ok(())
+    }
+}
+
+struct SeedSetter {}
+
+impl Setter<i64, KSampler> for SeedSetter {
+    fn set_value(&self, node: &mut dyn Node, value: i64) -> anyhow::Result<()> {
+        *as_node_mut::<KSampler>(node)
+            .context("Failed to cast node")?
+            .seed
+            .value_mut()
+            .context("Failed to get seed value")? = value;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone)]
 struct OverrideNode<T> {
     node: Option<String>,
@@ -356,29 +483,6 @@ impl PromptBuilder {
         self
     }
 
-    fn find_node<T: Node + 'static>(&self) -> Option<String> {
-        let output_node = self.output_node.clone().unwrap();
-        let mut find_node = FindNode::<T>::new(output_node.clone());
-        find_node.visit(
-            &self.base_prompt,
-            self.base_prompt.get_node_by_id(&output_node).unwrap(),
-        );
-        find_node.found
-    }
-
-    fn guess_node<'a, T: Node + 'static>(
-        &self,
-        new_prompt: &'a mut Prompt,
-    ) -> Option<&'a mut dyn Node> {
-        if let Some(node) = self.find_node::<T>() {
-            new_prompt.get_node_by_id_mut(&node)
-        } else if let Some((_, node)) = new_prompt.get_nodes_by_type_mut::<T>().next() {
-            Some(node)
-        } else {
-            None
-        }
-    }
-
     /// Builds a new `Prompt` instance based on the given parameters.
     ///
     /// # Returns
@@ -398,88 +502,70 @@ impl PromptBuilder {
         }
 
         if let Some(ref prompt) = self.prompt {
-            let node = if let Some(ref node) = prompt.node {
-                new_prompt.get_node_by_id_mut(node).unwrap()
-            } else if let Some(node) = self.guess_node::<CLIPTextEncode>(&mut new_prompt) {
-                node
+            if let Some(ref node) = prompt.node {
+                PromptSetter {}.set_node(&mut new_prompt, node, prompt.value.clone())?;
             } else {
-                return Err(anyhow!("Failed to find CLIPTextEncode node"));
-            };
-            *as_node_mut::<CLIPTextEncode>(node)
-                .context("Failed to cast node to CLIPTextEncode")?
-                .text
-                .value_mut()
-                .context("Failed to get text value")? = prompt.value.clone();
+                PromptSetter {}.set_from(
+                    &mut new_prompt,
+                    &self.output_node.clone().unwrap(),
+                    prompt.value.clone(),
+                )?;
+            }
         }
         if let Some(ref negative_prompt) = self.negative_prompt {
-            let node = if let Some(ref node) = negative_prompt.node {
-                new_prompt.get_node_by_id_mut(node).unwrap()
-            } else if let Some(node) = self.guess_node::<CLIPTextEncode>(&mut new_prompt) {
-                node
+            if let Some(ref node) = negative_prompt.node {
+                PromptSetter {}.set_node(&mut new_prompt, node, negative_prompt.value.clone())?;
             } else {
-                return Err(anyhow!("Failed to find CLIPTextEncode node"));
-            };
-            *as_node_mut::<CLIPTextEncode>(node)
-                .context("Failed to cast node to CLIPTextEncode")?
-                .text
-                .value_mut()
-                .context("Failed to get text value")? = negative_prompt.value.clone();
+                PromptSetter {}.set_from(
+                    &mut new_prompt,
+                    &self.output_node.clone().unwrap(),
+                    negative_prompt.value.clone(),
+                )?;
+            }
         }
         if let Some(ref model) = self.model {
-            let node = if let Some(ref node) = model.node {
-                new_prompt.get_node_by_id_mut(node).unwrap()
-            } else if let Some(node) = self.guess_node::<CheckpointLoaderSimple>(&mut new_prompt) {
-                node
+            if let Some(ref node) = model.node {
+                ModelSetter {}.set_node(&mut new_prompt, node, model.value.clone())?;
             } else {
-                return Err(anyhow!("Failed to find CheckpointLoaderSimple node"));
-            };
-            *as_node_mut::<CheckpointLoaderSimple>(node)
-                .context("Failed to cast node to CheckpointLoaderSimple")?
-                .ckpt_name
-                .value_mut()
-                .context("Failed to get ckpt_name value")? = model.value.clone();
+                ModelSetter {}.set_from(
+                    &mut new_prompt,
+                    &self.output_node.clone().unwrap(),
+                    model.value.clone(),
+                )?;
+            }
         }
         if let Some(ref width) = self.width {
-            let node = if let Some(ref node) = width.node {
-                new_prompt.get_node_by_id_mut(node).unwrap()
-            } else if let Some(node) = self.guess_node::<EmptyLatentImage>(&mut new_prompt) {
-                node
+            if let Some(ref node) = width.node {
+                SizeSetter {}.set_node(&mut new_prompt, node, (width.value, 0))?;
             } else {
-                return Err(anyhow!("Failed to find EmptyLatentImage node"));
-            };
-            *as_node_mut::<EmptyLatentImage>(node)
-                .context("Failed to cast node to EmptyLatentImage")?
-                .width
-                .value_mut()
-                .context("Failed to get width value")? = width.value;
+                SizeSetter {}.set_from(
+                    &mut new_prompt,
+                    &self.output_node.clone().unwrap(),
+                    (width.value, 0),
+                )?;
+            }
         }
         if let Some(ref height) = self.height {
-            let node = if let Some(ref node) = height.node {
-                new_prompt.get_node_by_id_mut(node).unwrap()
-            } else if let Some(node) = self.guess_node::<EmptyLatentImage>(&mut new_prompt) {
-                node
+            if let Some(ref node) = height.node {
+                SizeSetter {}.set_node(&mut new_prompt, node, (0, height.value))?;
             } else {
-                return Err(anyhow!("Failed to find EmptyLatentImage node"));
-            };
-            *as_node_mut::<EmptyLatentImage>(node)
-                .context("Failed to cast node to EmptyLatentImage")?
-                .height
-                .value_mut()
-                .context("Failed to get height value")? = height.value;
+                SizeSetter {}.set_from(
+                    &mut new_prompt,
+                    &self.output_node.clone().unwrap(),
+                    (0, height.value),
+                )?;
+            }
         }
         if let Some(ref seed) = self.seed {
-            let node = if let Some(ref node) = seed.node {
-                new_prompt.get_node_by_id_mut(node).unwrap()
-            } else if let Some(node) = self.guess_node::<KSampler>(&mut new_prompt) {
-                node
+            if let Some(ref node) = seed.node {
+                SeedSetter {}.set_node(&mut new_prompt, node, seed.value)?;
             } else {
-                return Err(anyhow!("Failed to find EmptyLatentImage node"));
-            };
-            *as_node_mut::<KSampler>(node)
-                .context("Failed to cast node to KSampler")?
-                .seed
-                .value_mut()
-                .context("Failed to get seed value")? = seed.value;
+                SeedSetter {}.set_from(
+                    &mut new_prompt,
+                    &self.output_node.clone().unwrap(),
+                    seed.value,
+                )?;
+            }
         }
         Ok(new_prompt)
     }
