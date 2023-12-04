@@ -111,6 +111,9 @@ dyn_clone::clone_trait_object!(Node);
 #[typetag::serde(tag = "class_type", content = "inputs")]
 pub trait Node: std::fmt::Debug + AsAny + DynClone {
     fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_>;
+    fn name(&self) -> &str {
+        self.typetag_name()
+    }
 }
 
 /// Struct representing a generic node.
@@ -126,6 +129,9 @@ pub struct GenericNode {
 impl Node for GenericNode {
     fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
         Box::new(self.inputs.values().filter_map(|input| input.node_id()))
+    }
+    fn name(&self) -> &str {
+        &self.class_type
     }
 }
 

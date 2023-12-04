@@ -259,6 +259,18 @@ struct OverrideNode<T> {
     value: T,
 }
 
+impl<T> Default for OverrideNode<T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self {
+            node: Default::default(),
+            value: Default::default(),
+        }
+    }
+}
+
 /// A builder for creating a `Prompt` instance.
 #[derive(Debug, Clone)]
 pub struct PromptBuilder {
@@ -406,23 +418,19 @@ impl PromptBuilder {
                 )?;
             }
         }
-        if let Some(ref width) = self.width {
-            if let Some(ref node) = width.node {
-                new_prompt.set_node::<SizeSetter>(node, (width.value, 0))?;
-            } else {
-                new_prompt
-                    .set_from::<SizeSetter>(&self.output_node.clone().unwrap(), (width.value, 0))?;
-            }
-        }
-        if let Some(ref height) = self.height {
-            if let Some(ref node) = height.node {
-                new_prompt.set_node::<SizeSetter>(node, (0, height.value))?;
-            } else {
-                new_prompt.set_from::<SizeSetter>(
-                    &self.output_node.clone().unwrap(),
-                    (0, height.value),
-                )?;
-            }
+        let (width, height) = (
+            self.width.unwrap_or_default(),
+            self.height.unwrap_or_default(),
+        );
+        if let Some(ref node) = width.node {
+            new_prompt.set_node::<SizeSetter>(node, (width.value, height.value))?;
+        } else if let Some(ref node) = height.node {
+            new_prompt.set_node::<SizeSetter>(node, (width.value, height.value))?;
+        } else {
+            new_prompt.set_from::<SizeSetter>(
+                &self.output_node.clone().unwrap(),
+                (width.value, height.value),
+            )?;
         }
         if let Some(ref seed) = self.seed {
             if let Some(ref node) = seed.node {
