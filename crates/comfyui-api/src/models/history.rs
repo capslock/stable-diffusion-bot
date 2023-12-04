@@ -13,7 +13,7 @@ pub struct History {
 }
 
 /// Struct representing a single task result from the ComfyUI API `history` endpoint.
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Task {
     /// Outputs from the task.
     pub outputs: Outputs,
@@ -47,7 +47,7 @@ pub struct NodeOutput {
 }
 
 /// Struct representing a prompt result.
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(from = "(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)")]
 pub struct PromptResult {
     /// The task number.

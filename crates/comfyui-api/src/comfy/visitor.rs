@@ -10,7 +10,13 @@ pub trait Visitor {
     ///
     /// * `prompt` - The prompt that contains the graph.
     /// * `node` - The node to visit.
-    fn visit(&mut self, prompt: &Prompt, node: &dyn Node);
+    fn visit(&mut self, prompt: &Prompt, node: &dyn Node) {
+        for c in node.connections() {
+            if let Some(node) = prompt.get_node_by_id(c) {
+                self.visit(prompt, node);
+            }
+        }
+    }
 }
 
 impl Visitor for ImageInfo {
@@ -35,6 +41,36 @@ impl Visitor for ImageInfo {
         }
         for c in node.connections() {
             if let Some(node) = prompt.get_node_by_id(c) {
+                self.visit(prompt, node);
+            }
+        }
+    }
+}
+
+pub(crate) struct FindNode<T: Node + 'static> {
+    pub(crate) visiting: String,
+    pub(crate) found: Option<String>,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T: Node + 'static> FindNode<T> {
+    pub(crate) fn new(start: String) -> Self {
+        Self {
+            visiting: start,
+            found: None,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T: Node + 'static> Visitor for FindNode<T> {
+    fn visit(&mut self, prompt: &Prompt, node: &dyn Node) {
+        if let Some(_node) = as_node::<T>(node) {
+            self.found = Some(self.visiting.clone());
+        }
+        for c in node.connections() {
+            if let Some(node) = prompt.get_node_by_id(c) {
+                self.visiting = c.to_string();
                 self.visit(prompt, node);
             }
         }
