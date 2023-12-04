@@ -29,7 +29,14 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let new_prompt = PromptBuilder::new(&prompt, None).seed(1, None).build()?;
+    let new_prompt = PromptBuilder::new(&prompt, None)
+        .seed(2, None)
+        .prompt("a watercolor of a corgi wearing a tophat".to_string(), None)
+        .negative_prompt("bad, ugly, photograph".to_string(), None)
+        .model("sd\\sd_xl_base_1.0.safetensors".to_string(), None)
+        .width(1280, None)
+        .height(960, None)
+        .build()?;
 
     let images = comfy.execute_prompt(&new_prompt).await?;
 
