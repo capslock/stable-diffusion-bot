@@ -3,6 +3,7 @@ use std::io::{self, Read};
 use anyhow::Context;
 use comfyui_api::comfy::{Comfy, ImageInfo};
 use futures_util::StreamExt;
+use tokio::pin;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -14,7 +15,10 @@ async fn main() -> anyhow::Result<()> {
     let prompt = serde_json::from_str(prompt.as_str()).unwrap();
     let comfy = Comfy::new()?;
 
-    let mut stream = comfy.stream_prompt(&prompt).await?.boxed();
+    let stream = comfy.stream_prompt(&prompt).await?;
+
+    pin!(stream);
+
     while let Some(image) = stream.next().await {
         match image {
             Ok((node, _image)) => {

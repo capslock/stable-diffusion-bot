@@ -1,68 +1,64 @@
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 use serde::{Deserialize, Serialize};
 
 /// Struct representing a prompt workflow.
-#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Deserialize, Debug)]
 pub struct Prompt {
     /// The prompt workflow, indexed by node id.
     #[serde(flatten)]
     pub workflow: HashMap<String, NodeOrUnknown>,
 }
 
+impl Prompt {
+    pub fn get_node_by_id(&self, id: &str) -> Option<&dyn Node> {
+        match self.workflow.get(id) {
+            Some(NodeOrUnknown::Node(node)) => Some(node.as_ref()),
+            Some(NodeOrUnknown::GenericNode(node)) => Some(node),
+            _ => None,
+        }
+    }
+}
+
 /// Enum capturing all possible node types.
 #[allow(clippy::large_enum_variant)]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum NodeOrUnknown {
     /// Enum variant representing a known node.
-    Node(Node),
+    Node(Box<dyn Node>),
     /// Variant capturing unknown nodes.
     GenericNode(GenericNode),
 }
 
-/// Enum of node types
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "class_type", content = "inputs")]
-pub enum Node {
-    /// Enum variant representing a KSampler node.
-    KSampler(KSampler),
-    /// Enum variant representing a CLIPTextEncode node.
-    CLIPTextEncode(CLIPTextEncode),
-    /// Enum variant representing an EmptyLatentImage node.
-    EmptyLatentImage(EmptyLatentImage),
-    /// Enum variant representing a CheckpointLoaderSimple node.
-    CheckpointLoaderSimple(CheckpointLoaderSimple),
-    /// Enum variant representing a VAELoader node.
-    VAELoader(VAELoader),
-    /// Enum variant representing a VAEDecode node.
-    VAEDecode(VAEDecode),
-    /// Enum variant representing a PreviewImage node.
-    PreviewImage(PreviewImage),
-    /// Enum variant representing a KSamplerSelect node.
-    KSamplerSelect(KSamplerSelect),
-    /// Enum variant representing a SamplerCustom node.
-    SamplerCustom(SamplerCustom),
-    /// Enum variant representing a SDTurboScheduler node.
-    SDTurboScheduler(SDTurboScheduler),
-    /// Enum variant representing a ImageOnlyCheckpointLoader node.
-    ImageOnlyCheckpointLoader(ImageOnlyCheckpointLoader),
-    /// Enum variant representing a LoadImage node.
-    LoadImage(LoadImage),
-    /// Enum variant representing a SVDimage2vidConditioning node.
-    #[serde(rename = "SVD_img2vid_Conditioning")]
-    SVDimg2vidConditioning(SVDimg2vidConditioning),
-    /// Enum variant representing a VideoLinearCFGGuidance node.
-    VideoLinearCFGGuidance(VideoLinearCFGGuidance),
-    /// Enum variant representing a SaveAnimatedWEBP node.
-    SaveAnimatedWEBP(SaveAnimatedWEBP),
-    /// Enum variant representing a LoraLoader node.
-    LoraLoader(LoraLoader),
-    /// Enum variant representing a ModelSamplingDiscrete node.
-    ModelSamplingDiscrete(ModelSamplingDiscrete),
-    /// Enum variant representing a SaveImage node.
-    SaveImage(SaveImage),
-    // TODO: Implement other node types.
+impl<T: Any> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// Trait to allow downcasting to `dyn Any`.
+pub trait AsAny {
+    /// Get a reference to `dyn Any`.
+    fn as_any(&self) -> &dyn Any;
+}
+
+/// Get a reference to a node of a specific type.
+///
+/// # Arguments
+///
+/// * `node` - The node to get a reference to.
+///
+/// # Returns
+///
+/// A reference to the node of the specified type if the node is of the specified type, otherwise `None`.
+pub fn as_node<T: Node + 'static>(node: &dyn Node) -> Option<&T> {
+    node.as_any().downcast_ref::<T>()
+}
+
+#[typetag::serde(tag = "class_type", content = "inputs")]
+pub trait Node: std::fmt::Debug + AsAny {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_>;
 }
 
 /// Struct representing a generic node.
@@ -72,6 +68,13 @@ pub struct GenericNode {
     pub class_type: String,
     /// The node inputs.
     pub inputs: HashMap<String, GenericValue>,
+}
+
+#[typetag::serde]
+impl Node for GenericNode {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.inputs.values().filter_map(|input| input.node_id()))
+    }
 }
 
 /// Enum of possible generic node input types.
@@ -88,6 +91,16 @@ pub enum GenericValue {
     String(String),
     /// Node connection input variant.
     NodeConnection(NodeConnection),
+}
+
+impl GenericValue {
+    /// Get the node id of the input.
+    pub fn node_id(&self) -> Option<&str> {
+        match self {
+            GenericValue::NodeConnection(node_connection) => Some(&node_connection.node_id),
+            _ => None,
+        }
+    }
 }
 
 /// Struct representing a node input connection.
@@ -131,6 +144,30 @@ pub enum Input<T> {
     Value(T),
 }
 
+impl<T> Input<T> {
+    /// Get the value of the input.
+    pub fn value(&self) -> Option<&T> {
+        match self {
+            Input::NodeConnection(_) => None,
+            Input::Value(value) => Some(value),
+        }
+    }
+
+    /// Get the node connection of the input.
+    pub fn node_connection(&self) -> Option<&NodeConnection> {
+        match self {
+            Input::NodeConnection(node_connection) => Some(node_connection),
+            Input::Value(_) => None,
+        }
+    }
+
+    /// Get the node id of the input.
+    pub fn node_id(&self) -> Option<&str> {
+        self.node_connection()
+            .map(|node_connection| node_connection.node_id.as_str())
+    }
+}
+
 /// Struct representing a KSampler node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct KSampler {
@@ -156,6 +193,28 @@ pub struct KSampler {
     pub latent_image: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for KSampler {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        let inputs = [
+            self.cfg.node_id(),
+            self.denoise.node_id(),
+            self.sampler_name.node_id(),
+            self.scheduler.node_id(),
+            self.seed.node_id(),
+            self.steps.node_id(),
+        ]
+        .into_iter()
+        .flatten();
+        Box::new(inputs.chain([
+            self.positive.node_id.as_str(),
+            self.negative.node_id.as_str(),
+            self.model.node_id.as_str(),
+            self.latent_image.node_id.as_str(),
+        ]))
+    }
+}
+
 /// Struct representing a CLIPTextEncode node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CLIPTextEncode {
@@ -163,6 +222,17 @@ pub struct CLIPTextEncode {
     pub text: Input<String>,
     /// The CLIP model input connection.
     pub clip: NodeConnection,
+}
+
+#[typetag::serde]
+impl Node for CLIPTextEncode {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [self.text.node_id(), Some(self.clip.node_id.as_str())]
+                .into_iter()
+                .flatten(),
+        )
+    }
 }
 
 /// Struct representing an EmptyLatentImage node.
@@ -176,6 +246,21 @@ pub struct EmptyLatentImage {
     pub height: Input<u32>,
 }
 
+#[typetag::serde]
+impl Node for EmptyLatentImage {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [
+                self.batch_size.node_id(),
+                self.width.node_id(),
+                self.height.node_id(),
+            ]
+            .into_iter()
+            .flatten(),
+        )
+    }
+}
+
 /// Struct representing a CheckpointLoaderSimple node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CheckpointLoaderSimple {
@@ -183,11 +268,25 @@ pub struct CheckpointLoaderSimple {
     pub ckpt_name: Input<String>,
 }
 
+#[typetag::serde]
+impl Node for CheckpointLoaderSimple {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new([self.ckpt_name.node_id()].into_iter().flatten())
+    }
+}
+
 /// Struct representing a VAELoader node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VAELoader {
     /// The VAE name.
     pub vae_name: Input<String>,
+}
+
+#[typetag::serde]
+impl Node for VAELoader {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new([self.vae_name.node_id()].into_iter().flatten())
+    }
 }
 
 /// Struct representing a VAEDecode node.
@@ -199,6 +298,13 @@ pub struct VAEDecode {
     pub vae: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for VAEDecode {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new([self.samples.node_id.as_str(), self.vae.node_id.as_str()].into_iter())
+    }
+}
+
 /// Struct representing a PreviewImage node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PreviewImage {
@@ -206,11 +312,25 @@ pub struct PreviewImage {
     pub images: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for PreviewImage {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new([self.images.node_id.as_str()].into_iter())
+    }
+}
+
 /// Struct representing a KSamplerSelect node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct KSamplerSelect {
     /// The sampler name.
     pub sampler_name: Input<String>,
+}
+
+#[typetag::serde]
+impl Node for KSamplerSelect {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new([self.sampler_name.node_id()].into_iter().flatten())
+    }
 }
 
 /// Struct representing a SamplerCustom node.
@@ -236,6 +356,27 @@ pub struct SamplerCustom {
     pub sigmas: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for SamplerCustom {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        let inputs = [
+            self.add_noise.node_id(),
+            self.cfg.node_id(),
+            self.noise_seed.node_id(),
+        ]
+        .into_iter()
+        .flatten();
+        Box::new(inputs.chain([
+            self.latent_image.node_id.as_str(),
+            self.model.node_id.as_str(),
+            self.positive.node_id.as_str(),
+            self.negative.node_id.as_str(),
+            self.sampler.node_id.as_str(),
+            self.sigmas.node_id.as_str(),
+        ]))
+    }
+}
+
 /// Struct representing a SDTurboScheduler node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SDTurboScheduler {
@@ -245,11 +386,29 @@ pub struct SDTurboScheduler {
     pub model: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for SDTurboScheduler {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [self.steps.node_id(), Some(self.model.node_id.as_str())]
+                .into_iter()
+                .flatten(),
+        )
+    }
+}
+
 /// Struct representing a ImageOnlyCheckpointLoader node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageOnlyCheckpointLoader {
     /// The checkpoint name.
     pub ckpt_name: Input<String>,
+}
+
+#[typetag::serde]
+impl Node for ImageOnlyCheckpointLoader {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new([self.ckpt_name.node_id()].into_iter().flatten())
+    }
 }
 
 /// Struct representing a LoadImage node.
@@ -262,8 +421,20 @@ pub struct LoadImage {
     pub image: Input<String>,
 }
 
+#[typetag::serde]
+impl Node for LoadImage {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [self.file_to_upload.node_id(), self.image.node_id()]
+                .into_iter()
+                .flatten(),
+        )
+    }
+}
+
 /// Struct representing a SVDimg2vidConditioning node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename = "SVD_img2vid_Conditioning")]
 pub struct SVDimg2vidConditioning {
     /// The augmentation level.
     pub augmentation_level: Input<f32>,
@@ -285,6 +456,27 @@ pub struct SVDimg2vidConditioning {
     pub vae: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for SVDimg2vidConditioning {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        let inputs = [
+            self.augmentation_level.node_id(),
+            self.fps.node_id(),
+            self.width.node_id(),
+            self.height.node_id(),
+            self.motion_bucket_id.node_id(),
+            self.video_frames.node_id(),
+        ]
+        .into_iter()
+        .flatten();
+        Box::new(inputs.chain([
+            self.clip_vision.node_id.as_str(),
+            self.init_image.node_id.as_str(),
+            self.vae.node_id.as_str(),
+        ]))
+    }
+}
+
 /// Struct representing a VideoLinearCFGGuidance node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VideoLinearCFGGuidance {
@@ -292,6 +484,17 @@ pub struct VideoLinearCFGGuidance {
     pub min_cfg: Input<f32>,
     /// The model input connection.
     pub model: NodeConnection,
+}
+
+#[typetag::serde]
+impl Node for VideoLinearCFGGuidance {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [self.min_cfg.node_id(), Some(self.model.node_id.as_str())]
+                .into_iter()
+                .flatten(),
+        )
+    }
 }
 
 /// Struct representing a SaveAnimatedWEBP node.
@@ -311,6 +514,22 @@ pub struct SaveAnimatedWEBP {
     pub images: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for SaveAnimatedWEBP {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        let inputs = [
+            self.filename_prefix.node_id(),
+            self.fps.node_id(),
+            self.lossless.node_id(),
+            self.method.node_id(),
+            self.quality.node_id(),
+        ]
+        .into_iter()
+        .flatten();
+        Box::new(inputs.chain([self.images.node_id.as_str()]))
+    }
+}
+
 /// Struct representing a LoraLoader node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoraLoader {
@@ -326,6 +545,20 @@ pub struct LoraLoader {
     pub clip: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for LoraLoader {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        let inputs = [
+            self.lora_name.node_id(),
+            self.strength_model.node_id(),
+            self.strength_clip.node_id(),
+        ]
+        .into_iter()
+        .flatten();
+        Box::new(inputs.chain([self.model.node_id.as_str(), self.clip.node_id.as_str()]))
+    }
+}
+
 /// Struct representing a ModelSamplingDiscrete node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ModelSamplingDiscrete {
@@ -337,6 +570,16 @@ pub struct ModelSamplingDiscrete {
     pub model: NodeConnection,
 }
 
+#[typetag::serde]
+impl Node for ModelSamplingDiscrete {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        let inputs = [self.sampling.node_id(), self.zsnr.node_id()]
+            .into_iter()
+            .flatten();
+        Box::new(inputs.chain([self.model.node_id.as_str()]))
+    }
+}
+
 /// Struct representing a SaveImage node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SaveImage {
@@ -344,6 +587,20 @@ pub struct SaveImage {
     pub filename_prefix: Input<String>,
     /// The image input connection.
     pub images: NodeConnection,
+}
+
+#[typetag::serde]
+impl Node for SaveImage {
+    fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [
+                self.filename_prefix.node_id(),
+                Some(self.images.node_id.as_str()),
+            ]
+            .into_iter()
+            .flatten(),
+        )
+    }
 }
 
 /// Struct representing a response to a prompt execution request.

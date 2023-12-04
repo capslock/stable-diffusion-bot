@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::{Image, Prompt};
 
 /// Struct containing task results from the ComfyUI API `history` endpoint.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(transparent)]
 pub struct History {
     /// Completed tasks indexed by their uuid.
@@ -13,7 +13,7 @@ pub struct History {
 }
 
 /// Struct representing a single task result from the ComfyUI API `history` endpoint.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Task {
     /// Outputs from the task.
     pub outputs: Outputs,
@@ -47,9 +47,8 @@ pub struct NodeOutput {
 }
 
 /// Struct representing a prompt result.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug)]
 #[serde(from = "(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)")]
-#[serde(into = "(u64, uuid::Uuid, Prompt, ExtraData, OutputsToExecute)")]
 pub struct PromptResult {
     /// The task number.
     pub num: u64,
