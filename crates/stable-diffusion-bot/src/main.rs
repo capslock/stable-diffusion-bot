@@ -36,6 +36,8 @@ struct Config {
     txt2img: Option<Txt2ImgRequest>,
     img2img: Option<Img2ImgRequest>,
     allow_all_users: Option<bool>,
+    aws_endpoint_url: Option<String>,
+    aws_bucket_id: Option<String>,
 }
 
 #[tokio::main]
@@ -74,6 +76,15 @@ async fn main() -> anyhow::Result<()> {
         .extract()
         .context("Invalid configuration")?;
 
+    let sdk_config = aws_config::from_env()
+        .endpoint_url(config.aws_endpoint_url.unwrap())
+        .load()
+        .await;
+    let mut s3_config_builder: aws_sdk_s3::config::Builder = (&sdk_config).into();
+    s3_config_builder.set_force_path_style(Some(true));
+    let s3_config = s3_config_builder.build();
+    let client = aws_sdk_s3::Client::from_conf(s3_config);
+
     StableDiffusionBotBuilder::new(
         config.api_key,
         config.allowed_users,
@@ -83,6 +94,8 @@ async fn main() -> anyhow::Result<()> {
     .db_path(config.db_path)
     .txt2img_defaults(config.txt2img.unwrap_or_default())
     .img2img_defaults(config.img2img.unwrap_or_default())
+    .aws_client(client)
+    .aws_bucket_id(config.aws_bucket_id.unwrap())
     .build()
     .await?
     .run()
