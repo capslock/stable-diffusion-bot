@@ -83,30 +83,30 @@ where
         F: FnOnce(&mut N) -> anyhow::Result<()>;
 }
 
-impl<T, N: Node + 'static> SetterExt<T, N> for Prompt {
+impl<T, N: Node + 'static> SetterExt<T, N> for crate::models::Prompt {
     fn set<S>(&mut self, value: T) -> anyhow::Result<()>
     where
         S: Setter<T, N>,
     {
-        S::from(value).set(self)
+        S::default().set(self, value)
     }
 
     fn set_from<S>(&mut self, output_node: &str, value: T) -> anyhow::Result<()>
     where
         S: Setter<T, N>,
     {
-        S::from(value).set_from(self, output_node)
+        S::default().set_from(self, output_node, value)
     }
 
     fn set_node<S>(&mut self, node: &str, value: T) -> anyhow::Result<()>
     where
         S: Setter<T, N>,
     {
-        S::from(value).set_node(self, node)
+        S::default().set_node(self, node, value)
     }
 }
 
-impl<N: Node + 'static> SetExt<N> for Prompt {
+impl<N: Node + 'static> SetExt<N> for crate::models::Prompt {
     fn set_with<F>(&mut self, f: F) -> anyhow::Result<()>
     where
         F: FnOnce(&mut N) -> anyhow::Result<()>,
@@ -122,7 +122,7 @@ impl<N: Node + 'static> SetExt<N> for Prompt {
     where
         F: FnOnce(&mut N) -> anyhow::Result<()>,
     {
-        f(self.get_node_mut(node)?)
+        f(self.get_typed_node_mut(node)?)
     }
 }
 
@@ -130,7 +130,7 @@ impl<N: Node + 'static> SetExt<N> for Prompt {
 pub trait Setter<T, N>
 where
     N: Node + 'static,
-    Self: From<T> + Getter<T, N>,
+    Self: Getter<T, N>,
 {
     /// Uses a heuristic to find a `Node` and set the value on it.
     ///
@@ -141,13 +141,13 @@ where
     /// # Returns
     ///
     /// `Ok(())`` on success, or an error if the node could not be found.
-    fn set(&self, prompt: &mut Prompt) -> anyhow::Result<()> {
+    fn set(&self, prompt: &mut crate::models::Prompt, value: T) -> anyhow::Result<()> {
         let node = if let Some(node) = guess_node_mut::<N>(prompt, None) {
             node
         } else {
             return Err(anyhow!("Failed to find node"));
         };
-        self.set_value(node)
+        self.set_value(node, value)
     }
 
     /// Finds a `Node` leading into the given `output_node` and sets the value on it.
@@ -159,7 +159,12 @@ where
     /// # Returns
     ///
     /// `Ok(())`` on success, or an error if the node could not be found.
-    fn set_from(&self, prompt: &mut Prompt, output_node: &str) -> anyhow::Result<()> {
+    fn set_from(
+        &self,
+        prompt: &mut crate::models::Prompt,
+        output_node: &str,
+        value: T,
+    ) -> anyhow::Result<()> {
         let node = if let Some(node) = Self::find_node(prompt, Some(output_node)) {
             prompt
                 .get_node_by_id_mut(&node)
@@ -167,7 +172,7 @@ where
         } else {
             return Err(anyhow!("Failed to find node"));
         };
-        self.set_value(node)
+        self.set_value(node, value)
     }
 
     /// Sets the value on the node with id `node`.
@@ -180,9 +185,14 @@ where
     /// # Returns
     ///
     /// `Ok(())`` on success, or an error if the node could not be found.
-    fn set_node(&self, prompt: &mut Prompt, node: &str) -> anyhow::Result<()> {
+    fn set_node(
+        &self,
+        prompt: &mut crate::models::Prompt,
+        node: &str,
+        value: T,
+    ) -> anyhow::Result<()> {
         let node = prompt.get_node_by_id_mut(node).unwrap();
-        self.set_value(node)
+        self.set_value(node, value)
     }
 
     /// Sets the value on the given `Node`.
@@ -194,114 +204,42 @@ where
     /// # Returns
     ///
     /// `Ok(())`` on success, or an error if the node could not be found.
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        *self.get_value_mut(node)? = self.value();
+    fn set_value(&self, node: &mut dyn Node, value: T) -> anyhow::Result<()> {
+        *self.get_value_mut(node)? = value;
         Ok(())
     }
+}
 
-    fn value(&self) -> T;
+impl<G, T, N> Setter<T, N> for G
+where
+    G: Getter<T, N>,
+    N: Node + 'static,
+{
 }
 
 /// A `Setter` for setting the prompt text.
-pub struct PromptSetter {
-    /// The prompt text.
-    pub prompt: String,
-}
-
-impl Setter<String, CLIPTextEncode> for PromptSetter {
-    fn value(&self) -> String {
-        self.prompt.clone()
-    }
-}
-
-impl From<String> for PromptSetter {
-    fn from(prompt: String) -> Self {
-        Self { prompt }
-    }
-}
+#[derive(Clone, Debug, Default)]
+pub struct Prompt {}
 
 /// A `Setter` for setting the negative prompt text.
-pub struct NegativePromptSetter {
-    /// The negative prompt text.
-    pub prompt: String,
-}
-
-impl Setter<String, CLIPTextEncode> for NegativePromptSetter {
-    fn value(&self) -> String {
-        self.prompt.clone()
-    }
-}
-
-impl From<String> for NegativePromptSetter {
-    fn from(prompt: String) -> Self {
-        Self { prompt }
-    }
-}
-
-impl From<&NegativePromptSetter> for PromptSetter {
-    fn from(negative_prompt: &NegativePromptSetter) -> Self {
-        Self {
-            prompt: negative_prompt.prompt.clone(),
-        }
-    }
-}
+#[derive(Clone, Debug, Default)]
+pub struct NegativePrompt {}
 
 /// A `Setter` for setting the model.
-pub struct ModelSetter {
-    /// The model.
-    pub(crate) model: String,
-}
-
-impl Setter<String, CheckpointLoaderSimple> for ModelSetter {
-    fn value(&self) -> String {
-        self.model.clone()
-    }
-}
-
-impl From<String> for ModelSetter {
-    fn from(model: String) -> Self {
-        Self { model }
-    }
-}
+#[derive(Clone, Debug, Default)]
+pub struct Model {}
 
 /// A `Setter` for setting the image size.
-pub struct WidthSetter {
-    /// The width of the image.
-    pub width: u32,
-}
-
-impl Setter<u32, EmptyLatentImage> for WidthSetter {
-    fn value(&self) -> u32 {
-        self.width
-    }
-}
-
-impl From<u32> for WidthSetter {
-    fn from(width: u32) -> Self {
-        Self { width }
-    }
-}
+#[derive(Clone, Debug, Default)]
+pub struct Width {}
 
 /// A `Setter` for setting the image size.
-pub struct HeightSetter {
-    /// The height of the image.
-    pub height: u32,
-}
-
-impl Setter<u32, EmptyLatentImage> for HeightSetter {
-    fn value(&self) -> u32 {
-        self.height
-    }
-}
-
-impl From<u32> for HeightSetter {
-    fn from(height: u32) -> Self {
-        Self { height }
-    }
-}
+#[derive(Clone, Debug, Default)]
+pub struct Height {}
 
 /// A `Setter` for setting the seed. Generic over the node type.
-pub struct SeedSetterT<N>
+#[derive(Clone, Debug)]
+pub struct SeedT<N>
 where
     N: Node + 'static,
 {
@@ -310,77 +248,47 @@ where
     pub _phantom: std::marker::PhantomData<N>,
 }
 
-impl Setter<i64, KSampler> for SeedSetterT<KSampler> {
-    fn value(&self) -> i64 {
-        self.seed
-    }
-}
-
-impl Setter<i64, SamplerCustom> for SeedSetterT<SamplerCustom> {
-    fn value(&self) -> i64 {
-        self.seed
-    }
-}
-
-impl<N> From<i64> for SeedSetterT<N>
+impl<N> Default for SeedT<N>
 where
     N: Node + 'static,
 {
-    fn from(seed: i64) -> Self {
+    fn default() -> Self {
         Self {
-            seed,
+            seed: 0,
             _phantom: std::marker::PhantomData,
         }
     }
 }
 
 /// A `Setter` for setting the seed.
-pub type SeedSetter = DelegatingSetter<
-    SeedSetterT<KSampler>,
-    SeedSetterT<SamplerCustom>,
-    i64,
-    KSampler,
-    SamplerCustom,
->;
+pub type Seed = Delegating<SeedT<KSampler>, SeedT<SamplerCustom>, i64, KSampler, SamplerCustom>;
 
 /// A `Setter` that delegates to two other `Setter`s.
-pub struct DelegatingSetter<S1, S2, T, N1, N2>
+#[derive(Clone, Debug)]
+pub struct Delegating<S1, S2, T, N1, N2>
 where
     S1: Getter<T, N1>,
     S2: Getter<T, N2>,
     N1: Node + 'static,
     N2: Node + 'static,
-    T: Clone,
+    T: Clone + Default,
 {
     /// The value to set.
     pub value: T,
     _phantom: std::marker::PhantomData<(S1, S2, N1, N2)>,
 }
 
-impl<S1, S2, T, N1, N2> Setter<T, N1> for DelegatingSetter<S1, S2, T, N1, N2>
-where
-    S1: Setter<T, N1>,
-    S2: Setter<T, N2>,
-    N1: Node + 'static,
-    N2: Node + 'static,
-    T: Clone,
-{
-    fn value(&self) -> T {
-        self.value.clone()
-    }
-}
-
-impl<S1, S2, T, N1, N2> From<T> for DelegatingSetter<S1, S2, T, N1, N2>
+impl<S1, S2, T, N1, N2> Default for Delegating<S1, S2, T, N1, N2>
 where
     S1: Getter<T, N1>,
     S2: Getter<T, N2>,
     N1: Node + 'static,
     N2: Node + 'static,
-    T: Clone,
+    T: Clone + Default,
 {
-    fn from(value: T) -> Self {
+    fn default() -> Self {
         Self {
-            value,
+            value: Default::default(),
             _phantom: std::marker::PhantomData,
         }
     }

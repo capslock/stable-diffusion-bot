@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use comfyui_api::{comfy::PromptBuilder, models::AsAny};
+use comfyui_api::{comfy::getter::*, comfy::PromptBuilder, models::AsAny};
 use dyn_clone::DynClone;
 use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 
@@ -12,8 +12,8 @@ dyn_clone::clone_trait_object!(GenParams);
 
 #[typetag::serde]
 pub trait GenParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {
-    fn seed(&self) -> Option<u64>;
-    fn set_seed(&mut self, seed: u64);
+    fn seed(&self) -> Option<i64>;
+    fn set_seed(&mut self, seed: i64);
 
     fn steps(&self) -> Option<u32>;
     fn set_steps(&mut self, steps: u32);
@@ -42,12 +42,12 @@ pub trait GenParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {
 
 #[typetag::serde]
 impl GenParams for comfyui_api::models::Prompt {
-    fn seed(&self) -> Option<u64> {
-        unimplemented!()
+    fn seed(&self) -> Option<i64> {
+        (self as &dyn SeedExt).seed().ok()
     }
 
-    fn set_seed(&mut self, seed: u64) {
-        todo!()
+    fn set_seed(&mut self, seed: i64) {
+        (self as &mut dyn SeedExt).set_seed(seed).ok();
     }
 
     fn steps(&self) -> Option<u32> {
@@ -55,7 +55,7 @@ impl GenParams for comfyui_api::models::Prompt {
     }
 
     fn set_steps(&mut self, steps: u32) {
-        todo!()
+        unimplemented!()
     }
 
     fn count(&self) -> Option<u32> {
@@ -63,7 +63,7 @@ impl GenParams for comfyui_api::models::Prompt {
     }
 
     fn set_count(&mut self, count: u32) {
-        todo!()
+        unimplemented!()
     }
 
     fn cfg(&self) -> Option<f32> {
@@ -71,39 +71,46 @@ impl GenParams for comfyui_api::models::Prompt {
     }
 
     fn set_cfg(&mut self, cfg: f32) {
-        todo!()
+        unimplemented!()
     }
 
     fn width(&self) -> Option<u32> {
-        unimplemented!()
+        (self as &dyn WidthExt).width().ok()
     }
 
     fn set_width(&mut self, width: u32) {
-        todo!()
+        (self as &mut dyn WidthExt).set_width(width).ok();
     }
 
     fn height(&self) -> Option<u32> {
-        unimplemented!()
+        (self as &dyn HeightExt).height().ok()
     }
 
     fn set_height(&mut self, height: u32) {
-        todo!()
+        (self as &mut dyn HeightExt).set_height(height).ok();
     }
 
     fn prompt(&self) -> Option<String> {
-        unimplemented!()
+        (self as &dyn PromptExt).prompt().ok().cloned()
     }
 
     fn set_prompt(&mut self, prompt: String) {
-        todo!()
+        if let Ok(p) = (self as &mut dyn PromptExt).prompt_mut() {
+            *p = prompt;
+        }
     }
 
     fn negative_prompt(&self) -> Option<String> {
-        unimplemented!()
+        (self as &dyn NegativePromptExt)
+            .negative_prompt()
+            .ok()
+            .cloned()
     }
 
     fn set_negative_prompt(&mut self, negative_prompt: String) {
-        todo!()
+        if let Ok(p) = (self as &mut dyn NegativePromptExt).negative_prompt_mut() {
+            *p = negative_prompt;
+        }
     }
 
     fn denoising(&self) -> Option<f32> {
@@ -111,7 +118,7 @@ impl GenParams for comfyui_api::models::Prompt {
     }
 
     fn set_denoising(&mut self, denoising: f32) {
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -210,11 +217,11 @@ impl Img2ImgApi for ComfyPromptApi {
 
 #[typetag::serde]
 impl GenParams for Txt2ImgRequest {
-    fn seed(&self) -> Option<u64> {
+    fn seed(&self) -> Option<i64> {
         todo!()
     }
 
-    fn set_seed(&mut self, seed: u64) {
+    fn set_seed(&mut self, seed: i64) {
         todo!()
     }
 
@@ -285,11 +292,11 @@ impl GenParams for Txt2ImgRequest {
 
 #[typetag::serde]
 impl GenParams for Img2ImgRequest {
-    fn seed(&self) -> Option<u64> {
+    fn seed(&self) -> Option<i64> {
         todo!()
     }
 
-    fn set_seed(&mut self, seed: u64) {
+    fn set_seed(&mut self, seed: i64) {
         todo!()
     }
 
