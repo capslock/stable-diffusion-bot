@@ -14,10 +14,11 @@ pub mod visitor;
 pub use visitor::Visitor;
 
 pub mod setter;
-pub use setter::*;
 
 pub mod getter;
 pub use getter::*;
+
+use self::setter::SetterExt as _;
 
 enum State {
     Executing(String, Vec<Image>),
@@ -402,9 +403,9 @@ impl PromptBuilder {
 
         if let Some(ref prompt) = self.prompt {
             if let Some(ref node) = prompt.node {
-                new_prompt.set_node::<PromptSetter>(node, prompt.value.clone())?;
+                new_prompt.set_node::<setter::Prompt>(node, prompt.value.clone())?;
             } else {
-                new_prompt.set_from::<PromptSetter>(
+                new_prompt.set_from::<setter::Prompt>(
                     &self.output_node.clone().unwrap(),
                     prompt.value.clone(),
                 )?;
@@ -412,9 +413,10 @@ impl PromptBuilder {
         }
         if let Some(ref negative_prompt) = self.negative_prompt {
             if let Some(ref node) = negative_prompt.node {
-                new_prompt.set_node::<NegativePromptSetter>(node, negative_prompt.value.clone())?;
+                new_prompt
+                    .set_node::<setter::NegativePrompt>(node, negative_prompt.value.clone())?;
             } else {
-                new_prompt.set_from::<NegativePromptSetter>(
+                new_prompt.set_from::<setter::NegativePrompt>(
                     &self.output_node.clone().unwrap(),
                     negative_prompt.value.clone(),
                 )?;
@@ -422,9 +424,9 @@ impl PromptBuilder {
         }
         if let Some(ref model) = self.model {
             if let Some(ref node) = model.node {
-                new_prompt.set_node::<ModelSetter>(node, model.value.clone())?;
+                new_prompt.set_node::<setter::Model>(node, model.value.clone())?;
             } else {
-                new_prompt.set_from::<ModelSetter>(
+                new_prompt.set_from::<setter::Model>(
                     &self.output_node.clone().unwrap(),
                     model.value.clone(),
                 )?;
@@ -432,26 +434,26 @@ impl PromptBuilder {
         }
         if let Some(width) = self.width {
             if let Some(ref node) = width.node {
-                new_prompt.set_node::<WidthSetter>(node, width.value)?;
+                new_prompt.set_node::<setter::Width>(node, width.value)?;
             } else {
                 new_prompt
-                    .set_from::<WidthSetter>(&self.output_node.clone().unwrap(), width.value)?;
+                    .set_from::<setter::Width>(&self.output_node.clone().unwrap(), width.value)?;
             }
         }
         if let Some(height) = self.height {
             if let Some(ref node) = height.node {
-                new_prompt.set_node::<HeightSetter>(node, height.value)?;
+                new_prompt.set_node::<setter::Height>(node, height.value)?;
             } else {
                 new_prompt
-                    .set_from::<HeightSetter>(&self.output_node.clone().unwrap(), height.value)?;
+                    .set_from::<setter::Height>(&self.output_node.clone().unwrap(), height.value)?;
             }
         }
         if let Some(ref seed) = self.seed {
             if let Some(ref node) = seed.node {
-                new_prompt.set_node::<SeedSetter>(node, seed.value)?;
+                new_prompt.set_node::<setter::Seed>(node, seed.value)?;
             } else {
                 new_prompt
-                    .set_from::<SeedSetter>(&self.output_node.clone().unwrap(), seed.value)?;
+                    .set_from::<setter::Seed>(&self.output_node.clone().unwrap(), seed.value)?;
             }
         }
         Ok(new_prompt)
