@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 
 use crate::{
-    comfy::getter::{find_node, guess_node, GetExt},
+    comfy::getter::{guess_node_mut, GetExt, Getter},
     models::*,
 };
 
@@ -111,7 +111,7 @@ impl<N: Node + 'static> SetExt<N> for Prompt {
     where
         F: FnOnce(&mut N) -> anyhow::Result<()>,
     {
-        if let Some(node) = guess_node::<N>(self, None) {
+        if let Some(node) = guess_node_mut::<N>(self, None) {
             f(as_node_mut::<N>(node).context("Failed to cast node")?)
         } else {
             Err(anyhow!("Failed to find node"))
@@ -130,7 +130,7 @@ impl<N: Node + 'static> SetExt<N> for Prompt {
 pub trait Setter<T, N>
 where
     N: Node + 'static,
-    Self: From<T>,
+    Self: From<T> + Getter<T, N>,
 {
     /// Uses a heuristic to find a `Node` and set the value on it.
     ///
@@ -142,7 +142,7 @@ where
     ///
     /// `Ok(())`` on success, or an error if the node could not be found.
     fn set(&self, prompt: &mut Prompt) -> anyhow::Result<()> {
-        let node = if let Some(node) = guess_node::<N>(prompt, None) {
+        let node = if let Some(node) = guess_node_mut::<N>(prompt, None) {
             node
         } else {
             return Err(anyhow!("Failed to find node"));
@@ -194,20 +194,12 @@ where
     /// # Returns
     ///
     /// `Ok(())`` on success, or an error if the node could not be found.
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()>;
-
-    /// Finds a `Node` leading into the given `output_node`.
-    ///
-    /// # Inputs
-    ///
-    /// * `prompt` - A mutable reference to a `Prompt`.
-    ///
-    /// # Returns
-    ///
-    /// The id of the node on success, or `None` if the node could not be found.
-    fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
-        find_node::<N>(prompt, output_node)
+    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
+        *self.get_value_mut(node)? = self.value();
+        Ok(())
     }
+
+    fn value(&self) -> T;
 }
 
 /// A `Setter` for setting the prompt text.
@@ -217,27 +209,8 @@ pub struct PromptSetter {
 }
 
 impl Setter<String, CLIPTextEncode> for PromptSetter {
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        *as_node_mut::<CLIPTextEncode>(node)
-            .context("Failed to cast node")?
-            .text
-            .value_mut()
-            .context("Failed to get text value")? = self.prompt.clone();
-        Ok(())
-    }
-
-    fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
-        if let Some(node) = find_node::<KSampler>(prompt, output_node) {
-            if let Ok(node) = prompt.get_node(&node) as anyhow::Result<&KSampler> {
-                return Some(node.positive.node_id.clone());
-            }
-        }
-        if let Some(node) = find_node::<SamplerCustom>(prompt, output_node) {
-            if let Ok(node) = prompt.get_node(&node) as anyhow::Result<&SamplerCustom> {
-                return Some(node.positive.node_id.clone());
-            }
-        }
-        None
+    fn value(&self) -> String {
+        self.prompt.clone()
     }
 }
 
@@ -254,22 +227,8 @@ pub struct NegativePromptSetter {
 }
 
 impl Setter<String, CLIPTextEncode> for NegativePromptSetter {
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        PromptSetter::from(self).set_value(node)
-    }
-
-    fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
-        if let Some(node) = find_node::<KSampler>(prompt, output_node) {
-            if let Ok(node) = prompt.get_node(&node) as anyhow::Result<&KSampler> {
-                return Some(node.negative.node_id.clone());
-            }
-        }
-        if let Some(node) = find_node::<SamplerCustom>(prompt, output_node) {
-            if let Ok(node) = prompt.get_node(&node) as anyhow::Result<&SamplerCustom> {
-                return Some(node.negative.node_id.clone());
-            }
-        }
-        None
+    fn value(&self) -> String {
+        self.prompt.clone()
     }
 }
 
@@ -294,13 +253,8 @@ pub struct ModelSetter {
 }
 
 impl Setter<String, CheckpointLoaderSimple> for ModelSetter {
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        *as_node_mut::<CheckpointLoaderSimple>(node)
-            .context("Failed to cast node")?
-            .ckpt_name
-            .value_mut()
-            .context("Failed to get ckpt_name value")? = self.model.clone();
-        Ok(())
+    fn value(&self) -> String {
+        self.model.clone()
     }
 }
 
@@ -311,36 +265,38 @@ impl From<String> for ModelSetter {
 }
 
 /// A `Setter` for setting the image size.
-pub struct SizeSetter {
+pub struct WidthSetter {
     /// The width of the image.
     pub width: u32,
+}
+
+impl Setter<u32, EmptyLatentImage> for WidthSetter {
+    fn value(&self) -> u32 {
+        self.width
+    }
+}
+
+impl From<u32> for WidthSetter {
+    fn from(width: u32) -> Self {
+        Self { width }
+    }
+}
+
+/// A `Setter` for setting the image size.
+pub struct HeightSetter {
     /// The height of the image.
     pub height: u32,
 }
 
-impl Setter<(u32, u32), EmptyLatentImage> for SizeSetter {
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        if self.width > 0 {
-            *as_node_mut::<EmptyLatentImage>(node)
-                .context("Failed to cast node")?
-                .width
-                .value_mut()
-                .context("Failed to get width value")? = self.width;
-        }
-        if self.height > 0 {
-            *as_node_mut::<EmptyLatentImage>(node)
-                .context("Failed to cast node")?
-                .height
-                .value_mut()
-                .context("Failed to get height value")? = self.height;
-        }
-        Ok(())
+impl Setter<u32, EmptyLatentImage> for HeightSetter {
+    fn value(&self) -> u32 {
+        self.height
     }
 }
 
-impl From<(u32, u32)> for SizeSetter {
-    fn from((width, height): (u32, u32)) -> Self {
-        Self { width, height }
+impl From<u32> for HeightSetter {
+    fn from(height: u32) -> Self {
+        Self { height }
     }
 }
 
@@ -355,24 +311,14 @@ where
 }
 
 impl Setter<i64, KSampler> for SeedSetterT<KSampler> {
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        *as_node_mut::<KSampler>(node)
-            .context("Failed to cast node")?
-            .seed
-            .value_mut()
-            .context("Failed to get seed value")? = self.seed;
-        Ok(())
+    fn value(&self) -> i64 {
+        self.seed
     }
 }
 
 impl Setter<i64, SamplerCustom> for SeedSetterT<SamplerCustom> {
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        *as_node_mut::<SamplerCustom>(node)
-            .context("Failed to cast node")?
-            .noise_seed
-            .value_mut()
-            .context("Failed to get seed value")? = self.seed;
-        Ok(())
+    fn value(&self) -> i64 {
+        self.seed
     }
 }
 
@@ -400,14 +346,14 @@ pub type SeedSetter = DelegatingSetter<
 /// A `Setter` that delegates to two other `Setter`s.
 pub struct DelegatingSetter<S1, S2, T, N1, N2>
 where
-    S1: Setter<T, N1>,
-    S2: Setter<T, N2>,
+    S1: Getter<T, N1>,
+    S2: Getter<T, N2>,
     N1: Node + 'static,
     N2: Node + 'static,
     T: Clone,
 {
     /// The value to set.
-    value: T,
+    pub value: T,
     _phantom: std::marker::PhantomData<(S1, S2, N1, N2)>,
 }
 
@@ -419,51 +365,15 @@ where
     N2: Node + 'static,
     T: Clone,
 {
-    fn set(&self, prompt: &mut Prompt) -> anyhow::Result<()> {
-        S1::from(self.value.clone()).set(prompt).or_else(|_| {
-            S2::from(self.value.clone())
-                .set(prompt)
-                .context("Failed to set value")
-        })
-    }
-
-    fn set_from(&self, prompt: &mut Prompt, output_node: &str) -> anyhow::Result<()> {
-        S1::from(self.value.clone())
-            .set_from(prompt, output_node)
-            .or_else(|_| {
-                S2::from(self.value.clone())
-                    .set_from(prompt, output_node)
-                    .context("Failed to set value")
-            })
-    }
-
-    fn set_node(&self, prompt: &mut Prompt, node: &str) -> anyhow::Result<()> {
-        S1::from(self.value.clone())
-            .set_node(prompt, node)
-            .or_else(|_| {
-                S2::from(self.value.clone())
-                    .set_node(prompt, node)
-                    .context("Failed to set value")
-            })
-    }
-
-    fn set_value(&self, node: &mut dyn Node) -> anyhow::Result<()> {
-        S1::from(self.value.clone()).set_value(node).or_else(|_| {
-            S2::from(self.value.clone())
-                .set_value(node)
-                .context("Failed to set value")
-        })
-    }
-
-    fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
-        find_node::<N1>(prompt, output_node).or_else(|| find_node::<N2>(prompt, output_node))
+    fn value(&self) -> T {
+        self.value.clone()
     }
 }
 
 impl<S1, S2, T, N1, N2> From<T> for DelegatingSetter<S1, S2, T, N1, N2>
 where
-    S1: Setter<T, N1>,
-    S2: Setter<T, N2>,
+    S1: Getter<T, N1>,
+    S2: Getter<T, N2>,
     N1: Node + 'static,
     N2: Node + 'static,
     T: Clone,

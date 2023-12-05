@@ -430,19 +430,21 @@ impl PromptBuilder {
                 )?;
             }
         }
-        let (width, height) = (
-            self.width.unwrap_or_default(),
-            self.height.unwrap_or_default(),
-        );
-        if let Some(ref node) = width.node {
-            new_prompt.set_node::<SizeSetter>(node, (width.value, height.value))?;
-        } else if let Some(ref node) = height.node {
-            new_prompt.set_node::<SizeSetter>(node, (width.value, height.value))?;
-        } else {
-            new_prompt.set_from::<SizeSetter>(
-                &self.output_node.clone().unwrap(),
-                (width.value, height.value),
-            )?;
+        if let Some(width) = self.width {
+            if let Some(ref node) = width.node {
+                new_prompt.set_node::<WidthSetter>(node, width.value)?;
+            } else {
+                new_prompt
+                    .set_from::<WidthSetter>(&self.output_node.clone().unwrap(), width.value)?;
+            }
+        }
+        if let Some(height) = self.height {
+            if let Some(ref node) = height.node {
+                new_prompt.set_node::<HeightSetter>(node, height.value)?;
+            } else {
+                new_prompt
+                    .set_from::<HeightSetter>(&self.output_node.clone().unwrap(), height.value)?;
+            }
         }
         if let Some(ref seed) = self.seed {
             if let Some(ref node) = seed.node {
