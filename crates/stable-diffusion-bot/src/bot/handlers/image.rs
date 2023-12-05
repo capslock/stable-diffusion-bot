@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context};
+use sal_e_api::{GenParams, Image};
 use stable_diffusion_api::{Img2ImgRequest, ImgInfo, ImgResponse, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
@@ -97,6 +98,36 @@ impl Response {
             source,
             seed,
         })
+    }
+
+    // TODO FIXME: Reconcile this with the above (remove the above?)
+    pub fn new_from_bytes(
+        caption: String,
+        images: Vec<Vec<u8>>,
+        seed: i64,
+        source: MessageId,
+    ) -> anyhow::Result<Self> {
+        if images.len() == 1 {
+            let images = images
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow!("Failed to get image"))?;
+            let images = Photo::Single(images);
+            Ok(Self {
+                caption,
+                images,
+                source,
+                seed,
+            })
+        } else {
+            let images = Photo::Album(images);
+            Ok(Self {
+                caption,
+                images,
+                source,
+                seed,
+            })
+        }
     }
 
     pub async fn send(self, bot: &Bot, chat_id: ChatId) -> anyhow::Result<()> {
@@ -198,13 +229,31 @@ impl<T> TryFrom<&ImgResponse<T>> for MessageText {
     }
 }
 
+// TODO FIXME: Proper implementation.
+impl TryFrom<&Vec<Image>> for MessageText {
+    type Error = anyhow::Error;
+
+    fn try_from(images: &Vec<Image>) -> Result<Self, Self::Error> {
+        Ok(Self("`hello`".to_string()))
+    }
+}
+
+// TODO FIXME: Proper implementation.
+impl TryFrom<Vec<Image>> for MessageText {
+    type Error = anyhow::Error;
+
+    fn try_from(images: Vec<Image>) -> Result<Self, Self::Error> {
+        Ok(Self("`hello`".to_string()))
+    }
+}
+
 async fn do_img2img(
     bot: &Bot,
     cfg: &ConfigParameters,
-    img2img: &mut Img2ImgRequest,
+    img2img: &mut Box<dyn GenParams>,
     msg: &Message,
     photo: Vec<PhotoSize>,
-) -> anyhow::Result<ImgResponse<Img2ImgRequest>> {
+) -> anyhow::Result<Vec<Image>> {
     let prompt = if let Some(caption) = msg.caption() {
         caption
     } else {
@@ -213,7 +262,8 @@ async fn do_img2img(
         return Err(anyhow!("No prompt provided for img2img"));
     };
 
-    img2img.with_prompt(prompt.to_owned());
+    // TODO FIXME: Add this functionality.
+    //img2img.with_prompt(prompt.to_owned());
 
     let photo = if let Some(photo) = photo
         .iter()
@@ -229,11 +279,16 @@ async fn do_img2img(
 
     let photo = helpers::get_file(bot, &file).await?;
 
-    img2img.with_image(photo);
+    // TODO FIXME: Add this functionality.
+    //img2img.with_image(photo);
 
-    let resp = cfg.api.img2img()?.send(img2img).await?;
+    let resp = cfg
+        .img2img_api
+        .img2img(img2img.as_mut(), photo.into_iter().collect(), prompt)
+        .await?;
 
-    _ = img2img.init_images.take();
+    // TODO FIXME: Needed?
+    // _ = img2img.init_images.take();
 
     Ok(resp)
 }
@@ -242,7 +297,7 @@ async fn handle_image(
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
-    (txt2img, mut img2img): (Txt2ImgRequest, Img2ImgRequest),
+    (txt2img, mut img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
     msg: Message,
     photo: Vec<PhotoSize>,
 ) -> anyhow::Result<()> {
@@ -251,17 +306,26 @@ async fn handle_image(
 
     let resp = do_img2img(&bot, &cfg, &mut img2img, &msg, photo).await?;
 
-    let seed = if resp.info()?.seed == resp.parameters.seed {
-        -1
-    } else {
-        resp.info()?.seed.unwrap_or(-1)
-    };
+    // TODO FIXME: Add seed handling.
+    // let seed = if resp.info()?.seed == resp.parameters.seed {
+    //     -1
+    // } else {
+    //     resp.info()?.seed.unwrap_or(-1)
+    // };
+    let seed = -1;
 
     let caption = MessageText::try_from(&resp).context("Failed to build caption from response")?;
-    Response::new(caption.0, resp.images, seed, msg.id)
-        .context("Failed to create response!")?
-        .send(&bot, msg.chat.id)
-        .await?;
+
+    // TODO FIXME: Reconcile after fixing definition.
+    Response::new_from_bytes(
+        caption.0,
+        resp.into_iter().map(|i| i.data).collect(),
+        seed,
+        msg.id,
+    )
+    .context("Failed to create response!")?
+    .send(&bot, msg.chat.id)
+    .await?;
 
     dialogue
         .update(State::Ready {
@@ -278,11 +342,12 @@ async fn handle_image(
 async fn do_txt2img(
     prompt: &str,
     cfg: &ConfigParameters,
-    txt2img: &mut Txt2ImgRequest,
-) -> anyhow::Result<ImgResponse<Txt2ImgRequest>> {
-    txt2img.with_prompt(prompt.to_owned());
+    txt2img: &mut dyn GenParams,
+) -> anyhow::Result<Vec<Image>> {
+    // TODO FIXME: Add this back in.
+    //txt2img.with_prompt(prompt.to_owned());
 
-    let resp = cfg.api.txt2img()?.send(txt2img).await?;
+    let resp = cfg.txt2img_api.txt2img(txt2img, prompt).await?;
 
     Ok(resp)
 }
@@ -291,26 +356,35 @@ async fn handle_prompt(
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
-    (mut txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
+    (mut txt2img, img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
     msg: Message,
     text: String,
 ) -> anyhow::Result<()> {
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
-    let resp = do_txt2img(text.as_str(), &cfg, &mut txt2img).await?;
+    let resp = do_txt2img(text.as_str(), &cfg, txt2img.as_mut()).await?;
 
-    let seed = if resp.info()?.seed == resp.parameters.seed {
-        -1
-    } else {
-        resp.info()?.seed.unwrap_or(-1)
-    };
+    // TODO FIXME: Add seed handling.
+    //let seed = if resp.info()?.seed == resp.parameters.seed {
+    //    -1
+    //} else {
+    //    resp.info()?.seed.unwrap_or(-1)
+    //};
+    let seed = -1;
 
     let caption = MessageText::try_from(&resp).context("Failed to build caption from response")?;
-    Response::new(caption.0, resp.images, seed, msg.id)
-        .context("Failed to create response!")?
-        .send(&bot, msg.chat.id)
-        .await?;
+
+    // TODO FIXME: Adjust as needed.
+    Response::new_from_bytes(
+        caption.0,
+        resp.into_iter().map(|i| i.data).collect(),
+        seed,
+        msg.id,
+    )
+    .context("Failed to create response!")?
+    .send(&bot, msg.chat.id)
+    .await?;
 
     dialogue
         .update(State::Ready {
@@ -341,7 +415,7 @@ async fn handle_rerun(
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
-    (txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest),
+    (txt2img, img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
     q: CallbackQuery,
 ) -> anyhow::Result<()> {
     let message = if let Some(message) = q.message {
@@ -404,7 +478,7 @@ async fn handle_rerun(
 async fn handle_reuse(
     bot: Bot,
     dialogue: DiffusionDialogue,
-    (mut txt2img, mut img2img): (Txt2ImgRequest, Img2ImgRequest),
+    (mut txt2img, mut img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
     q: CallbackQuery,
     seed: i64,
 ) -> anyhow::Result<()> {
@@ -432,7 +506,8 @@ async fn handle_reuse(
     };
 
     if parent.photo().is_some() {
-        img2img.with_seed(seed);
+        // TODO FIXME: Seed re-use.
+        //img2img.with_seed(seed);
         dialogue
             .update(State::Ready {
                 bot_state: BotState::default(),
@@ -442,7 +517,8 @@ async fn handle_reuse(
             .await
             .map_err(|e| anyhow!(e))?;
     } else if parent.text().is_some() {
-        txt2img.with_seed(seed);
+        // TODO FIXME: Seed re-use.
+        //txt2img.with_seed(seed);
         dialogue
             .update(State::Ready {
                 bot_state: BotState::default(),
