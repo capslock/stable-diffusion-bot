@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use comfyui_api::{comfy::PromptBuilder, models::AsAny};
 use dyn_clone::DynClone;
-use serde::{Deserialize, Serialize};
 use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 
 #[derive(Debug, Clone, Default)]
@@ -12,10 +11,109 @@ pub struct Image {
 dyn_clone::clone_trait_object!(GenParams);
 
 #[typetag::serde]
-pub trait GenParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {}
+pub trait GenParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {
+    fn seed(&self) -> Option<u64>;
+    fn set_seed(&mut self, seed: u64);
+
+    fn steps(&self) -> Option<u32>;
+    fn set_steps(&mut self, steps: u32);
+
+    fn count(&self) -> Option<u32>;
+    fn set_count(&mut self, count: u32);
+
+    fn cfg(&self) -> Option<f32>;
+    fn set_cfg(&mut self, cfg: f32);
+
+    fn width(&self) -> Option<u32>;
+    fn set_width(&mut self, width: u32);
+
+    fn height(&self) -> Option<u32>;
+    fn set_height(&mut self, height: u32);
+
+    fn prompt(&self) -> Option<String>;
+    fn set_prompt(&mut self, prompt: String);
+
+    fn negative_prompt(&self) -> Option<String>;
+    fn set_negative_prompt(&mut self, negative_prompt: String);
+
+    fn denoising(&self) -> Option<f32>;
+    fn set_denoising(&mut self, denoising: f32);
+}
 
 #[typetag::serde]
-impl GenParams for comfyui_api::models::Prompt {}
+impl GenParams for comfyui_api::models::Prompt {
+    fn seed(&self) -> Option<u64> {
+        unimplemented!()
+    }
+
+    fn set_seed(&mut self, seed: u64) {
+        todo!()
+    }
+
+    fn steps(&self) -> Option<u32> {
+        unimplemented!()
+    }
+
+    fn set_steps(&mut self, steps: u32) {
+        todo!()
+    }
+
+    fn count(&self) -> Option<u32> {
+        unimplemented!()
+    }
+
+    fn set_count(&mut self, count: u32) {
+        todo!()
+    }
+
+    fn cfg(&self) -> Option<f32> {
+        unimplemented!()
+    }
+
+    fn set_cfg(&mut self, cfg: f32) {
+        todo!()
+    }
+
+    fn width(&self) -> Option<u32> {
+        unimplemented!()
+    }
+
+    fn set_width(&mut self, width: u32) {
+        todo!()
+    }
+
+    fn height(&self) -> Option<u32> {
+        unimplemented!()
+    }
+
+    fn set_height(&mut self, height: u32) {
+        todo!()
+    }
+
+    fn prompt(&self) -> Option<String> {
+        unimplemented!()
+    }
+
+    fn set_prompt(&mut self, prompt: String) {
+        todo!()
+    }
+
+    fn negative_prompt(&self) -> Option<String> {
+        unimplemented!()
+    }
+
+    fn set_negative_prompt(&mut self, negative_prompt: String) {
+        todo!()
+    }
+
+    fn denoising(&self) -> Option<f32> {
+        unimplemented!()
+    }
+
+    fn set_denoising(&mut self, denoising: f32) {
+        todo!()
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct ComfyPromptApi {
@@ -111,10 +209,154 @@ impl Img2ImgApi for ComfyPromptApi {
 }
 
 #[typetag::serde]
-impl GenParams for Txt2ImgRequest {}
+impl GenParams for Txt2ImgRequest {
+    fn seed(&self) -> Option<u64> {
+        todo!()
+    }
+
+    fn set_seed(&mut self, seed: u64) {
+        todo!()
+    }
+
+    fn steps(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_steps(&mut self, steps: u32) {
+        todo!()
+    }
+
+    fn count(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_count(&mut self, count: u32) {
+        todo!()
+    }
+
+    fn cfg(&self) -> Option<f32> {
+        todo!()
+    }
+
+    fn set_cfg(&mut self, cfg: f32) {
+        todo!()
+    }
+
+    fn width(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_width(&mut self, width: u32) {
+        todo!()
+    }
+
+    fn height(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_height(&mut self, height: u32) {
+        todo!()
+    }
+
+    fn prompt(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn set_prompt(&mut self, prompt: String) {
+        todo!()
+    }
+
+    fn negative_prompt(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn set_negative_prompt(&mut self, negative_prompt: String) {
+        todo!()
+    }
+
+    fn denoising(&self) -> Option<f32> {
+        todo!()
+    }
+
+    fn set_denoising(&mut self, denoising: f32) {
+        todo!()
+    }
+}
 
 #[typetag::serde]
-impl GenParams for Img2ImgRequest {}
+impl GenParams for Img2ImgRequest {
+    fn seed(&self) -> Option<u64> {
+        todo!()
+    }
+
+    fn set_seed(&mut self, seed: u64) {
+        todo!()
+    }
+
+    fn steps(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_steps(&mut self, steps: u32) {
+        todo!()
+    }
+
+    fn count(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_count(&mut self, count: u32) {
+        todo!()
+    }
+
+    fn cfg(&self) -> Option<f32> {
+        todo!()
+    }
+
+    fn set_cfg(&mut self, cfg: f32) {
+        todo!()
+    }
+
+    fn width(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_width(&mut self, width: u32) {
+        todo!()
+    }
+
+    fn height(&self) -> Option<u32> {
+        todo!()
+    }
+
+    fn set_height(&mut self, height: u32) {
+        todo!()
+    }
+
+    fn prompt(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn set_prompt(&mut self, prompt: String) {
+        todo!()
+    }
+
+    fn negative_prompt(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn set_negative_prompt(&mut self, negative_prompt: String) {
+        todo!()
+    }
+
+    fn denoising(&self) -> Option<f32> {
+        todo!()
+    }
+
+    fn set_denoising(&mut self, denoising: f32) {
+        todo!()
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct StableDiffusionWebUiApi {
