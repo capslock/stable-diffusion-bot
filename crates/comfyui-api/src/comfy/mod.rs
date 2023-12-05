@@ -42,6 +42,18 @@ pub struct Comfy {
     history: HistoryApi,
 }
 
+impl Default for Comfy {
+    fn default() -> Self {
+        let api = Api::default();
+        Self {
+            prompt: api.prompt().expect("failed to create prompt api"),
+            view: api.view().expect("failed to create view api"),
+            websocket: api.websocket().expect("failed to create websocket api"),
+            history: api.history().expect("failed to create history api"),
+        }
+    }
+}
+
 impl Comfy {
     /// Returns a new `Comfy` instance with default settings.
     pub fn new() -> anyhow::Result<Self> {
