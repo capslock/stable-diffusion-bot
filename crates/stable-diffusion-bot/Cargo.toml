@@ -9,18 +9,20 @@ edition = "2021"
 anyhow = "1.0.70"
 base64 = "0.21.0"
 bytes = "1.4.0"
+clap = { version = "4.4.7", features = ["derive"] }
+comfyui-api = { path = "../comfyui-api" }
 figment = { version = "0.10.8", features = ["toml", "env"] }
 futures = "0.3.28"
 lazy_static = "1.4.0"
 regex = "1"
 reqwest = { version = "0.11.14", features = ["json"] }
+sal-e-api = { path = "../sal-e-api" }
 serde = "1.0.157"
+stable-diffusion-api = { path = "../stable-diffusion-api" }
 teloxide = { version = "0.12", features = ["macros", "sqlite-storage"] }
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
-stable-diffusion-api = { path = "../stable-diffusion-api" }
-clap = { version = "4.4.7", features = ["derive"] }
 tracing-journald = "0.3.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]

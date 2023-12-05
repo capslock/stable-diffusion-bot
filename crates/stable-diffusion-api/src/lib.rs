@@ -119,6 +119,23 @@ impl<T> ImgResponse<T> {
     pub fn info(&self) -> anyhow::Result<ImgInfo> {
         serde_json::from_str(&self.info).context("failed to parse info")
     }
+
+    /// Decodes and returns a vector of images from the `images` field of the `ImgResponse`.
+    ///
+    /// # Errors
+    ///
+    /// If any of the images fail to decode, an error will be returned.
+    pub fn images(&self) -> anyhow::Result<Vec<Vec<u8>>> {
+        use base64::{engine::general_purpose, Engine as _};
+        self.images
+            .iter()
+            .map(|img| {
+                general_purpose::STANDARD
+                    .decode(img)
+                    .context("failed to decode image")
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
+    }
 }
 
 #[skip_serializing_none]

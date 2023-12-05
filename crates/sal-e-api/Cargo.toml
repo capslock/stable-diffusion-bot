@@ -1,0 +1,17 @@
+[package]
+name = "sal-e-api"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.70"
+async-trait = "0.1.74"
+comfyui-api = { path = "../comfyui-api" }
+futures-util = "0.3.29"
+stable-diffusion-api = { path = "../stable-diffusion-api" }
+tracing = "0.1.37"
+
+[dev-dependencies]
+tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }

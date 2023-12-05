@@ -1,8 +1,9 @@
-use std::collections::HashSet;
-
 use anyhow::{anyhow, Context};
 
-use crate::{comfy::visitor::FindNode, comfy::GetExt, comfy::Visitor, models::*};
+use crate::{
+    comfy::getter::{find_node, guess_node, GetExt},
+    models::*,
+};
 
 /// Extension methods for `Prompt` to use Setters to set values on nodes.
 pub trait SetterExt<T, N>
@@ -207,54 +208,6 @@ where
     fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
         find_node::<N>(prompt, output_node)
     }
-}
-
-fn find_node<T: Node + 'static>(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
-    let output_node = if let Some(node) = output_node {
-        node.to_string()
-    } else {
-        find_output_node(prompt)?
-    };
-    let mut find_node = FindNode::<T>::new(output_node.clone());
-    find_node.visit(prompt, prompt.get_node_by_id(&output_node).unwrap());
-    find_node.found
-}
-
-fn guess_node<'a, T: Node + 'static>(
-    prompt: &'a mut Prompt,
-    output_node: Option<&str>,
-) -> Option<&'a mut dyn Node> {
-    if let Some(node) = find_node::<T>(prompt, output_node) {
-        prompt.get_node_by_id_mut(&node)
-    } else if let Some((_, node)) = prompt.get_nodes_by_type_mut::<T>().next() {
-        Some(node)
-    } else {
-        None
-    }
-}
-
-pub(crate) fn find_output_node(prompt: &Prompt) -> Option<String> {
-    let nodes: HashSet<String> = prompt.workflow.keys().cloned().collect();
-    prompt
-        .workflow
-        .iter()
-        .fold(nodes, |mut nodes, (key, value)| {
-            let mut has_input = false;
-            let connections = match value {
-                NodeOrUnknown::Node(node) => node.connections(),
-                NodeOrUnknown::GenericNode(node) => node.connections(),
-            };
-            for c in connections {
-                has_input = true;
-                nodes.remove(c);
-            }
-            if !has_input {
-                nodes.remove(key);
-            }
-            nodes
-        })
-        .into_iter()
-        .next()
 }
 
 /// A `Setter` for setting the prompt text.

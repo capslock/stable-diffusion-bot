@@ -52,7 +52,6 @@ impl Prompt {
 }
 
 /// Enum capturing all possible node types.
-#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum NodeOrUnknown {
@@ -109,7 +108,7 @@ pub fn as_node_mut<T: Node + 'static>(node: &mut dyn Node) -> Option<&mut T> {
 dyn_clone::clone_trait_object!(Node);
 
 #[typetag::serde(tag = "class_type", content = "inputs")]
-pub trait Node: std::fmt::Debug + AsAny + DynClone {
+pub trait Node: std::fmt::Debug + Send + Sync + AsAny + DynClone {
     fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_>;
     fn name(&self) -> &str {
         self.typetag_name()
