@@ -1684,10 +1684,13 @@ dependencies = [
  "anyhow",
  "async-trait",
  "comfyui-api",
+ "dyn-clone",
  "futures-util",
+ "serde",
  "stable-diffusion-api",
  "tokio",
  "tracing",
+ "typetag",
 ]
 
 [[package]]
