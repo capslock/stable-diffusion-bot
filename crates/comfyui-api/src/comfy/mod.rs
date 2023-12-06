@@ -18,6 +18,8 @@ pub mod setter;
 pub mod getter;
 pub use getter::*;
 
+mod accessors;
+
 use self::setter::SetterExt as _;
 
 enum State {
@@ -403,9 +405,9 @@ impl PromptBuilder {
 
         if let Some(ref prompt) = self.prompt {
             if let Some(ref node) = prompt.node {
-                new_prompt.set_node::<setter::Prompt>(node, prompt.value.clone())?;
+                new_prompt.set_node::<accessors::Prompt>(node, prompt.value.clone())?;
             } else {
-                new_prompt.set_from::<setter::Prompt>(
+                new_prompt.set_from::<accessors::Prompt>(
                     &self.output_node.clone().unwrap(),
                     prompt.value.clone(),
                 )?;
@@ -414,9 +416,9 @@ impl PromptBuilder {
         if let Some(ref negative_prompt) = self.negative_prompt {
             if let Some(ref node) = negative_prompt.node {
                 new_prompt
-                    .set_node::<setter::NegativePrompt>(node, negative_prompt.value.clone())?;
+                    .set_node::<accessors::NegativePrompt>(node, negative_prompt.value.clone())?;
             } else {
-                new_prompt.set_from::<setter::NegativePrompt>(
+                new_prompt.set_from::<accessors::NegativePrompt>(
                     &self.output_node.clone().unwrap(),
                     negative_prompt.value.clone(),
                 )?;
@@ -424,9 +426,9 @@ impl PromptBuilder {
         }
         if let Some(ref model) = self.model {
             if let Some(ref node) = model.node {
-                new_prompt.set_node::<setter::Model>(node, model.value.clone())?;
+                new_prompt.set_node::<accessors::Model>(node, model.value.clone())?;
             } else {
-                new_prompt.set_from::<setter::Model>(
+                new_prompt.set_from::<accessors::Model>(
                     &self.output_node.clone().unwrap(),
                     model.value.clone(),
                 )?;
@@ -434,26 +436,30 @@ impl PromptBuilder {
         }
         if let Some(width) = self.width {
             if let Some(ref node) = width.node {
-                new_prompt.set_node::<setter::Width>(node, width.value)?;
+                new_prompt.set_node::<accessors::Width>(node, width.value)?;
             } else {
-                new_prompt
-                    .set_from::<setter::Width>(&self.output_node.clone().unwrap(), width.value)?;
+                new_prompt.set_from::<accessors::Width>(
+                    &self.output_node.clone().unwrap(),
+                    width.value,
+                )?;
             }
         }
         if let Some(height) = self.height {
             if let Some(ref node) = height.node {
-                new_prompt.set_node::<setter::Height>(node, height.value)?;
+                new_prompt.set_node::<accessors::Height>(node, height.value)?;
             } else {
-                new_prompt
-                    .set_from::<setter::Height>(&self.output_node.clone().unwrap(), height.value)?;
+                new_prompt.set_from::<accessors::Height>(
+                    &self.output_node.clone().unwrap(),
+                    height.value,
+                )?;
             }
         }
         if let Some(ref seed) = self.seed {
             if let Some(ref node) = seed.node {
-                new_prompt.set_node::<setter::Seed>(node, seed.value)?;
+                new_prompt.set_node::<accessors::Seed>(node, seed.value)?;
             } else {
                 new_prompt
-                    .set_from::<setter::Seed>(&self.output_node.clone().unwrap(), seed.value)?;
+                    .set_from::<accessors::Seed>(&self.output_node.clone().unwrap(), seed.value)?;
             }
         }
         Ok(new_prompt)

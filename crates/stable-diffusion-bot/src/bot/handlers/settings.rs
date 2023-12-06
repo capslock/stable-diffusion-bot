@@ -377,7 +377,6 @@ pub(crate) async fn handle_settings_button(
     Ok(())
 }
 
-// TODO FIXME: Implement settings.
 fn update_txt2img_setting<S1, S2>(
     txt2img: &mut dyn GenParams,
     setting: S1,
@@ -387,21 +386,18 @@ where
     S1: AsRef<str>,
     S2: AsRef<str>,
 {
-    // let value = value.as_ref();
-    // match setting.as_ref() {
-    //     "steps" => txt2img.steps = Some(value.parse()?),
-    //     "seed" => txt2img.seed = Some(value.parse()?),
-    //     "count" => txt2img.n_iter = Some(value.parse()?),
-    //     "cfg" => txt2img.cfg_scale = Some(value.parse()?),
-    //     "width" => txt2img.width = Some(value.parse()?),
-    //     "height" => txt2img.height = Some(value.parse()?),
-    //     "negative" => txt2img.negative_prompt = Some(value.to_owned()),
-    //     "styles" => txt2img.styles = Some(value.split(' ').map(ToOwned::to_owned).collect()),
-    //     "tiling" => txt2img.tiling = Some(value.parse()?),
-    //     "faces" => txt2img.restore_faces = Some(value.parse()?),
-    //     "denoising" => txt2img.denoising_strength = Some(value.parse()?),
-    //     _ => return Err(anyhow!("Got invalid setting: {}", setting.as_ref())),
-    // }
+    let value = value.as_ref();
+    match setting.as_ref() {
+        "steps" => txt2img.set_steps(value.parse()?),
+        "seed" => txt2img.set_seed(value.parse()?),
+        "count" => txt2img.set_count(value.parse()?),
+        "cfg" => txt2img.set_cfg(value.parse()?),
+        "width" => txt2img.set_width(value.parse()?),
+        "height" => txt2img.set_height(value.parse()?),
+        "negative" => txt2img.set_negative_prompt(value.to_owned()),
+        "denoising" => txt2img.set_denoising(value.parse()?),
+        _ => return Err(anyhow!("Got invalid setting: {}", setting.as_ref())),
+    }
     Ok(())
 }
 
@@ -415,33 +411,26 @@ where
     S1: AsRef<str>,
     S2: AsRef<str>,
 {
-    // let value = value.as_ref();
-    // match setting.as_ref() {
-    //     "steps" => img2img.steps = Some(200.min(value.parse()?)),
-    //     "seed" => img2img.seed = Some((-1).max(value.parse()?)),
-    //     "count" => img2img.n_iter = Some(value.parse::<u32>()?.clamp(1, 10)),
-    //     "cfg" => img2img.cfg_scale = Some(value.parse::<f64>()?.clamp(0.0, 20.0)),
-    //     "width" => {
-    //         img2img.width = {
-    //             let mut value = value.parse::<u32>()?;
-    //             value -= value % 64;
-    //             Some(value.clamp(64, 1024))
-    //         }
-    //     }
-    //     "height" => {
-    //         img2img.height = {
-    //             let mut value = value.parse::<u32>()?;
-    //             value -= value % 64;
-    //             Some(value.clamp(64, 1024))
-    //         }
-    //     }
-    //     "negative" => img2img.negative_prompt = Some(value.to_owned()),
-    //     "styles" => img2img.styles = Some(value.split(' ').map(ToOwned::to_owned).collect()),
-    //     "tiling" => img2img.tiling = Some(value.parse()?),
-    //     "faces" => img2img.restore_faces = Some(value.parse()?),
-    //     "denoising" => img2img.denoising_strength = Some(value.parse::<f64>()?.clamp(0.0, 1.0)),
-    //     _ => return Err(anyhow!("invalid setting: {}", setting.as_ref())),
-    // }
+    let value = value.as_ref();
+    match setting.as_ref() {
+        "steps" => img2img.set_steps(200.min(value.parse()?)),
+        "seed" => img2img.set_seed((-1).max(value.parse()?)),
+        "count" => img2img.set_count(value.parse::<u32>()?.clamp(1, 10)),
+        "cfg" => img2img.set_cfg(value.parse::<f32>()?.clamp(0.0, 20.0)),
+        "width" => img2img.set_width({
+            let mut value = value.parse::<u32>()?;
+            value -= value % 64;
+            value.clamp(64, 1024)
+        }),
+        "height" => img2img.set_height({
+            let mut value = value.parse::<u32>()?;
+            value -= value % 64;
+            value.clamp(64, 1024)
+        }),
+        "negative" => img2img.set_negative_prompt(value.to_owned()),
+        "denoising" => img2img.set_denoising(value.parse::<f32>()?.clamp(0.0, 1.0)),
+        _ => return Err(anyhow!("invalid setting: {}", setting.as_ref())),
+    }
     Ok(())
 }
 

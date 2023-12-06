@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use sal_e_api::{GenParams, Image};
-use stable_diffusion_api::{Img2ImgRequest, ImgInfo, ImgResponse, Txt2ImgRequest};
+use stable_diffusion_api::{ImgInfo, ImgResponse};
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
@@ -85,7 +85,7 @@ struct Response {
 }
 
 impl Response {
-    pub fn new(
+    pub fn _new(
         caption: String,
         images: Vec<String>,
         seed: i64,
@@ -233,7 +233,7 @@ impl<T> TryFrom<&ImgResponse<T>> for MessageText {
 impl TryFrom<&Vec<Image>> for MessageText {
     type Error = anyhow::Error;
 
-    fn try_from(images: &Vec<Image>) -> Result<Self, Self::Error> {
+    fn try_from(_images: &Vec<Image>) -> Result<Self, Self::Error> {
         Ok(Self("`hello`".to_string()))
     }
 }
@@ -242,7 +242,7 @@ impl TryFrom<&Vec<Image>> for MessageText {
 impl TryFrom<Vec<Image>> for MessageText {
     type Error = anyhow::Error;
 
-    fn try_from(images: Vec<Image>) -> Result<Self, Self::Error> {
+    fn try_from(_images: Vec<Image>) -> Result<Self, Self::Error> {
         Ok(Self("`hello`".to_string()))
     }
 }
@@ -262,8 +262,7 @@ async fn do_img2img(
         return Err(anyhow!("No prompt provided for img2img"));
     };
 
-    // TODO FIXME: Add this functionality.
-    //img2img.with_prompt(prompt.to_owned());
+    img2img.set_prompt(prompt.to_owned());
 
     let photo = if let Some(photo) = photo
         .iter()
@@ -277,15 +276,12 @@ async fn do_img2img(
     };
     let file = bot.get_file(&photo.file.id).send().await?;
 
-    let photo = helpers::get_file(bot, &file).await?;
+    let _photo = helpers::get_file(bot, &file).await?;
 
     // TODO FIXME: Add this functionality.
     //img2img.with_image(photo);
 
-    let resp = cfg
-        .img2img_api
-        .img2img(img2img.as_mut(), photo.into_iter().collect(), prompt)
-        .await?;
+    let resp = cfg.img2img_api.img2img(img2img.as_ref()).await?;
 
     // TODO FIXME: Needed?
     // _ = img2img.init_images.take();
@@ -344,10 +340,9 @@ async fn do_txt2img(
     cfg: &ConfigParameters,
     txt2img: &mut dyn GenParams,
 ) -> anyhow::Result<Vec<Image>> {
-    // TODO FIXME: Add this back in.
-    //txt2img.with_prompt(prompt.to_owned());
+    txt2img.set_prompt(prompt.to_owned());
 
-    let resp = cfg.txt2img_api.txt2img(txt2img, prompt).await?;
+    let resp = cfg.txt2img_api.txt2img(txt2img).await?;
 
     Ok(resp)
 }
@@ -506,8 +501,7 @@ async fn handle_reuse(
     };
 
     if parent.photo().is_some() {
-        // TODO FIXME: Seed re-use.
-        //img2img.with_seed(seed);
+        img2img.set_seed(seed);
         dialogue
             .update(State::Ready {
                 bot_state: BotState::default(),
@@ -517,8 +511,7 @@ async fn handle_reuse(
             .await
             .map_err(|e| anyhow!(e))?;
     } else if parent.text().is_some() {
-        // TODO FIXME: Seed re-use.
-        //txt2img.with_seed(seed);
+        txt2img.set_seed(seed);
         dialogue
             .update(State::Ready {
                 bot_state: BotState::default(),
