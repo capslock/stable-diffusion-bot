@@ -57,6 +57,39 @@ pub enum BotState {
     },
 }
 
+fn default_txt2img(txt2img: Txt2ImgRequest) -> Txt2ImgRequest {
+    Txt2ImgRequest {
+        seed: Some(-1),
+        sampler_index: Some("Euler".to_owned()),
+        batch_size: Some(1),
+        n_iter: Some(1),
+        steps: Some(50),
+        cfg_scale: Some(7.0),
+        width: Some(512),
+        height: Some(512),
+        negative_prompt: Some("".to_owned()),
+        ..Default::default()
+    }
+    .merge(txt2img)
+}
+
+fn default_img2img(img2img: Img2ImgRequest) -> Img2ImgRequest {
+    Img2ImgRequest {
+        denoising_strength: Some(0.75),
+        seed: Some(-1),
+        sampler_index: Some("Euler".to_owned()),
+        batch_size: Some(1),
+        n_iter: Some(1),
+        steps: Some(50),
+        cfg_scale: Some(7.0),
+        width: Some(512),
+        height: Some(512),
+        negative_prompt: Some("".to_owned()),
+        ..Default::default()
+    }
+    .merge(img2img)
+}
+
 type DialogueStorage = std::sync::Arc<ErasedStorage<State>>;
 
 type DiffusionDialogue = Dialogue<State, ErasedStorage<State>>;
@@ -379,61 +412,66 @@ impl StableDiffusionBotBuilder {
 
         let client = reqwest::Client::new();
 
-        let (txt2img_api, img2img_api): (Box<dyn Txt2ImgApi>, Box<dyn Img2ImgApi>) =
-            match self.api_type {
-                ApiType::ComfyUI => {
-                    let mut txt2img_prompt = String::new();
+        let (txt2img_api, img2img_api): (Box<dyn Txt2ImgApi>, Box<dyn Img2ImgApi>) = match self
+            .api_type
+        {
+            ApiType::ComfyUI => {
+                let mut txt2img_prompt = String::new();
 
-                    File::open(
-                        self.comfyui_txt2img_prompt_file
-                            .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
-                    )
-                    .await
-                    .context("Failed to open comfyui prompt file")?
-                    .read_to_string(&mut txt2img_prompt)
-                    .await?;
+                File::open(
+                    self.comfyui_txt2img_prompt_file
+                        .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
+                )
+                .await
+                .context("Failed to open comfyui prompt file")?
+                .read_to_string(&mut txt2img_prompt)
+                .await?;
 
-                    let mut img2img_prompt = String::new();
+                let mut img2img_prompt = String::new();
 
-                    File::open(
-                        self.comfyui_img2img_prompt_file
-                            .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
-                    )
-                    .await
-                    .context("Failed to open comfyui prompt file")?
-                    .read_to_string(&mut img2img_prompt)
-                    .await?;
+                File::open(
+                    self.comfyui_img2img_prompt_file
+                        .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
+                )
+                .await
+                .context("Failed to open comfyui prompt file")?
+                .read_to_string(&mut img2img_prompt)
+                .await?;
 
-                    let txt2img_prompt =
-                        serde_json::from_str::<comfyui_api::models::Prompt>(&txt2img_prompt)
-                            .context("Failed to deserialize prompt")?;
+                let txt2img_prompt =
+                    serde_json::from_str::<comfyui_api::models::Prompt>(&txt2img_prompt)
+                        .context("Failed to deserialize prompt")?;
 
-                    let txt2img_api = ComfyPromptApi::new(txt2img_prompt)?;
+                let txt2img_api = ComfyPromptApi::new(txt2img_prompt)?;
 
-                    let img2img_prompt =
-                        serde_json::from_str::<comfyui_api::models::Prompt>(&img2img_prompt)
-                            .context("Failed to deserialize prompt")?;
-                    let img2img_api = ComfyPromptApi::new(img2img_prompt)?;
-                    (Box::new(txt2img_api), Box::new(img2img_api))
-                }
-                ApiType::StableDiffusionWebUi => {
-                    let api = Api::new_with_client_and_url(client, self.sd_api_url.clone())
-                        .context("Failed to initialize sd api")?;
-                    let txt2img_api = StableDiffusionWebUiApi {
-                        client: api.clone(),
-                        txt2img_defaults: self.txt2img_defaults.clone().unwrap_or_default(),
-                        img2img_defaults: self.img2img_defaults.clone().unwrap_or_default(),
-                    };
+                let img2img_prompt =
+                    serde_json::from_str::<comfyui_api::models::Prompt>(&img2img_prompt)
+                        .context("Failed to deserialize prompt")?;
+                let img2img_api = ComfyPromptApi::new(img2img_prompt)?;
+                (Box::new(txt2img_api), Box::new(img2img_api))
+            }
+            ApiType::StableDiffusionWebUi => {
+                let api = Api::new_with_client_and_url(client, self.sd_api_url.clone())
+                    .context("Failed to initialize sd api")?;
+                let txt2img_api = StableDiffusionWebUiApi {
+                    client: api.clone(),
+                    txt2img_defaults: default_txt2img(
+                        self.txt2img_defaults.clone().unwrap_or_default(),
+                    ),
+                    img2img_defaults: default_img2img(
+                        self.img2img_defaults.clone().unwrap_or_default(),
+                    ),
+                };
 
-                    let img2img_api = StableDiffusionWebUiApi {
-                        client: api,
-                        txt2img_defaults: self.txt2img_defaults.unwrap_or_default(),
-                        img2img_defaults: self.img2img_defaults.unwrap_or_default(),
-                    };
+                let img2img_api = StableDiffusionWebUiApi {
+                    client: api,
+                    txt2img_defaults: default_txt2img(self.txt2img_defaults.unwrap_or_default()),
+                    img2img_defaults: default_img2img(self.img2img_defaults.unwrap_or_default()),
+                };
 
-                    (Box::new(txt2img_api), Box::new(img2img_api))
-                }
-            };
+                (Box::new(txt2img_api), Box::new(img2img_api))
+            }
+        };
 
         let parameters = ConfigParameters {
             allowed_users,
@@ -483,6 +521,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_stable_diffusion_bot_defaults() {
+        let api_key = "api_key".to_string();
+        let sd_api_url = "http://localhost:7860".to_string();
+        let allowed_users = vec![1, 2, 3];
+        let allow_all_users = false;
+        let api_type = ApiType::StableDiffusionWebUi;
+
+        let builder = StableDiffusionBotBuilder::new(
+            api_key.clone(),
+            allowed_users.clone(),
+            sd_api_url.clone(),
+            api_type,
+            allow_all_users,
+        );
+
+        let bot = builder.build().await.unwrap();
+
+        assert_eq!(
+            bot.config.allowed_users,
+            allowed_users.into_iter().map(ChatId).collect()
+        );
+        assert_eq!(bot.config.allow_all_users, allow_all_users);
+        assert_eq!(
+            bot.config
+                .txt2img_api
+                .as_any()
+                .downcast_ref::<StableDiffusionWebUiApi>()
+                .unwrap()
+                .txt2img_defaults,
+            default_txt2img(Txt2ImgRequest::default())
+        );
+        assert_eq!(
+            bot.config
+                .img2img_api
+                .as_any()
+                .downcast_ref::<StableDiffusionWebUiApi>()
+                .unwrap()
+                .img2img_defaults,
+            default_img2img(Img2ImgRequest::default())
+        );
+    }
+
+    #[tokio::test]
     async fn test_stable_diffusion_bot_user_defaults() {
         let api_key = "api_key".to_string();
         let sd_api_url = "http://localhost:7860".to_string();
@@ -528,7 +609,7 @@ mod tests {
                 .downcast_ref::<StableDiffusionWebUiApi>()
                 .unwrap()
                 .txt2img_defaults,
-            txt2img_settings
+            default_txt2img(txt2img_settings)
         );
         assert_eq!(
             bot.config
@@ -537,7 +618,7 @@ mod tests {
                 .downcast_ref::<StableDiffusionWebUiApi>()
                 .unwrap()
                 .img2img_defaults,
-            img2img_settings
+            default_img2img(img2img_settings)
         );
     }
 
@@ -586,7 +667,7 @@ mod tests {
                 .downcast_ref::<StableDiffusionWebUiApi>()
                 .unwrap()
                 .txt2img_defaults,
-            Txt2ImgRequest::default()
+            default_txt2img(Txt2ImgRequest::default())
         );
         assert_eq!(
             bot.config
@@ -595,7 +676,7 @@ mod tests {
                 .downcast_ref::<StableDiffusionWebUiApi>()
                 .unwrap()
                 .img2img_defaults,
-            Img2ImgRequest::default()
+            default_img2img(Img2ImgRequest::default())
         );
     }
 }
