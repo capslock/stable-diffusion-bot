@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.70"
 async-trait = "0.1.74"
+base64 = "0.21.0"
 comfyui-api = { path = "../comfyui-api" }
 dyn-clone = "1.0.16"
 futures-util = "0.3.29"

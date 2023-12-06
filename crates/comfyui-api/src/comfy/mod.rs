@@ -39,20 +39,22 @@ pub struct NodeOutput {
 /// Higher-level API for interacting with the ComfyUI API.
 #[derive(Clone, Debug)]
 pub struct Comfy {
+    history: HistoryApi,
     prompt: PromptApi,
+    upload: UploadApi,
     view: ViewApi,
     websocket: WebsocketApi,
-    history: HistoryApi,
 }
 
 impl Default for Comfy {
     fn default() -> Self {
         let api = Api::default();
         Self {
+            history: api.history().expect("failed to create history api"),
             prompt: api.prompt().expect("failed to create prompt api"),
+            upload: api.upload().expect("failed to create upload api"),
             view: api.view().expect("failed to create view api"),
             websocket: api.websocket().expect("failed to create websocket api"),
-            history: api.history().expect("failed to create history api"),
         }
     }
 }
@@ -62,10 +64,11 @@ impl Comfy {
     pub fn new() -> anyhow::Result<Self> {
         let api = Api::default();
         Ok(Self {
+            history: api.history()?,
             prompt: api.prompt()?,
+            upload: api.upload()?,
             view: api.view()?,
             websocket: api.websocket()?,
-            history: api.history()?,
         })
     }
 
@@ -84,10 +87,11 @@ impl Comfy {
     {
         let api = Api::new_with_url(url.as_ref())?;
         Ok(Self {
+            history: api.history()?,
             prompt: api.prompt()?,
+            upload: api.upload()?,
             view: api.view()?,
             websocket: api.websocket()?,
-            history: api.history()?,
         })
     }
 
@@ -107,10 +111,11 @@ impl Comfy {
     {
         let api = Api::new_with_client_and_url(client, url.as_ref())?;
         Ok(Self {
+            history: api.history()?,
             prompt: api.prompt()?,
+            upload: api.upload()?,
             view: api.view()?,
             websocket: api.websocket()?,
-            history: api.history()?,
         })
     }
 
@@ -232,6 +237,10 @@ impl Comfy {
             }
         }
         Ok(images)
+    }
+
+    pub async fn upload_file(&self, file: Vec<u8>) -> anyhow::Result<ImageUpload> {
+        self.upload.image(file).await
     }
 }
 
