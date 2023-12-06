@@ -253,7 +253,10 @@ pub(crate) async fn handle_settings_button(
         .await
         .map_err(|e| anyhow!(e))?
         .unwrap_or_else(|| {
-            State::new_with_defaults(cfg.txt2img_api.gen_params(), cfg.img2img_api.gen_params())
+            State::new_with_defaults(
+                cfg.txt2img_api.gen_params(None),
+                cfg.img2img_api.gen_params(None),
+            )
         });
     match &mut state {
         State::Ready {
@@ -346,7 +349,10 @@ pub(crate) fn state_or_default() -> UpdateHandler<anyhow::Error> {
                 error!("Failed to get state: {:?}", err);
             }
             result.ok().flatten().unwrap_or_else(|| {
-                State::new_with_defaults(cfg.txt2img_api.gen_params(), cfg.img2img_api.gen_params())
+                State::new_with_defaults(
+                    cfg.txt2img_api.gen_params(None),
+                    cfg.img2img_api.gen_params(None),
+                )
             })
         },
     )
@@ -435,7 +441,10 @@ pub(crate) fn map_settings() -> UpdateHandler<anyhow::Error> {
         State::Ready {
             txt2img, img2img, ..
         } => (txt2img, img2img),
-        State::New => (cfg.txt2img_api.gen_params(), cfg.img2img_api.gen_params()),
+        State::New => (
+            cfg.txt2img_api.gen_params(None),
+            cfg.img2img_api.gen_params(None),
+        ),
     })
 }
 
@@ -576,7 +585,7 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use sal_e_api::{Img2ImgApi, Response, Txt2ImgApi};
+    use sal_e_api::{Img2ImgApi, Img2ImgParams, Response, Txt2ImgApi, Txt2ImgParams};
     use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
     use teloxide::types::{UpdateKind, User};
 
@@ -655,8 +664,8 @@ mod tests {
                 .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::Ready {
                     bot_state: BotState::SettingsTxt2Img { selection: None },
-                    txt2img: Box::<Txt2ImgRequest>::default(),
-                    img2img: Box::<Img2ImgRequest>::default()
+                    txt2img: Box::<Txt2ImgParams>::default(),
+                    img2img: Box::<Img2ImgParams>::default()
                 }])
                 .await,
             ControlFlow::Break(_)
@@ -670,8 +679,8 @@ mod tests {
                 .endpoint(|| async { anyhow::Ok(()) })
                 .dispatch(dptree::deps![State::Ready {
                     bot_state: BotState::SettingsImg2Img { selection: None },
-                    txt2img: Box::<Txt2ImgRequest>::default(),
-                    img2img: Box::<Img2ImgRequest>::default()
+                    txt2img: Box::<Txt2ImgParams>::default(),
+                    img2img: Box::<Img2ImgParams>::default()
                 }])
                 .await,
             ControlFlow::Break(_)
@@ -700,8 +709,8 @@ mod tests {
                 )
                 .dispatch(dptree::deps![State::Ready {
                     bot_state: BotState::SettingsTxt2Img { selection: None },
-                    txt2img: Box::<Txt2ImgRequest>::default(),
-                    img2img: Box::<Img2ImgRequest>::default()
+                    txt2img: Box::<Txt2ImgParams>::default(),
+                    img2img: Box::<Img2ImgParams>::default()
                 }])
                 .await,
             ControlFlow::Break(_)
@@ -719,8 +728,8 @@ mod tests {
                 )
                 .dispatch(dptree::deps![State::Ready {
                     bot_state: BotState::SettingsImg2Img { selection: None },
-                    txt2img: Box::<Txt2ImgRequest>::default(),
-                    img2img: Box::<Img2ImgRequest>::default()
+                    txt2img: Box::<Txt2ImgParams>::default(),
+                    img2img: Box::<Img2ImgParams>::default()
                 }])
                 .await,
             ControlFlow::Break(_)
@@ -747,8 +756,8 @@ mod tests {
 
     #[async_trait]
     impl Txt2ImgApi for MockApi {
-        fn gen_params(&self) -> Box<dyn GenParams> {
-            Box::<Txt2ImgRequest>::default()
+        fn gen_params(&self, _user_params: Option<&dyn GenParams>) -> Box<dyn GenParams> {
+            Box::<Txt2ImgParams>::default()
         }
 
         async fn txt2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {
@@ -758,8 +767,8 @@ mod tests {
 
     #[async_trait]
     impl Img2ImgApi for MockApi {
-        fn gen_params(&self) -> Box<dyn GenParams> {
-            Box::<Img2ImgRequest>::default()
+        fn gen_params(&self, _user_params: Option<&dyn GenParams>) -> Box<dyn GenParams> {
+            Box::<Img2ImgParams>::default()
         }
 
         async fn img2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {
@@ -776,16 +785,16 @@ mod tests {
                         let txt2img = txt2img
                             .as_ref()
                             .as_any()
-                            .downcast_ref::<Txt2ImgRequest>()
+                            .downcast_ref::<Txt2ImgParams>()
                             .unwrap();
                         let img2img = img2img
                             .as_ref()
                             .as_any()
-                            .downcast_ref::<Img2ImgRequest>()
+                            .downcast_ref::<Img2ImgParams>()
                             .unwrap();
                         assert!(
                             (txt2img, img2img)
-                                == (&Txt2ImgRequest::default(), &Img2ImgRequest::default())
+                                == (&Txt2ImgParams::default(), &Img2ImgParams::default())
                         );
                         anyhow::Ok(())
                     }
@@ -806,13 +815,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_map_settings_ready() {
-        let txt2img = Txt2ImgRequest {
-            negative_prompt: Some("test".to_string()),
-            ..Txt2ImgRequest::default()
+        let txt2img = Txt2ImgParams {
+            user_params: Txt2ImgRequest {
+                negative_prompt: Some("test".to_string()),
+                ..Txt2ImgRequest::default()
+            },
+            defaults: Some(Txt2ImgRequest::default()),
         };
-        let img2img = Img2ImgRequest {
-            negative_prompt: Some("test".to_string()),
-            ..Img2ImgRequest::default()
+        let img2img = Img2ImgParams {
+            user_params: Img2ImgRequest {
+                negative_prompt: Some("test".to_string()),
+                ..Img2ImgRequest::default()
+            },
+            defaults: Some(Img2ImgRequest::default()),
         };
         assert!(matches!(
             map_settings()
@@ -821,23 +836,29 @@ mod tests {
                         let txt2img = txt2img
                             .as_ref()
                             .as_any()
-                            .downcast_ref::<Txt2ImgRequest>()
+                            .downcast_ref::<Txt2ImgParams>()
                             .unwrap();
                         let img2img = img2img
                             .as_ref()
                             .as_any()
-                            .downcast_ref::<Img2ImgRequest>()
+                            .downcast_ref::<Img2ImgParams>()
                             .unwrap();
                         assert!(
                             (txt2img, img2img)
                                 == (
-                                    &Txt2ImgRequest {
-                                        negative_prompt: Some("test".to_string()),
-                                        ..Txt2ImgRequest::default()
+                                    &Txt2ImgParams {
+                                        user_params: Txt2ImgRequest {
+                                            negative_prompt: Some("test".to_string()),
+                                            ..Txt2ImgRequest::default()
+                                        },
+                                        defaults: Some(Txt2ImgRequest::default()),
                                     },
-                                    &Img2ImgRequest {
-                                        negative_prompt: Some("test".to_string()),
-                                        ..Img2ImgRequest::default()
+                                    &Img2ImgParams {
+                                        user_params: Img2ImgRequest {
+                                            negative_prompt: Some("test".to_string()),
+                                            ..Img2ImgRequest::default()
+                                        },
+                                        defaults: Some(Img2ImgRequest::default()),
                                     }
                                 )
                         );
