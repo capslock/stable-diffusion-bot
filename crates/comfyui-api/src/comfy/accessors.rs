@@ -121,3 +121,25 @@ pub(crate) type Cfg = Delegating<CfgT<KSampler>, CfgT<SamplerCustom>, f32, KSamp
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Denoise;
+
+#[derive(Clone, Debug)]
+pub(crate) struct SamplerT<N>
+where
+    N: Node + 'static,
+{
+    pub _phantom: std::marker::PhantomData<N>,
+}
+
+impl<N> Default for SamplerT<N>
+where
+    N: Node + 'static,
+{
+    fn default() -> Self {
+        Self {
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+pub(crate) type Sampler =
+    Delegating<SamplerT<KSampler>, SamplerT<KSamplerSelect>, String, KSampler, KSamplerSelect>;

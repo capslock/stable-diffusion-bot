@@ -1,12 +1,75 @@
 use async_trait::async_trait;
-use comfyui_api::{comfy::getter::*, models::AsAny};
+use comfyui_api::models::AsAny;
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
-use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
+use stable_diffusion_api::{Img2ImgRequest, ImgInfo, Txt2ImgRequest};
 
-#[derive(Debug, Clone, Default)]
-pub struct Image {
-    pub data: Vec<u8>,
+#[derive(Debug, Clone)]
+pub struct Response {
+    pub images: Vec<Vec<u8>>,
+    pub params: Box<dyn ImageParams>,
+    pub gen_params: Box<dyn GenParams>,
+}
+
+dyn_clone::clone_trait_object!(ImageParams);
+
+pub trait ImageParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {
+    fn seed(&self) -> Option<i64>;
+    fn steps(&self) -> Option<u32>;
+    fn cfg(&self) -> Option<f32>;
+    fn width(&self) -> Option<u32>;
+    fn height(&self) -> Option<u32>;
+    fn prompt(&self) -> Option<String>;
+    fn negative_prompt(&self) -> Option<String>;
+    fn denoising(&self) -> Option<f32>;
+    fn model(&self) -> Option<String>;
+    fn sampler(&self) -> Option<String>;
+}
+
+impl ImageParams for comfyui_api::models::Prompt {
+    fn seed(&self) -> Option<i64> {
+        comfyui_api::comfy::SeedExt::seed(self).ok().copied()
+    }
+
+    fn steps(&self) -> Option<u32> {
+        comfyui_api::comfy::StepsExt::steps(self).ok().copied()
+    }
+
+    fn cfg(&self) -> Option<f32> {
+        comfyui_api::comfy::CfgExt::cfg(self).ok().copied()
+    }
+
+    fn width(&self) -> Option<u32> {
+        comfyui_api::comfy::WidthExt::width(self).ok().copied()
+    }
+
+    fn height(&self) -> Option<u32> {
+        comfyui_api::comfy::HeightExt::height(self).ok().copied()
+    }
+
+    fn prompt(&self) -> Option<String> {
+        comfyui_api::comfy::PromptExt::prompt(self).ok().cloned()
+    }
+
+    fn negative_prompt(&self) -> Option<String> {
+        comfyui_api::comfy::NegativePromptExt::negative_prompt(self)
+            .ok()
+            .cloned()
+    }
+
+    fn denoising(&self) -> Option<f32> {
+        comfyui_api::comfy::DenoiseExt::denoise(self).ok().copied()
+    }
+
+    fn model(&self) -> Option<String> {
+        comfyui_api::comfy::ModelExt::ckpt_name(self).ok().cloned()
+    }
+
+    fn sampler(&self) -> Option<String> {
+        comfyui_api::comfy::SamplerExt::sampler_name(self)
+            .ok()
+            .cloned()
+    }
 }
 
 dyn_clone::clone_trait_object!(GenParams);
@@ -50,23 +113,27 @@ pub struct ComfyParams {
 #[typetag::serde]
 impl GenParams for ComfyParams {
     fn seed(&self) -> Option<i64> {
-        (&self.prompt as &dyn SeedExt).seed().ok().copied()
+        comfyui_api::comfy::SeedExt::seed(&self.prompt)
+            .ok()
+            .copied()
     }
 
     fn set_seed(&mut self, seed: i64) {
-        if let Ok(value) = (&mut self.prompt as &mut dyn SeedExt).seed_mut() {
-            *value = seed;
-        }
+        comfyui_api::comfy::SeedExt::seed_mut(&mut self.prompt)
+            .map(|s| *s = seed)
+            .ok();
     }
 
     fn steps(&self) -> Option<u32> {
-        (&self.prompt as &dyn StepsExt).steps().ok().copied()
+        comfyui_api::comfy::StepsExt::steps(&self.prompt)
+            .ok()
+            .copied()
     }
 
     fn set_steps(&mut self, steps: u32) {
-        if let Ok(value) = (&mut self.prompt as &mut dyn StepsExt).steps_mut() {
-            *value = steps;
-        }
+        comfyui_api::comfy::StepsExt::steps_mut(&mut self.prompt)
+            .map(|s| *s = steps)
+            .ok();
     }
 
     fn count(&self) -> Option<u32> {
@@ -78,66 +145,73 @@ impl GenParams for ComfyParams {
     }
 
     fn cfg(&self) -> Option<f32> {
-        (&self.prompt as &dyn CfgExt).cfg().ok().copied()
+        comfyui_api::comfy::CfgExt::cfg(&self.prompt).ok().copied()
     }
 
     fn set_cfg(&mut self, cfg: f32) {
-        if let Ok(value) = (&mut self.prompt as &mut dyn CfgExt).cfg_mut() {
-            *value = cfg;
-        }
+        comfyui_api::comfy::CfgExt::cfg_mut(&mut self.prompt)
+            .map(|s| *s = cfg)
+            .ok();
     }
 
     fn width(&self) -> Option<u32> {
-        (&self.prompt as &dyn WidthExt).width().ok().copied()
+        comfyui_api::comfy::WidthExt::width(&self.prompt)
+            .ok()
+            .copied()
     }
 
     fn set_width(&mut self, width: u32) {
-        if let Ok(value) = (&mut self.prompt as &mut dyn WidthExt).width_mut() {
-            *value = width;
-        }
+        comfyui_api::comfy::WidthExt::width_mut(&mut self.prompt)
+            .map(|s| *s = width)
+            .ok();
     }
 
     fn height(&self) -> Option<u32> {
-        (&self.prompt as &dyn HeightExt).height().ok().copied()
+        comfyui_api::comfy::HeightExt::height(&self.prompt)
+            .ok()
+            .copied()
     }
 
     fn set_height(&mut self, height: u32) {
-        if let Ok(value) = (&mut self.prompt as &mut dyn HeightExt).height_mut() {
-            *value = height;
-        }
+        comfyui_api::comfy::HeightExt::height_mut(&mut self.prompt)
+            .map(|s| *s = height)
+            .ok();
     }
 
     fn prompt(&self) -> Option<String> {
-        (&self.prompt as &dyn PromptExt).prompt().ok().cloned()
+        comfyui_api::comfy::PromptExt::prompt(&self.prompt)
+            .ok()
+            .cloned()
     }
 
     fn set_prompt(&mut self, prompt: String) {
-        if let Ok(p) = (&mut self.prompt as &mut dyn PromptExt).prompt_mut() {
-            *p = prompt;
-        }
+        comfyui_api::comfy::PromptExt::prompt_mut(&mut self.prompt)
+            .map(|s| *s = prompt)
+            .ok();
     }
 
     fn negative_prompt(&self) -> Option<String> {
-        (&self.prompt as &dyn NegativePromptExt)
-            .negative_prompt()
+        comfyui_api::comfy::NegativePromptExt::negative_prompt(&self.prompt)
             .ok()
             .cloned()
     }
 
     fn set_negative_prompt(&mut self, negative_prompt: String) {
-        if let Ok(p) = (&mut self.prompt as &mut dyn NegativePromptExt).negative_prompt_mut() {
-            *p = negative_prompt;
-        }
+        comfyui_api::comfy::NegativePromptExt::negative_prompt_mut(&mut self.prompt)
+            .map(|s| *s = negative_prompt)
+            .ok();
     }
 
     fn denoising(&self) -> Option<f32> {
-        (&self.prompt as &dyn DenoiseExt).denoise().ok().copied()
+        comfyui_api::comfy::DenoiseExt::denoise(&self.prompt)
+            .ok()
+            .copied()
     }
 
     fn set_denoising(&mut self, denoising: f32) {
-        if let Ok(value) = (&mut self.prompt as &mut dyn DenoiseExt).denoise_mut() {
-            *value = denoising;
-        }
+        comfyui_api::comfy::DenoiseExt::denoise_mut(&mut self.prompt)
+            .map(|s| *s = denoising)
+            .ok();
     }
 }
 
@@ -164,7 +238,7 @@ dyn_clone::clone_trait_object!(Txt2ImgApi);
 /// Struct representing a connection to a Stable Diffusion API.
 #[async_trait]
 pub trait Txt2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
-    async fn txt2img(&self, config: &dyn GenParams) -> anyhow::Result<Vec<Image>>;
+    async fn txt2img(&self, config: &dyn GenParams) -> anyhow::Result<Response>;
 
     fn gen_params(&self) -> Box<dyn GenParams>;
 }
@@ -174,23 +248,21 @@ dyn_clone::clone_trait_object!(Img2ImgApi);
 /// Struct representing a connection to a Stable Diffusion API.
 #[async_trait]
 pub trait Img2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
-    async fn img2img(&self, config: &dyn GenParams) -> anyhow::Result<Vec<Image>>;
+    async fn img2img(&self, config: &dyn GenParams) -> anyhow::Result<Response>;
 
     fn gen_params(&self) -> Box<dyn GenParams>;
 }
 
 #[async_trait]
 impl Txt2ImgApi for ComfyPromptApi {
-    async fn txt2img(&self, config: &dyn GenParams) -> anyhow::Result<Vec<Image>> {
-        let config = config
-            .as_any()
-            .downcast_ref()
-            .unwrap_or(&self.params.prompt);
-        let images = self.client.execute_prompt(config).await?;
-        Ok(images
-            .into_iter()
-            .map(|image| Image { data: image.image })
-            .collect())
+    async fn txt2img(&self, config: &dyn GenParams) -> anyhow::Result<Response> {
+        let prompt = config.as_any().downcast_ref().unwrap_or(&self.params);
+        let images = self.client.execute_prompt(&prompt.prompt).await?;
+        Ok(Response {
+            images: images.into_iter().map(|image| image.image).collect(),
+            params: Box::new(prompt.prompt.clone()),
+            gen_params: Box::new(prompt.clone()),
+        })
     }
 
     fn gen_params(&self) -> Box<dyn GenParams> {
@@ -200,16 +272,14 @@ impl Txt2ImgApi for ComfyPromptApi {
 
 #[async_trait]
 impl Img2ImgApi for ComfyPromptApi {
-    async fn img2img(&self, config: &dyn GenParams) -> anyhow::Result<Vec<Image>> {
-        let config = config
-            .as_any()
-            .downcast_ref()
-            .unwrap_or(&self.params.prompt);
-        let images = self.client.execute_prompt(config).await?;
-        Ok(images
-            .into_iter()
-            .map(|image| Image { data: image.image })
-            .collect())
+    async fn img2img(&self, config: &dyn GenParams) -> anyhow::Result<Response> {
+        let prompt = config.as_any().downcast_ref().unwrap_or(&self.params);
+        let images = self.client.execute_prompt(&prompt.prompt).await?;
+        Ok(Response {
+            images: images.into_iter().map(|image| image.image).collect(),
+            params: Box::new(prompt.prompt.clone()),
+            gen_params: Box::new(prompt.clone()),
+        })
     }
 
     fn gen_params(&self) -> Box<dyn GenParams> {
@@ -382,18 +452,19 @@ impl StableDiffusionWebUiApi {
 
 #[async_trait]
 impl Txt2ImgApi for StableDiffusionWebUiApi {
-    async fn txt2img(&self, config: &dyn GenParams) -> anyhow::Result<Vec<Image>> {
+    async fn txt2img(&self, config: &dyn GenParams) -> anyhow::Result<Response> {
         let config = config
             .as_any()
             .downcast_ref()
             .unwrap_or(&self.txt2img_defaults);
         let txt2img = self.client.txt2img()?;
         let resp = txt2img.send(config).await?;
-        Ok(resp
-            .images()?
-            .into_iter()
-            .map(|image| Image { data: image })
-            .collect())
+        let params = Box::new(resp.info()?);
+        Ok(Response {
+            images: resp.images()?,
+            params: params.clone(),
+            gen_params: Box::new(resp.parameters.clone()),
+        })
     }
 
     fn gen_params(&self) -> Box<dyn GenParams> {
@@ -403,21 +474,64 @@ impl Txt2ImgApi for StableDiffusionWebUiApi {
 
 #[async_trait]
 impl Img2ImgApi for StableDiffusionWebUiApi {
-    async fn img2img(&self, config: &dyn GenParams) -> anyhow::Result<Vec<Image>> {
+    async fn img2img(&self, config: &dyn GenParams) -> anyhow::Result<Response> {
         let config = config
             .as_any()
             .downcast_ref()
             .unwrap_or(&self.img2img_defaults);
         let img2img = self.client.img2img()?;
         let resp = img2img.send(config).await?;
-        Ok(resp
-            .images()?
-            .into_iter()
-            .map(|image| Image { data: image })
-            .collect())
+        let params = Box::new(resp.info()?);
+        Ok(Response {
+            images: resp.images()?,
+            params: params.clone(),
+            gen_params: Box::new(resp.parameters.clone()),
+        })
     }
 
     fn gen_params(&self) -> Box<dyn GenParams> {
         Box::new(self.img2img_defaults.clone())
+    }
+}
+
+impl ImageParams for ImgInfo {
+    fn seed(&self) -> Option<i64> {
+        self.seed
+    }
+
+    fn steps(&self) -> Option<u32> {
+        self.steps
+    }
+
+    fn cfg(&self) -> Option<f32> {
+        self.cfg_scale.map(|c| c as f32)
+    }
+
+    fn width(&self) -> Option<u32> {
+        self.width.map(|w| w as u32)
+    }
+
+    fn height(&self) -> Option<u32> {
+        self.height.map(|h| h as u32)
+    }
+
+    fn prompt(&self) -> Option<String> {
+        self.prompt.clone()
+    }
+
+    fn negative_prompt(&self) -> Option<String> {
+        self.negative_prompt.clone()
+    }
+
+    fn denoising(&self) -> Option<f32> {
+        self.denoising_strength.map(|d| d as f32)
+    }
+
+    fn model(&self) -> Option<String> {
+        self.sd_model_name.clone()
+    }
+
+    fn sampler(&self) -> Option<String> {
+        self.sampler_name.clone()
     }
 }
