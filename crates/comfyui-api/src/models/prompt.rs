@@ -247,7 +247,7 @@ pub struct KSampler {
     /// The seed.
     pub seed: Input<i64>,
     /// The number of steps.
-    pub steps: Input<i32>,
+    pub steps: Input<u32>,
     /// The positive conditioning input connection.
     pub positive: NodeConnection,
     /// The negative conditioning input connection.

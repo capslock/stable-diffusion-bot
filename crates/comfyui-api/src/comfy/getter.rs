@@ -5,7 +5,7 @@ use anyhow::{anyhow, Context};
 use crate::models::*;
 use crate::{comfy::visitor::FindNode, comfy::Visitor};
 
-use super::setter;
+use super::accessors;
 
 /// A trait for setting values on nodes.
 pub trait Getter<T, N>
@@ -309,7 +309,61 @@ pub(crate) fn find_output_node(prompt: &Prompt) -> Option<String> {
         .next()
 }
 
-impl Getter<String, CLIPTextEncode> for setter::Prompt {
+#[macro_export]
+macro_rules! create_getter {
+    ($ValueType:ty, $NodeType:ty, $AccessorType:ty, $field_name:ident) => {
+        impl Getter<$ValueType, $NodeType> for $AccessorType {
+            fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a $ValueType> {
+                as_node::<$NodeType>(node)
+                    .context(concat!("Failed to cast node to ", stringify!($NodeType)))?
+                    .$field_name
+                    .value()
+                    .context(concat!(
+                        "Failed to get ",
+                        stringify!($getter_name),
+                        " value"
+                    ))
+            }
+
+            fn get_value_mut<'a>(
+                &self,
+                node: &'a mut dyn Node,
+            ) -> anyhow::Result<&'a mut $ValueType> {
+                as_node_mut::<$NodeType>(node)
+                    .context(concat!("Failed to cast node to ", stringify!($NodeType)))?
+                    .$field_name
+                    .value_mut()
+                    .context(concat!(
+                        "Failed to get ",
+                        stringify!($getter_name),
+                        " value"
+                    ))
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! create_ext_trait {
+    ($ValueType:ty, $AccessorType:ty, $getter_name:ident, $getter_name_mut:ident, $TraitName:ident) => {
+        pub trait $TraitName {
+            fn $getter_name(&self) -> anyhow::Result<&$ValueType>;
+            fn $getter_name_mut(&mut self) -> anyhow::Result<&mut $ValueType>;
+        }
+
+        impl $TraitName for Prompt {
+            fn $getter_name(&self) -> anyhow::Result<&$ValueType> {
+                self.get::<$AccessorType>()
+            }
+
+            fn $getter_name_mut(&mut self) -> anyhow::Result<&mut $ValueType> {
+                self.get_mut::<$AccessorType>()
+            }
+        }
+    };
+}
+
+impl Getter<String, CLIPTextEncode> for accessors::Prompt {
     fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a String> {
         as_node::<CLIPTextEncode>(node)
             .context("Failed to cast node")?
@@ -348,21 +402,21 @@ pub trait PromptExt {
 
 impl PromptExt for Prompt {
     fn prompt(&self) -> anyhow::Result<&String> {
-        self.get::<setter::Prompt>()
+        self.get::<accessors::Prompt>()
     }
 
     fn prompt_mut(&mut self) -> anyhow::Result<&mut String> {
-        self.get_mut::<setter::Prompt>()
+        self.get_mut::<accessors::Prompt>()
     }
 }
 
-impl Getter<String, CLIPTextEncode> for setter::NegativePrompt {
+impl Getter<String, CLIPTextEncode> for accessors::NegativePrompt {
     fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a String> {
-        setter::Prompt::default().get_value(node)
+        accessors::Prompt.get_value(node)
     }
 
     fn get_value_mut<'a>(&self, node: &'a mut dyn Node) -> anyhow::Result<&'a mut String> {
-        setter::Prompt::default().get_value_mut(node)
+        accessors::Prompt.get_value_mut(node)
     }
 
     fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
@@ -387,150 +441,44 @@ pub trait NegativePromptExt {
 
 impl NegativePromptExt for Prompt {
     fn negative_prompt(&self) -> anyhow::Result<&String> {
-        self.get::<setter::NegativePrompt>()
+        self.get::<accessors::NegativePrompt>()
     }
 
     fn negative_prompt_mut(&mut self) -> anyhow::Result<&mut String> {
-        self.get_mut::<setter::NegativePrompt>()
+        self.get_mut::<accessors::NegativePrompt>()
     }
 }
 
-impl Getter<String, CheckpointLoaderSimple> for setter::Model {
-    fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a String> {
-        as_node::<CheckpointLoaderSimple>(node)
-            .context("Failed to cast node")?
-            .ckpt_name
-            .value()
-            .context("Failed to get ckpt_name value")
-    }
+create_getter!(String, CheckpointLoaderSimple, accessors::Model, ckpt_name);
+create_ext_trait!(String, accessors::Model, ckpt_name, ckpt_name_mut, ModelExt);
 
-    fn get_value_mut<'a>(&self, node: &'a mut dyn Node) -> anyhow::Result<&'a mut String> {
-        as_node_mut::<CheckpointLoaderSimple>(node)
-            .context("Failed to cast node")?
-            .ckpt_name
-            .value_mut()
-            .context("Failed to get ckpt_name value")
-    }
-}
+create_getter!(u32, EmptyLatentImage, accessors::Width, width);
+create_ext_trait!(u32, accessors::Width, width, width_mut, WidthExt);
 
-pub trait ModelExt {
-    fn model(&self) -> anyhow::Result<&String>;
-    fn model_mut(&mut self) -> anyhow::Result<&mut String>;
-}
+create_getter!(u32, EmptyLatentImage, accessors::Height, height);
+create_ext_trait!(u32, accessors::Height, height, height_mut, HeightExt);
 
-impl ModelExt for Prompt {
-    fn model(&self) -> anyhow::Result<&String> {
-        self.get::<setter::Model>()
-    }
+create_getter!(i64, KSampler, accessors::SeedT<KSampler>, seed);
+create_getter!(
+    i64,
+    SamplerCustom,
+    accessors::SeedT<SamplerCustom>,
+    noise_seed
+);
 
-    fn model_mut(&mut self) -> anyhow::Result<&mut String> {
-        self.get_mut::<setter::Model>()
-    }
-}
+create_ext_trait!(i64, accessors::Seed, seed, seed_mut, SeedExt);
 
-impl Getter<u32, EmptyLatentImage> for setter::Width {
-    fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a u32> {
-        as_node::<EmptyLatentImage>(node)
-            .context("Failed to cast node")?
-            .width
-            .value()
-            .context("Failed to get width value")
-    }
+create_getter!(u32, KSampler, accessors::StepsT<KSampler>, steps);
+create_getter!(
+    u32,
+    SDTurboScheduler,
+    accessors::StepsT<SDTurboScheduler>,
+    steps
+);
 
-    fn get_value_mut<'a>(&self, node: &'a mut dyn Node) -> anyhow::Result<&'a mut u32> {
-        as_node_mut::<EmptyLatentImage>(node)
-            .context("Failed to cast node")?
-            .width
-            .value_mut()
-            .context("Failed to get width value")
-    }
-}
+create_ext_trait!(u32, accessors::Steps, steps, steps_mut, StepsExt);
 
-pub trait WidthExt {
-    fn width(&self) -> anyhow::Result<u32>;
-    fn set_width(&mut self, width: u32) -> anyhow::Result<()>;
-}
-
-impl WidthExt for Prompt {
-    fn width(&self) -> anyhow::Result<u32> {
-        self.get::<setter::Width>().map(|x| *x)
-    }
-
-    fn set_width(&mut self, width: u32) -> anyhow::Result<()> {
-        self.get_mut::<setter::Width>().map(|x| *x = width)
-    }
-}
-
-impl Getter<u32, EmptyLatentImage> for setter::Height {
-    fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a u32> {
-        as_node::<EmptyLatentImage>(node)
-            .context("Failed to cast node")?
-            .height
-            .value()
-            .context("Failed to get height value")
-    }
-
-    fn get_value_mut<'a>(&self, node: &'a mut dyn Node) -> anyhow::Result<&'a mut u32> {
-        as_node_mut::<EmptyLatentImage>(node)
-            .context("Failed to cast node")?
-            .height
-            .value_mut()
-            .context("Failed to get height value")
-    }
-}
-
-pub trait HeightExt {
-    fn height(&self) -> anyhow::Result<u32>;
-    fn set_height(&mut self, height: u32) -> anyhow::Result<()>;
-}
-
-impl HeightExt for Prompt {
-    fn height(&self) -> anyhow::Result<u32> {
-        self.get::<setter::Height>().map(|x| *x)
-    }
-
-    fn set_height(&mut self, height: u32) -> anyhow::Result<()> {
-        self.get_mut::<setter::Height>().map(|x| *x = height)
-    }
-}
-
-impl Getter<i64, KSampler> for setter::SeedT<KSampler> {
-    fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a i64> {
-        as_node::<KSampler>(node)
-            .context("Failed to cast node")?
-            .seed
-            .value()
-            .context("Failed to get seed value")
-    }
-
-    fn get_value_mut<'a>(&self, node: &'a mut dyn Node) -> anyhow::Result<&'a mut i64> {
-        as_node_mut::<KSampler>(node)
-            .context("Failed to cast node")?
-            .seed
-            .value_mut()
-            .context("Failed to get seed value")
-    }
-}
-
-impl Getter<i64, SamplerCustom> for setter::SeedT<SamplerCustom> {
-    fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a i64> {
-        as_node::<SamplerCustom>(node)
-            .context("Failed to cast node")?
-            .noise_seed
-            .value()
-            .context("Failed to get seed value")
-    }
-
-    fn get_value_mut<'a>(&self, node: &'a mut dyn Node) -> anyhow::Result<&'a mut i64> {
-        as_node_mut::<SamplerCustom>(node)
-            .context("Failed to cast node")?
-            .noise_seed
-            .value_mut()
-            .context("Failed to get seed value")
-    }
-}
-
-impl<S1, S2, T, N1, N2> Getter<T, N1> for setter::Delegating<S1, S2, T, N1, N2>
+impl<S1, S2, T, N1, N2> Getter<T, N1> for accessors::Delegating<S1, S2, T, N1, N2>
 where
     S1: Getter<T, N1>,
     S2: Getter<T, N2>,
@@ -613,17 +561,10 @@ where
     }
 }
 
-pub trait SeedExt {
-    fn seed(&self) -> anyhow::Result<i64>;
-    fn set_seed(&mut self, seed: i64) -> anyhow::Result<()>;
-}
+create_getter!(f32, KSampler, accessors::CfgT<KSampler>, cfg);
+create_getter!(f32, SamplerCustom, accessors::CfgT<SamplerCustom>, cfg);
 
-impl SeedExt for Prompt {
-    fn seed(&self) -> anyhow::Result<i64> {
-        self.get::<setter::Seed>().map(|x| *x)
-    }
+create_ext_trait!(f32, accessors::Cfg, cfg, cfg_mut, CfgExt);
 
-    fn set_seed(&mut self, seed: i64) -> anyhow::Result<()> {
-        self.get_mut::<setter::Seed>().map(|x| *x = seed)
-    }
-}
+create_getter!(f32, KSampler, accessors::Denoise, denoise);
+create_ext_trait!(f32, accessors::Denoise, denoise, denoise_mut, DenoiseExt);
