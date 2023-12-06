@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use itertools::Itertools as _;
 use sal_e_api::GenParams;
 use teloxide::{
     dispatching::UpdateHandler,
@@ -30,95 +31,97 @@ pub(crate) enum SettingsCommands {
 #[allow(dead_code)]
 pub(crate) struct Settings {
     // Number of sampling steps.
-    pub steps: u32,
+    pub steps: Option<u32>,
     // Random seed.
-    pub seed: i64,
+    pub seed: Option<i64>,
     // Number of images to generate per batch.
-    pub batch_size: u32,
+    pub batch_size: Option<u32>,
     // Number of batches of images to generate.
-    pub n_iter: u32,
+    pub n_iter: Option<u32>,
     // CFG scale.
-    pub cfg_scale: f32,
+    pub cfg_scale: Option<f32>,
     // Image width.
-    pub width: u32,
+    pub width: Option<u32>,
     // Image height.
-    pub height: u32,
+    pub height: Option<u32>,
     // Negative prompt.
-    pub negative_prompt: String,
+    pub negative_prompt: Option<String>,
     // Denoising strength. Only used for img2img.
     pub denoising_strength: Option<f32>,
     // Sampler name.
-    pub sampler_index: String,
+    pub sampler_index: Option<String>,
 }
 
 impl Settings {
     /// Build an inline keyboard to configure settings.
     pub fn keyboard(&self) -> InlineKeyboardMarkup {
-        let keyboard = InlineKeyboardMarkup::new([
+        InlineKeyboardMarkup::new(
             [
-                InlineKeyboardButton::callback(format!("Steps: {}", self.steps), "settings_steps"),
-                InlineKeyboardButton::callback(format!("Seed: {}", self.seed), "settings_seed"),
-            ],
-            [
-                InlineKeyboardButton::callback(
-                    format!("Batch Count: {}", self.n_iter),
-                    "settings_count",
-                ),
-                InlineKeyboardButton::callback(
-                    format!("CFG Scale: {}", self.cfg_scale),
-                    "settings_cfg",
-                ),
-            ],
-            [
-                InlineKeyboardButton::callback(format!("Width: {}", self.width), "settings_width"),
-                InlineKeyboardButton::callback(
-                    format!("Height: {}", self.height),
-                    "settings_height",
-                ),
-            ],
-        ]);
-
-        if let Some(d) = self.denoising_strength {
-            keyboard.append_row([
-                InlineKeyboardButton::callback("Negative Prompt".to_owned(), "settings_negative"),
-                InlineKeyboardButton::callback(
-                    format!("Denoising Strength: {d}"),
-                    "settings_denoising",
-                ),
-            ])
-        } else {
-            keyboard.append_row([
-                InlineKeyboardButton::callback("Negative Prompt".to_owned(), "settings_negative"),
-                InlineKeyboardButton::callback("Cancel".to_owned(), "settings_back"),
-            ])
-        }
+                self.steps.map(|steps| {
+                    InlineKeyboardButton::callback(format!("Steps: {}", steps), "settings_steps")
+                }),
+                self.seed.map(|seed| {
+                    InlineKeyboardButton::callback(format!("Seed: {}", seed), "settings_seed")
+                }),
+                self.n_iter.map(|n_iter| {
+                    InlineKeyboardButton::callback(
+                        format!("Batch Count: {}", n_iter),
+                        "settings_count",
+                    )
+                }),
+                self.cfg_scale.map(|cfg_scale| {
+                    InlineKeyboardButton::callback(
+                        format!("CFG Scale: {}", cfg_scale),
+                        "settings_cfg",
+                    )
+                }),
+                self.width.map(|width| {
+                    InlineKeyboardButton::callback(format!("Width: {}", width), "settings_width")
+                }),
+                self.height.map(|height| {
+                    InlineKeyboardButton::callback(format!("Height: {}", height), "settings_height")
+                }),
+                self.negative_prompt.as_ref().map(|_| {
+                    InlineKeyboardButton::callback(
+                        "Negative Prompt".to_owned(),
+                        "settings_negative",
+                    )
+                }),
+                self.denoising_strength.map(|denoising_strength| {
+                    InlineKeyboardButton::callback(
+                        format!("Denoising Strength: {}", denoising_strength),
+                        "settings_denoising",
+                    )
+                }),
+                Some(InlineKeyboardButton::callback(
+                    "Cancel".to_owned(),
+                    "settings_back",
+                )),
+            ]
+            .into_iter()
+            .flatten()
+            .chunks(2)
+            .into_iter()
+            .map(Iterator::collect)
+            .collect::<Vec<Vec<_>>>(),
+        )
     }
 }
 
-impl TryFrom<&dyn GenParams> for Settings {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &dyn GenParams) -> Result<Self, Self::Error> {
-        Ok(Self {
-            steps: value.steps().ok_or_else(|| anyhow!("Missing steps!"))?,
-            seed: value.seed().ok_or_else(|| anyhow!("Missing seed!"))?,
-            batch_size: value
-                .batch_size()
-                .ok_or_else(|| anyhow!("Missing batch_size!"))?,
-            n_iter: value.count().ok_or_else(|| anyhow!("Missing n_iter!"))?,
-            cfg_scale: value.cfg().ok_or_else(|| anyhow!("Missing cfg_scale!"))?,
-            width: value.width().ok_or_else(|| anyhow!("Missing width!"))?,
-            height: value.height().ok_or_else(|| anyhow!("Missing height!"))?,
-            negative_prompt: value
-                .negative_prompt()
-                .clone()
-                .ok_or_else(|| anyhow!("Missing negative_prompt!"))?,
+impl From<&dyn GenParams> for Settings {
+    fn from(value: &dyn GenParams) -> Self {
+        Self {
+            steps: value.steps(),
+            seed: value.seed(),
+            batch_size: value.batch_size(),
+            n_iter: value.count(),
+            cfg_scale: value.cfg(),
+            width: value.width(),
+            height: value.height(),
+            negative_prompt: value.negative_prompt().clone(),
             denoising_strength: value.denoising(),
-            sampler_index: value
-                .sampler()
-                .clone()
-                .ok_or_else(|| anyhow!("Missing sampler_index!"))?,
-        })
+            sampler_index: value.sampler().clone(),
+        }
     }
 }
 
@@ -155,7 +158,7 @@ pub(crate) async fn handle_settings(
     parent: Message,
 ) -> anyhow::Result<()> {
     let settings = if parent.photo().is_some() {
-        let settings = Settings::try_from(img2img.as_ref())?;
+        let settings = Settings::from(img2img.as_ref());
         dialogue
             .update(State::Ready {
                 bot_state: BotState::SettingsImg2Img { selection: None },
@@ -166,7 +169,7 @@ pub(crate) async fn handle_settings(
             .map_err(|e| anyhow!(e))?;
         settings
     } else if parent.text().is_some() {
-        let settings = Settings::try_from(txt2img.as_ref())?;
+        let settings = Settings::from(txt2img.as_ref());
         dialogue
             .update(State::Ready {
                 bot_state: BotState::SettingsTxt2Img { selection: None },
@@ -386,7 +389,7 @@ pub(crate) async fn handle_txt2img_settings_value(
         bot,
         dialogue,
         msg.chat.id,
-        Settings::try_from(txt2img.as_ref())?,
+        Settings::from(txt2img.as_ref()),
         State::Ready {
             bot_state,
             txt2img,
@@ -417,7 +420,7 @@ pub(crate) async fn handle_img2img_settings_value(
         bot,
         dialogue,
         msg.chat.id,
-        Settings::try_from(img2img.as_ref())?,
+        Settings::from(img2img.as_ref()),
         State::Ready {
             bot_state,
             txt2img,
@@ -442,7 +445,7 @@ async fn handle_img2img_settings_command(
     dialogue: DiffusionDialogue,
     (txt2img, img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
 ) -> anyhow::Result<()> {
-    let settings = Settings::try_from(img2img.as_ref())?;
+    let settings = Settings::from(img2img.as_ref());
     dialogue
         .update(State::Ready {
             bot_state: BotState::SettingsImg2Img { selection: None },
@@ -464,7 +467,7 @@ async fn handle_txt2img_settings_command(
     dialogue: DiffusionDialogue,
     (txt2img, img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
 ) -> anyhow::Result<()> {
-    let settings = Settings::try_from(txt2img.as_ref())?;
+    let settings = Settings::from(txt2img.as_ref());
     dialogue
         .update(State::Ready {
             bot_state: BotState::SettingsTxt2Img { selection: None },

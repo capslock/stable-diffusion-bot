@@ -14,6 +14,7 @@ clap = { version = "4.4.7", features = ["derive"] }
 comfyui-api = { path = "../comfyui-api" }
 figment = { version = "0.10.8", features = ["toml", "env"] }
 futures = "0.3.28"
+itertools = "0.12.0"
 lazy_static = "1.4.0"
 regex = "1"
 reqwest = { version = "0.11.14", features = ["json"] }
