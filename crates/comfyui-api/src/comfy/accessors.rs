@@ -143,3 +143,6 @@ where
 
 pub(crate) type Sampler =
     Delegating<SamplerT<KSampler>, SamplerT<KSamplerSelect>, String, KSampler, KSamplerSelect>;
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct BatchSize;

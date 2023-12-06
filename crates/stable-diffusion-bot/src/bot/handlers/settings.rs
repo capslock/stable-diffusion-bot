@@ -1,6 +1,5 @@
-use anyhow::{anyhow, Context as _};
+use anyhow::anyhow;
 use sal_e_api::GenParams;
-use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
@@ -39,21 +38,15 @@ pub(crate) struct Settings {
     // Number of batches of images to generate.
     pub n_iter: u32,
     // CFG scale.
-    pub cfg_scale: f64,
+    pub cfg_scale: f32,
     // Image width.
     pub width: u32,
     // Image height.
     pub height: u32,
     // Negative prompt.
     pub negative_prompt: String,
-    // Styles to apply.
-    pub styles: Vec<String>,
-    // Whether to run a restore faces pass.
-    pub restore_faces: bool,
-    // Enable or disable image tiling.
-    pub tiling: bool,
     // Denoising strength. Only used for img2img.
-    pub denoising_strength: Option<f64>,
+    pub denoising_strength: Option<f32>,
     // Sampler name.
     pub sampler_index: String,
 }
@@ -83,140 +76,49 @@ impl Settings {
                     "settings_height",
                 ),
             ],
-            [
-                InlineKeyboardButton::callback("Negative Prompt".to_owned(), "settings_negative"),
-                InlineKeyboardButton::callback("Styles".to_owned(), "settings_styles"),
-            ],
-            [
-                InlineKeyboardButton::callback(
-                    format!("Tiling: {}", self.tiling),
-                    "settings_tiling",
-                ),
-                InlineKeyboardButton::callback(
-                    format!("Restore Faces: {}", self.restore_faces),
-                    "settings_faces",
-                ),
-            ],
         ]);
 
         if let Some(d) = self.denoising_strength {
             keyboard.append_row([
+                InlineKeyboardButton::callback("Negative Prompt".to_owned(), "settings_negative"),
                 InlineKeyboardButton::callback(
                     format!("Denoising Strength: {d}"),
                     "settings_denoising",
                 ),
-                InlineKeyboardButton::callback("Cancel".to_owned(), "settings_back"),
             ])
         } else {
-            keyboard.append_row([InlineKeyboardButton::callback(
-                "Cancel".to_owned(),
-                "settings_back",
-            )])
+            keyboard.append_row([
+                InlineKeyboardButton::callback("Negative Prompt".to_owned(), "settings_negative"),
+                InlineKeyboardButton::callback("Cancel".to_owned(), "settings_back"),
+            ])
         }
     }
 }
 
-// TODO FIXME: Proper implementation without downcast.
 impl TryFrom<&dyn GenParams> for Settings {
     type Error = anyhow::Error;
 
     fn try_from(value: &dyn GenParams) -> Result<Self, Self::Error> {
-        Settings::try_from(
-            value
-                .as_any()
-                .downcast_ref::<Txt2ImgRequest>()
-                .context("Failed to downcast")?,
-        )
-    }
-}
-
-impl TryFrom<&Txt2ImgRequest> for Settings {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &Txt2ImgRequest) -> Result<Self, Self::Error> {
         Ok(Self {
-            steps: value.steps.ok_or_else(|| anyhow!("Missing steps!"))?,
-            seed: value.seed.ok_or_else(|| anyhow!("Missing seed!"))?,
+            steps: value.steps().ok_or_else(|| anyhow!("Missing steps!"))?,
+            seed: value.seed().ok_or_else(|| anyhow!("Missing seed!"))?,
             batch_size: value
-                .batch_size
+                .batch_size()
                 .ok_or_else(|| anyhow!("Missing batch_size!"))?,
-            n_iter: value.n_iter.ok_or_else(|| anyhow!("Missing n_iter!"))?,
-            cfg_scale: value
-                .cfg_scale
-                .ok_or_else(|| anyhow!("Missing cfg_scale!"))?,
-            width: value.width.ok_or_else(|| anyhow!("Missing width!"))?,
-            height: value.height.ok_or_else(|| anyhow!("Missing height!"))?,
+            n_iter: value.count().ok_or_else(|| anyhow!("Missing n_iter!"))?,
+            cfg_scale: value.cfg().ok_or_else(|| anyhow!("Missing cfg_scale!"))?,
+            width: value.width().ok_or_else(|| anyhow!("Missing width!"))?,
+            height: value.height().ok_or_else(|| anyhow!("Missing height!"))?,
             negative_prompt: value
-                .negative_prompt
+                .negative_prompt()
                 .clone()
                 .ok_or_else(|| anyhow!("Missing negative_prompt!"))?,
-            styles: value
-                .styles
-                .clone()
-                .ok_or_else(|| anyhow!("Missing styles!"))?,
-            restore_faces: value
-                .restore_faces
-                .ok_or_else(|| anyhow!("Missing restore_faces!"))?,
-            tiling: value.tiling.ok_or_else(|| anyhow!("Missing tiling!"))?,
-            denoising_strength: value.denoising_strength,
+            denoising_strength: value.denoising(),
             sampler_index: value
-                .sampler_index
+                .sampler()
                 .clone()
                 .ok_or_else(|| anyhow!("Missing sampler_index!"))?,
         })
-    }
-}
-
-impl TryFrom<Txt2ImgRequest> for Settings {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Txt2ImgRequest) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
-}
-
-impl TryFrom<&Img2ImgRequest> for Settings {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &Img2ImgRequest) -> Result<Self, Self::Error> {
-        Ok(Self {
-            steps: value.steps.ok_or_else(|| anyhow!("Missing steps!"))?,
-            seed: value.seed.ok_or_else(|| anyhow!("Missing seed!"))?,
-            batch_size: value
-                .batch_size
-                .ok_or_else(|| anyhow!("Missing batch_size!"))?,
-            n_iter: value.n_iter.ok_or_else(|| anyhow!("Missing n_iter!"))?,
-            cfg_scale: value
-                .cfg_scale
-                .ok_or_else(|| anyhow!("Missing cfg_scale!"))?,
-            width: value.width.ok_or_else(|| anyhow!("Missing width!"))?,
-            height: value.height.ok_or_else(|| anyhow!("Missing height!"))?,
-            negative_prompt: value
-                .negative_prompt
-                .clone()
-                .ok_or_else(|| anyhow!("Missing negative_prompt!"))?,
-            styles: value
-                .styles
-                .clone()
-                .ok_or_else(|| anyhow!("Missing styles!"))?,
-            restore_faces: value
-                .restore_faces
-                .ok_or_else(|| anyhow!("Missing restore_faces!"))?,
-            tiling: value.tiling.ok_or_else(|| anyhow!("Missing tiling!"))?,
-            denoising_strength: value.denoising_strength,
-            sampler_index: value
-                .sampler_index
-                .clone()
-                .ok_or_else(|| anyhow!("Missing sampler_index!"))?,
-        })
-    }
-}
-
-impl TryFrom<Img2ImgRequest> for Settings {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Img2ImgRequest) -> Result<Self, Self::Error> {
-        Self::try_from(&value)
     }
 }
 
@@ -826,7 +728,7 @@ mod tests {
         assert!(matches!(
             filter_map_settings_state()
                 .endpoint(
-                    |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async {
+                    |(_, _, _): (Option<String>, &dyn GenParams, &dyn GenParams)| async {
                         anyhow::Ok(())
                     }
                 )
