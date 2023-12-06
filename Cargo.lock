@@ -1886,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "stable-diffusion-api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
@@ -1898,7 +1898,7 @@ dependencies = [
 
 [[package]]
 name = "stable-diffusion-bot"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
