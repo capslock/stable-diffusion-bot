@@ -1,6 +1,9 @@
 use anyhow::Context;
 use async_trait::async_trait;
-use comfyui_api::{comfy::LoadImageExt, models::AsAny};
+use comfyui_api::{
+    comfy::{LoadImageExt, SeedExt},
+    models::AsAny,
+};
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use stable_diffusion_api::{Img2ImgRequest, ImgInfo, Txt2ImgRequest};
@@ -303,12 +306,19 @@ pub trait Img2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
 #[async_trait]
 impl Txt2ImgApi for ComfyPromptApi {
     async fn txt2img(&self, config: &dyn GenParams) -> anyhow::Result<Response> {
-        let prompt = config.as_any().downcast_ref().unwrap_or(&self.params);
-        let images = self.client.execute_prompt(&prompt.prompt).await?;
+        let base_prompt = config.as_any().downcast_ref().unwrap_or(&self.params);
+
+        let mut prompt = base_prompt.prompt.clone();
+
+        if let Ok(-1) = comfyui_api::comfy::SeedExt::seed(&prompt) {
+            *prompt.seed_mut().unwrap() = rand::random::<i64>().abs();
+        }
+
+        let images = self.client.execute_prompt(&prompt).await?;
         Ok(Response {
             images: images.into_iter().map(|image| image.image).collect(),
-            params: Box::new(prompt.prompt.clone()),
-            gen_params: Box::new(prompt.clone()),
+            params: Box::new(prompt),
+            gen_params: Box::new(base_prompt.clone()),
         })
     }
 
@@ -335,10 +345,14 @@ impl Img2ImgApi for ComfyPromptApi {
 
         *LoadImageExt::image_mut(&mut prompt)? = resp.name;
 
+        if let Ok(-1) = comfyui_api::comfy::SeedExt::seed(&prompt) {
+            *prompt.seed_mut().unwrap() = rand::random::<i64>().abs();
+        }
+
         let images = self.client.execute_prompt(&prompt).await?;
         Ok(Response {
             images: images.into_iter().map(|image| image.image).collect(),
-            params: Box::new(base_prompt.prompt.clone()),
+            params: Box::new(prompt.clone()),
             gen_params: Box::new(base_prompt.clone()),
         })
     }

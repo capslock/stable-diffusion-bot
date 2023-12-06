@@ -94,12 +94,36 @@ impl StableDiffusionBot {
         .filter_map_async(
             |dialogue: Dialogue<State, S>, cfg: ConfigParameters| async move {
                 match dialogue.get().await {
-                    Ok(dialogue) => Some(dialogue.unwrap_or_else(|| {
-                        State::new_with_defaults(
-                            cfg.txt2img_api.gen_params(),
-                            cfg.img2img_api.gen_params(),
-                        )
-                    })),
+                    Ok(dialogue) => {
+                        let mut dialogue = dialogue.unwrap_or_else(|| {
+                            State::new_with_defaults(
+                                cfg.txt2img_api.gen_params(),
+                                cfg.img2img_api.gen_params(),
+                            )
+                        });
+                        match dialogue {
+                            State::New => {}
+                            State::Ready {
+                                ref mut txt2img,
+                                ref mut img2img,
+                                ..
+                            } => {
+                                if txt2img.as_any().type_id()
+                                    != cfg.txt2img_api.gen_params().as_any().type_id()
+                                {
+                                    warn!("txt2img settings type mismatch, resetting to default");
+                                    *txt2img = cfg.txt2img_api.gen_params();
+                                }
+                                if img2img.as_any().type_id()
+                                    != cfg.img2img_api.gen_params().as_any().type_id()
+                                {
+                                    warn!("img2img settings type mismatch, resetting to default");
+                                    *img2img = cfg.img2img_api.gen_params();
+                                }
+                            }
+                        }
+                        Some(dialogue)
+                    }
                     Err(err) => {
                         error!("dialogue.get() failed: {:?}", err);
                         let defaults = State::new_with_defaults(
