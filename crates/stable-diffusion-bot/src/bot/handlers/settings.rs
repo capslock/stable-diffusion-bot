@@ -303,7 +303,6 @@ where
     Ok(())
 }
 
-// TODO FIXME: Implement settings.
 fn update_img2img_setting<S1, S2>(
     img2img: &mut dyn GenParams,
     setting: S1,
@@ -573,6 +572,9 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
+    use sal_e_api::{Img2ImgApi, Response, Txt2ImgApi};
+    use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
     use teloxide::types::{UpdateKind, User};
 
     use super::*;
@@ -643,36 +645,35 @@ mod tests {
         ));
     }
 
-    // TODO FIXME: Fix tests.
-    // #[tokio::test]
-    // async fn test_filter_settings_state_txt2img() {
-    //     assert!(matches!(
-    //         filter_settings_state()
-    //             .endpoint(|| async { anyhow::Ok(()) })
-    //             .dispatch(dptree::deps![State::Ready {
-    //                 bot_state: BotState::SettingsTxt2Img { selection: None },
-    //                 txt2img: Txt2ImgRequest::default(),
-    //                 img2img: Img2ImgRequest::default()
-    //             }])
-    //             .await,
-    //         ControlFlow::Break(_)
-    //     ));
-    // }
+    #[tokio::test]
+    async fn test_filter_settings_state_txt2img() {
+        assert!(matches!(
+            filter_settings_state()
+                .endpoint(|| async { anyhow::Ok(()) })
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsTxt2Img { selection: None },
+                    txt2img: Box::<Txt2ImgRequest>::default(),
+                    img2img: Box::<Img2ImgRequest>::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
 
-    // #[tokio::test]
-    // async fn test_filter_settings_state_img2img() {
-    //     assert!(matches!(
-    //         filter_settings_state()
-    //             .endpoint(|| async { anyhow::Ok(()) })
-    //             .dispatch(dptree::deps![State::Ready {
-    //                 bot_state: BotState::SettingsImg2Img { selection: None },
-    //                 txt2img: Txt2ImgRequest::default(),
-    //                 img2img: Img2ImgRequest::default()
-    //             }])
-    //             .await,
-    //         ControlFlow::Break(_)
-    //     ));
-    // }
+    #[tokio::test]
+    async fn test_filter_settings_state_img2img() {
+        assert!(matches!(
+            filter_settings_state()
+                .endpoint(|| async { anyhow::Ok(()) })
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsImg2Img { selection: None },
+                    txt2img: Box::<Txt2ImgRequest>::default(),
+                    img2img: Box::<Img2ImgRequest>::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
 
     #[tokio::test]
     async fn test_filter_settings_state() {
@@ -685,43 +686,43 @@ mod tests {
         ));
     }
 
-    // #[tokio::test]
-    // async fn test_filter_map_settings_state_txt2img() {
-    //     assert!(matches!(
-    //         filter_map_settings_state()
-    //             .endpoint(
-    //                 |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async {
-    //                     anyhow::Ok(())
-    //                 }
-    //             )
-    //             .dispatch(dptree::deps![State::Ready {
-    //                 bot_state: BotState::SettingsTxt2Img { selection: None },
-    //                 txt2img: Txt2ImgRequest::default(),
-    //                 img2img: Img2ImgRequest::default()
-    //             }])
-    //             .await,
-    //         ControlFlow::Break(_)
-    //     ));
-    // }
+    #[tokio::test]
+    async fn test_filter_map_settings_state_txt2img() {
+        assert!(matches!(
+            filter_map_settings_state()
+                .endpoint(
+                    |(_, _, _): (Option<String>, Box<dyn GenParams>, Box<dyn GenParams>)| async {
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsTxt2Img { selection: None },
+                    txt2img: Box::<Txt2ImgRequest>::default(),
+                    img2img: Box::<Img2ImgRequest>::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
 
-    // #[tokio::test]
-    // async fn test_filter_map_settings_state_img2img() {
-    //     assert!(matches!(
-    //         filter_map_settings_state()
-    //             .endpoint(
-    //                 |(_, _, _): (Option<String>, Txt2ImgRequest, Img2ImgRequest)| async {
-    //                     anyhow::Ok(())
-    //                 }
-    //             )
-    //             .dispatch(dptree::deps![State::Ready {
-    //                 bot_state: BotState::SettingsImg2Img { selection: None },
-    //                 txt2img: Txt2ImgRequest::default(),
-    //                 img2img: Img2ImgRequest::default()
-    //             }])
-    //             .await,
-    //         ControlFlow::Break(_)
-    //     ));
-    // }
+    #[tokio::test]
+    async fn test_filter_map_settings_state_img2img() {
+        assert!(matches!(
+            filter_map_settings_state()
+                .endpoint(
+                    |(_, _, _): (Option<String>, Box<dyn GenParams>, Box<dyn GenParams>)| async {
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![State::Ready {
+                    bot_state: BotState::SettingsImg2Img { selection: None },
+                    txt2img: Box::<Txt2ImgRequest>::default(),
+                    img2img: Box::<Img2ImgRequest>::default()
+                }])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
 
     #[tokio::test]
     async fn test_filter_map_settings_state() {
@@ -738,65 +739,123 @@ mod tests {
         ));
     }
 
-    // #[tokio::test]
-    // async fn test_map_settings_default() {
-    //     assert!(matches!(
-    //         map_settings()
-    //             .endpoint(
-    //                 |(txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest)| async {
-    //                     assert!(
-    //                         (txt2img, img2img)
-    //                             == (Txt2ImgRequest::default(), Img2ImgRequest::default())
-    //                     );
-    //                     anyhow::Ok(())
-    //                 }
-    //             )
-    //             .dispatch(dptree::deps![ConfigParameters::default(), State::New])
-    //             .await,
-    //         ControlFlow::Break(_)
-    //     ));
-    // }
+    #[derive(Debug, Clone, Default)]
+    struct MockApi;
 
-    // #[tokio::test]
-    // async fn test_map_settings_ready() {
-    //     let txt2img = Txt2ImgRequest {
-    //         negative_prompt: Some("test".to_string()),
-    //         ..Txt2ImgRequest::default()
-    //     };
-    //     let img2img = Img2ImgRequest {
-    //         negative_prompt: Some("test".to_string()),
-    //         ..Img2ImgRequest::default()
-    //     };
-    //     assert!(matches!(
-    //         map_settings()
-    //             .endpoint(
-    //                 |(txt2img, img2img): (Txt2ImgRequest, Img2ImgRequest)| async {
-    //                     assert!(
-    //                         (txt2img, img2img)
-    //                             == (
-    //                                 Txt2ImgRequest {
-    //                                     negative_prompt: Some("test".to_string()),
-    //                                     ..Txt2ImgRequest::default()
-    //                                 },
-    //                                 Img2ImgRequest {
-    //                                     negative_prompt: Some("test".to_string()),
-    //                                     ..Img2ImgRequest::default()
-    //                                 }
-    //                             )
-    //                     );
-    //                     anyhow::Ok(())
-    //                 }
-    //             )
-    //             .dispatch(dptree::deps![
-    //                 ConfigParameters::default(),
-    //                 State::Ready {
-    //                     bot_state: BotState::Generate,
-    //                     txt2img,
-    //                     img2img
-    //                 }
-    //             ])
-    //             .await,
-    //         ControlFlow::Break(_)
-    //     ));
-    // }
+    #[async_trait]
+    impl Txt2ImgApi for MockApi {
+        fn gen_params(&self) -> Box<dyn GenParams> {
+            Box::<Txt2ImgRequest>::default()
+        }
+
+        async fn txt2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {
+            Err(anyhow!("Not implemented"))
+        }
+    }
+
+    #[async_trait]
+    impl Img2ImgApi for MockApi {
+        fn gen_params(&self) -> Box<dyn GenParams> {
+            Box::<Img2ImgRequest>::default()
+        }
+
+        async fn img2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {
+            Err(anyhow!("Not implemented"))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_map_settings_default() {
+        assert!(matches!(
+            map_settings()
+                .endpoint(
+                    |(txt2img, img2img): (Box<dyn GenParams>, Box<dyn GenParams>)| async move {
+                        let txt2img = txt2img
+                            .as_ref()
+                            .as_any()
+                            .downcast_ref::<Txt2ImgRequest>()
+                            .unwrap();
+                        let img2img = img2img
+                            .as_ref()
+                            .as_any()
+                            .downcast_ref::<Img2ImgRequest>()
+                            .unwrap();
+                        assert!(
+                            (txt2img, img2img)
+                                == (&Txt2ImgRequest::default(), &Img2ImgRequest::default())
+                        );
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![
+                    ConfigParameters {
+                        txt2img_api: Box::new(MockApi),
+                        img2img_api: Box::new(MockApi),
+                        allowed_users: Default::default(),
+                        allow_all_users: false
+                    },
+                    State::New
+                ])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_map_settings_ready() {
+        let txt2img = Txt2ImgRequest {
+            negative_prompt: Some("test".to_string()),
+            ..Txt2ImgRequest::default()
+        };
+        let img2img = Img2ImgRequest {
+            negative_prompt: Some("test".to_string()),
+            ..Img2ImgRequest::default()
+        };
+        assert!(matches!(
+            map_settings()
+                .endpoint(
+                    |(txt2img, img2img): (Box<dyn GenParams>, Box<dyn GenParams>)| async move {
+                        let txt2img = txt2img
+                            .as_ref()
+                            .as_any()
+                            .downcast_ref::<Txt2ImgRequest>()
+                            .unwrap();
+                        let img2img = img2img
+                            .as_ref()
+                            .as_any()
+                            .downcast_ref::<Img2ImgRequest>()
+                            .unwrap();
+                        assert!(
+                            (txt2img, img2img)
+                                == (
+                                    &Txt2ImgRequest {
+                                        negative_prompt: Some("test".to_string()),
+                                        ..Txt2ImgRequest::default()
+                                    },
+                                    &Img2ImgRequest {
+                                        negative_prompt: Some("test".to_string()),
+                                        ..Img2ImgRequest::default()
+                                    }
+                                )
+                        );
+                        anyhow::Ok(())
+                    }
+                )
+                .dispatch(dptree::deps![
+                    ConfigParameters {
+                        txt2img_api: Box::new(MockApi),
+                        img2img_api: Box::new(MockApi),
+                        allowed_users: Default::default(),
+                        allow_all_users: false
+                    },
+                    State::Ready {
+                        bot_state: BotState::Generate,
+                        txt2img: Box::new(txt2img),
+                        img2img: Box::new(img2img)
+                    }
+                ])
+                .await,
+            ControlFlow::Break(_)
+        ));
+    }
 }

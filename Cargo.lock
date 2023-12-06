@@ -2022,6 +2022,7 @@ name = "stable-diffusion-bot"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64 0.21.5",
  "bytes",
  "clap",
