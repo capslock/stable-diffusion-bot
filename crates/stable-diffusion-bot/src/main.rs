@@ -6,7 +6,7 @@ use figment::{
 };
 use serde::{Deserialize, Serialize};
 use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
-use stable_diffusion_bot::{ApiType, StableDiffusionBotBuilder};
+use stable_diffusion_bot::{ApiType, ComfyUIConfig, StableDiffusionBotBuilder};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -37,7 +37,7 @@ struct Config {
     txt2img: Option<Txt2ImgRequest>,
     img2img: Option<Img2ImgRequest>,
     allow_all_users: Option<bool>,
-    comfyui_prompt_file: Option<PathBuf>,
+    comfyui: Option<ComfyUIConfig>,
 }
 
 #[tokio::main]
@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
     .db_path(config.db_path)
     .txt2img_defaults(config.txt2img.unwrap_or_default())
     .img2img_defaults(config.img2img.unwrap_or_default())
-    .comfyui_prompt_file(config.comfyui_prompt_file.unwrap_or_default())
+    .comfyui_config(config.comfyui.unwrap_or_default())
     .build()
     .await?
     .run()
