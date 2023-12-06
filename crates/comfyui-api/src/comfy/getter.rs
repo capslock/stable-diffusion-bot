@@ -587,3 +587,12 @@ create_ext_trait!(
     sampler_name_mut,
     SamplerExt
 );
+
+create_getter!(u32, EmptyLatentImage, accessors::BatchSize, batch_size);
+create_ext_trait!(
+    u32,
+    accessors::BatchSize,
+    batch_size,
+    batch_size_mut,
+    BatchSizeExt
+);

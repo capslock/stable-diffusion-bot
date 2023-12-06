@@ -1,7 +1,7 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use anyhow::Context;
-use sal_e_api::{ComfyPromptApi, GenParams, StableDiffusionWebUiApi, Txt2ImgApi};
+use anyhow::{anyhow, Context};
+use sal_e_api::{ComfyPromptApi, GenParams, Img2ImgApi, StableDiffusionWebUiApi, Txt2ImgApi};
 use serde::{Deserialize, Serialize};
 use teloxide::{
     dispatching::{
@@ -14,6 +14,8 @@ use teloxide::{
     types::Update,
     utils::command::BotCommands,
 };
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tracing::{error, warn};
 
 use stable_diffusion_api::{Api, Img2ImgRequest, Txt2ImgRequest};
@@ -53,47 +55,6 @@ pub enum BotState {
     SettingsImg2Img {
         selection: Option<String>,
     },
-}
-
-// TODO FIXME: Re-add these (or remove?)
-fn default_txt2img(txt2img: Txt2ImgRequest) -> Txt2ImgRequest {
-    Txt2ImgRequest {
-        styles: Some(Vec::new()),
-        seed: Some(-1),
-        sampler_index: Some("Euler".to_owned()),
-        batch_size: Some(1),
-        n_iter: Some(1),
-        steps: Some(50),
-        cfg_scale: Some(7.0),
-        width: Some(512),
-        height: Some(512),
-        restore_faces: Some(false),
-        tiling: Some(false),
-        negative_prompt: Some("".to_owned()),
-        ..Default::default()
-    }
-    .merge(txt2img)
-}
-
-// TODO FIXME: Re-add these (or remove?)
-fn default_img2img(img2img: Img2ImgRequest) -> Img2ImgRequest {
-    Img2ImgRequest {
-        denoising_strength: Some(0.75),
-        styles: Some(Vec::new()),
-        seed: Some(-1),
-        sampler_index: Some("Euler".to_owned()),
-        batch_size: Some(1),
-        n_iter: Some(1),
-        steps: Some(50),
-        cfg_scale: Some(7.0),
-        width: Some(512),
-        height: Some(512),
-        restore_faces: Some(false),
-        tiling: Some(false),
-        negative_prompt: Some("".to_owned()),
-        ..Default::default()
-    }
-    .merge(img2img)
 }
 
 type DialogueStorage = std::sync::Arc<ErasedStorage<State>>;
@@ -208,14 +169,23 @@ impl ConfigParameters {
     }
 }
 
+#[derive(Serialize, Deserialize, Default, Debug)]
+pub enum ApiType {
+    ComfyUI,
+    #[default]
+    StableDiffusionWebUi,
+}
+
 /// Struct that builds a StableDiffusionBot instance.
 pub struct StableDiffusionBotBuilder {
     api_key: String,
     allowed_users: Vec<i64>,
     db_path: Option<String>,
     sd_api_url: String,
+    api_type: ApiType,
     txt2img_defaults: Option<Txt2ImgRequest>,
     img2img_defaults: Option<Img2ImgRequest>,
+    comfyui_prompt_file: Option<PathBuf>,
     allow_all_users: bool,
 }
 
@@ -225,6 +195,7 @@ impl StableDiffusionBotBuilder {
         api_key: String,
         allowed_users: Vec<i64>,
         sd_api_url: String,
+        api_type: ApiType,
         allow_all_users: bool,
     ) -> Self {
         StableDiffusionBotBuilder {
@@ -235,6 +206,8 @@ impl StableDiffusionBotBuilder {
             txt2img_defaults: None,
             img2img_defaults: None,
             allow_all_users,
+            api_type,
+            comfyui_prompt_file: None,
         }
     }
 
@@ -327,6 +300,11 @@ impl StableDiffusionBotBuilder {
         self
     }
 
+    pub fn comfyui_prompt_file(mut self, prompt_file: PathBuf) -> Self {
+        self.comfyui_prompt_file = Some(prompt_file);
+        self
+    }
+
     /// Consumes the builder and builds a `StableDiffusionBot` instance.
     ///
     /// # Examples
@@ -359,32 +337,49 @@ impl StableDiffusionBotBuilder {
 
         let client = reqwest::Client::new();
 
-        // let api = Api::new_with_client_and_url(client, self.sd_api_url.clone())
-        //     .context("Failed to initialize sd api")?;
-        // let txt2img_api = StableDiffusionWebUiApi {
-        //     client: api.clone(),
-        //     txt2img_defaults: self.txt2img_defaults.clone().unwrap_or_default(),
-        //     img2img_defaults: self.img2img_defaults.clone().unwrap_or_default(),
-        // };
+        let (txt2img_api, img2img_api): (Box<dyn Txt2ImgApi>, Box<dyn Img2ImgApi>) =
+            match self.api_type {
+                ApiType::ComfyUI => {
+                    let mut prompt = String::new();
 
-        // let img2img_api = StableDiffusionWebUiApi {
-        //     client: api,
-        //     txt2img_defaults: self.txt2img_defaults.unwrap_or_default(),
-        //     img2img_defaults: self.img2img_defaults.unwrap_or_default(),
-        // };
+                    File::open(
+                        self.comfyui_prompt_file
+                            .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
+                    )
+                    .await
+                    .context("Failed to open comfyui prompt file")?
+                    .read_to_string(&mut prompt)
+                    .await?;
 
-        let api = ComfyPromptApi::new(serde_json::from_str(
-            self.txt2img_defaults
-                .unwrap_or_default()
-                .prompt
-                .unwrap_or_default()
-                .as_str(),
-        )?)?;
+                    let prompt = serde_json::from_str::<comfyui_api::models::Prompt>(&prompt)
+                        .context("Failed to deserialize prompt")?;
+
+                    let api = ComfyPromptApi::new(prompt)?;
+                    (Box::new(api.clone()), Box::new(api))
+                }
+                ApiType::StableDiffusionWebUi => {
+                    let api = Api::new_with_client_and_url(client, self.sd_api_url.clone())
+                        .context("Failed to initialize sd api")?;
+                    let txt2img_api = StableDiffusionWebUiApi {
+                        client: api.clone(),
+                        txt2img_defaults: self.txt2img_defaults.clone().unwrap_or_default(),
+                        img2img_defaults: self.img2img_defaults.clone().unwrap_or_default(),
+                    };
+
+                    let img2img_api = StableDiffusionWebUiApi {
+                        client: api,
+                        txt2img_defaults: self.txt2img_defaults.unwrap_or_default(),
+                        img2img_defaults: self.img2img_defaults.unwrap_or_default(),
+                    };
+
+                    (Box::new(txt2img_api), Box::new(img2img_api))
+                }
+            };
 
         let parameters = ConfigParameters {
             allowed_users,
-            txt2img_api: Box::new(api.clone()),
-            img2img_api: Box::new(api),
+            txt2img_api,
+            img2img_api,
             allow_all_users: self.allow_all_users,
         };
 

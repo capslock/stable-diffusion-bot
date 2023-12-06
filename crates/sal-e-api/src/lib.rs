@@ -102,6 +102,12 @@ pub trait GenParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {
 
     fn denoising(&self) -> Option<f32>;
     fn set_denoising(&mut self, denoising: f32);
+
+    fn sampler(&self) -> Option<String>;
+    fn set_sampler(&mut self, sampler: String);
+
+    fn batch_size(&self) -> Option<u32>;
+    fn set_batch_size(&mut self, batch_size: u32);
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -211,6 +217,30 @@ impl GenParams for ComfyParams {
     fn set_denoising(&mut self, denoising: f32) {
         comfyui_api::comfy::DenoiseExt::denoise_mut(&mut self.prompt)
             .map(|s| *s = denoising)
+            .ok();
+    }
+
+    fn sampler(&self) -> Option<String> {
+        comfyui_api::comfy::SamplerExt::sampler_name(&self.prompt)
+            .ok()
+            .cloned()
+    }
+
+    fn set_sampler(&mut self, sampler: String) {
+        comfyui_api::comfy::SamplerExt::sampler_name_mut(&mut self.prompt)
+            .map(|s| *s = sampler)
+            .ok();
+    }
+
+    fn batch_size(&self) -> Option<u32> {
+        comfyui_api::comfy::BatchSizeExt::batch_size(&self.prompt)
+            .ok()
+            .copied()
+    }
+
+    fn set_batch_size(&mut self, batch_size: u32) {
+        comfyui_api::comfy::BatchSizeExt::batch_size_mut(&mut self.prompt)
+            .map(|s| *s = batch_size)
             .ok();
     }
 }
@@ -360,6 +390,22 @@ impl GenParams for Txt2ImgRequest {
     fn set_denoising(&mut self, denoising: f32) {
         self.denoising_strength = Some(denoising as f64);
     }
+
+    fn sampler(&self) -> Option<String> {
+        self.sampler_index.clone()
+    }
+
+    fn set_sampler(&mut self, sampler: String) {
+        self.sampler_index = Some(sampler);
+    }
+
+    fn batch_size(&self) -> Option<u32> {
+        self.batch_size
+    }
+
+    fn set_batch_size(&mut self, batch_size: u32) {
+        self.batch_size = Some(batch_size);
+    }
 }
 
 #[typetag::serde]
@@ -434,6 +480,22 @@ impl GenParams for Img2ImgRequest {
 
     fn set_denoising(&mut self, denoising: f32) {
         self.denoising_strength = Some(denoising as f64);
+    }
+
+    fn sampler(&self) -> Option<String> {
+        self.sampler_index.clone()
+    }
+
+    fn set_sampler(&mut self, sampler: String) {
+        self.sampler_index = Some(sampler);
+    }
+
+    fn batch_size(&self) -> Option<u32> {
+        self.batch_size
+    }
+
+    fn set_batch_size(&mut self, batch_size: u32) {
+        self.batch_size = Some(batch_size);
     }
 }
 
