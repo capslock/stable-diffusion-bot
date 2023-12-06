@@ -58,8 +58,8 @@ pub(crate) async fn unauthenticated_commands_handler(
             dialogue
                 .update(State::Ready {
                     bot_state: BotState::default(),
-                    txt2img: cfg.txt2img_api.gen_params(),
-                    img2img: cfg.img2img_api.gen_params(),
+                    txt2img: cfg.txt2img_api.gen_params(None),
+                    img2img: cfg.img2img_api.gen_params(None),
                 })
                 .await
                 .map_err(|e| anyhow!(e))?;
@@ -122,8 +122,7 @@ pub(crate) fn authenticated_command_handler() -> UpdateHandler<anyhow::Error> {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use sal_e_api::{GenParams, Img2ImgApi, Response, Txt2ImgApi};
-    use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
+    use sal_e_api::{GenParams, Img2ImgApi, Img2ImgParams, Response, Txt2ImgApi, Txt2ImgParams};
     use teloxide::types::{Me, UpdateKind, User};
 
     fn create_message(text: &str) -> Message {
@@ -176,8 +175,8 @@ mod tests {
 
     #[async_trait]
     impl Txt2ImgApi for MockApi {
-        fn gen_params(&self) -> Box<dyn GenParams> {
-            Box::<Txt2ImgRequest>::default()
+        fn gen_params(&self, _user_settings: Option<&dyn GenParams>) -> Box<dyn GenParams> {
+            Box::<Txt2ImgParams>::default()
         }
 
         async fn txt2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {
@@ -187,8 +186,8 @@ mod tests {
 
     #[async_trait]
     impl Img2ImgApi for MockApi {
-        fn gen_params(&self) -> Box<dyn GenParams> {
-            Box::<Img2ImgRequest>::default()
+        fn gen_params(&self, _user_settings: Option<&dyn GenParams>) -> Box<dyn GenParams> {
+            Box::<Img2ImgParams>::default()
         }
 
         async fn img2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {

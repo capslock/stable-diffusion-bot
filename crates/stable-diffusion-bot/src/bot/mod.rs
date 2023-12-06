@@ -130,8 +130,8 @@ impl StableDiffusionBot {
                     Ok(dialogue) => {
                         let mut dialogue = dialogue.unwrap_or_else(|| {
                             State::new_with_defaults(
-                                cfg.txt2img_api.gen_params(),
-                                cfg.img2img_api.gen_params(),
+                                cfg.txt2img_api.gen_params(None),
+                                cfg.img2img_api.gen_params(None),
                             )
                         });
                         match dialogue {
@@ -141,17 +141,19 @@ impl StableDiffusionBot {
                                 ref mut img2img,
                                 ..
                             } => {
-                                if txt2img.as_any().type_id()
-                                    != cfg.txt2img_api.gen_params().as_any().type_id()
-                                {
+                                let txt2img_params = cfg.txt2img_api.gen_params(None);
+                                if txt2img.as_any().type_id() != txt2img_params.as_any().type_id() {
                                     warn!("txt2img settings type mismatch, resetting to default");
-                                    *txt2img = cfg.txt2img_api.gen_params();
+                                    *txt2img = txt2img_params;
+                                } else {
+                                    *txt2img = cfg.txt2img_api.gen_params(Some(txt2img.as_ref()));
                                 }
-                                if img2img.as_any().type_id()
-                                    != cfg.img2img_api.gen_params().as_any().type_id()
-                                {
+                                let img2img_params = cfg.img2img_api.gen_params(None);
+                                if img2img.as_any().type_id() != img2img_params.as_any().type_id() {
                                     warn!("img2img settings type mismatch, resetting to default");
-                                    *img2img = cfg.img2img_api.gen_params();
+                                    *img2img = img2img_params;
+                                } else {
+                                    *img2img = cfg.img2img_api.gen_params(Some(img2img.as_ref()));
                                 }
                             }
                         }
@@ -160,8 +162,8 @@ impl StableDiffusionBot {
                     Err(err) => {
                         error!("dialogue.get() failed: {:?}", err);
                         let defaults = State::new_with_defaults(
-                            cfg.txt2img_api.gen_params(),
-                            cfg.img2img_api.gen_params(),
+                            cfg.txt2img_api.gen_params(None),
+                            cfg.img2img_api.gen_params(None),
                         );
                         match dialogue.update(defaults.clone()).await {
                             Ok(_) => {
