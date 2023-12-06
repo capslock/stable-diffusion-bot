@@ -3,11 +3,13 @@ use reqwest::Url;
 
 pub mod history;
 pub mod prompt;
+pub mod upload;
 pub mod view;
 pub mod websocket;
 
 pub use history::*;
 pub use prompt::*;
+pub use upload::*;
 pub use view::*;
 pub use websocket::*;
 
@@ -103,6 +105,21 @@ impl Api {
             self.url
                 .join("history/")
                 .context("Failed to parse history endpoint")?,
+        ))
+    }
+
+    /// Returns a new instance of `UploadApi` with the API's cloned
+    /// `reqwest::Client` and the URL for the `view` endpoint.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
+    pub fn upload(&self) -> anyhow::Result<UploadApi> {
+        Ok(UploadApi::new_with_url(
+            self.client.clone(),
+            self.url
+                .join("upload/")
+                .context("Failed to parse view endpoint")?,
         ))
     }
 

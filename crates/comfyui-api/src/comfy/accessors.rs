@@ -146,3 +146,6 @@ pub(crate) type Sampler =
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct BatchSize;
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct LoadImage;

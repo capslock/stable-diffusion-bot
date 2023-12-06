@@ -23,7 +23,7 @@ where
     ///
     /// `Ok(())`` on success, or an error if the node could not be found.
     fn get<'a>(&self, prompt: &'a Prompt) -> anyhow::Result<&'a T> {
-        let node = if let Some(node) = guess_node::<N>(prompt, None) {
+        let node = if let Some(node) = Self::guess_node(prompt, None) {
             node
         } else {
             return Err(anyhow!("Failed to find node"));
@@ -32,7 +32,7 @@ where
     }
 
     fn get_mut<'a>(&self, prompt: &'a mut Prompt) -> anyhow::Result<&'a mut T> {
-        let node = if let Some(node) = guess_node_mut::<N>(prompt, None) {
+        let node = if let Some(node) = Self::guess_node_mut(prompt, None) {
             node
         } else {
             return Err(anyhow!("Failed to find node"));
@@ -119,6 +119,29 @@ where
     /// The id of the node on success, or `None` if the node could not be found.
     fn find_node(prompt: &Prompt, output_node: Option<&str>) -> Option<String> {
         find_node::<N>(prompt, output_node)
+    }
+
+    fn guess_node<'a>(prompt: &'a Prompt, output_node: Option<&str>) -> Option<&'a dyn Node> {
+        if let Some(node) = Self::find_node(prompt, output_node) {
+            prompt.get_node_by_id(&node)
+        } else if let Some((_, node)) = prompt.get_nodes_by_type::<N>().next() {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn guess_node_mut<'a>(
+        prompt: &'a mut Prompt,
+        output_node: Option<&str>,
+    ) -> Option<&'a mut dyn Node> {
+        if let Some(node) = Self::find_node(prompt, output_node) {
+            prompt.get_node_by_id_mut(&node)
+        } else if let Some((_, node)) = prompt.get_nodes_by_type_mut::<N>().next() {
+            Some(node)
+        } else {
+            None
+        }
     }
 }
 
@@ -259,6 +282,7 @@ pub(crate) fn find_node<T: Node + 'static>(
     find_node.found
 }
 
+#[allow(dead_code)]
 pub(crate) fn guess_node<'a, T: Node + 'static>(
     prompt: &'a Prompt,
     output_node: Option<&str>,
@@ -596,3 +620,6 @@ create_ext_trait!(
     batch_size_mut,
     BatchSizeExt
 );
+
+create_getter!(String, LoadImage, accessors::LoadImage, image);
+create_ext_trait!(String, accessors::LoadImage, image, image_mut, LoadImageExt);

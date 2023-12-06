@@ -206,15 +206,13 @@ async fn do_img2img(
     };
     let file = bot.get_file(&photo.file.id).send().await?;
 
-    let _photo = helpers::get_file(bot, &file).await?;
+    let photo = helpers::get_file(bot, &file).await?;
 
-    // TODO FIXME: Add this functionality.
-    //img2img.with_image(photo);
+    img2img.set_image(Some(photo.into()));
 
     let resp = cfg.img2img_api.img2img(img2img.as_ref()).await?;
 
-    // TODO FIXME: Needed?
-    // _ = img2img.init_images.take();
+    img2img.set_image(None);
 
     Ok(resp)
 }
