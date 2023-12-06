@@ -176,6 +176,12 @@ pub enum ApiType {
     StableDiffusionWebUi,
 }
 
+#[derive(Serialize, Deserialize, Default, Debug)]
+pub struct ComfyUIConfig {
+    pub txt2img_prompt_file: Option<PathBuf>,
+    pub img2img_prompt_file: Option<PathBuf>,
+}
+
 /// Struct that builds a StableDiffusionBot instance.
 pub struct StableDiffusionBotBuilder {
     api_key: String,
@@ -185,7 +191,8 @@ pub struct StableDiffusionBotBuilder {
     api_type: ApiType,
     txt2img_defaults: Option<Txt2ImgRequest>,
     img2img_defaults: Option<Img2ImgRequest>,
-    comfyui_prompt_file: Option<PathBuf>,
+    comfyui_img2img_prompt_file: Option<PathBuf>,
+    comfyui_txt2img_prompt_file: Option<PathBuf>,
     allow_all_users: bool,
 }
 
@@ -207,7 +214,8 @@ impl StableDiffusionBotBuilder {
             img2img_defaults: None,
             allow_all_users,
             api_type,
-            comfyui_prompt_file: None,
+            comfyui_txt2img_prompt_file: None,
+            comfyui_img2img_prompt_file: None,
         }
     }
 
@@ -302,8 +310,15 @@ impl StableDiffusionBotBuilder {
         self
     }
 
-    pub fn comfyui_prompt_file(mut self, prompt_file: PathBuf) -> Self {
-        self.comfyui_prompt_file = Some(prompt_file);
+    pub fn comfyui_config(
+        mut self,
+        ComfyUIConfig {
+            txt2img_prompt_file,
+            img2img_prompt_file,
+        }: ComfyUIConfig,
+    ) -> Self {
+        self.comfyui_txt2img_prompt_file = txt2img_prompt_file;
+        self.comfyui_img2img_prompt_file = img2img_prompt_file;
         self
     }
 
@@ -343,22 +358,39 @@ impl StableDiffusionBotBuilder {
         let (txt2img_api, img2img_api): (Box<dyn Txt2ImgApi>, Box<dyn Img2ImgApi>) =
             match self.api_type {
                 ApiType::ComfyUI => {
-                    let mut prompt = String::new();
+                    let mut txt2img_prompt = String::new();
 
                     File::open(
-                        self.comfyui_prompt_file
+                        self.comfyui_txt2img_prompt_file
                             .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
                     )
                     .await
                     .context("Failed to open comfyui prompt file")?
-                    .read_to_string(&mut prompt)
+                    .read_to_string(&mut txt2img_prompt)
                     .await?;
 
-                    let prompt = serde_json::from_str::<comfyui_api::models::Prompt>(&prompt)
-                        .context("Failed to deserialize prompt")?;
+                    let mut img2img_prompt = String::new();
 
-                    let api = ComfyPromptApi::new(prompt)?;
-                    (Box::new(api.clone()), Box::new(api))
+                    File::open(
+                        self.comfyui_img2img_prompt_file
+                            .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
+                    )
+                    .await
+                    .context("Failed to open comfyui prompt file")?
+                    .read_to_string(&mut img2img_prompt)
+                    .await?;
+
+                    let txt2img_prompt =
+                        serde_json::from_str::<comfyui_api::models::Prompt>(&txt2img_prompt)
+                            .context("Failed to deserialize prompt")?;
+
+                    let txt2img_api = ComfyPromptApi::new(txt2img_prompt)?;
+
+                    let img2img_prompt =
+                        serde_json::from_str::<comfyui_api::models::Prompt>(&img2img_prompt)
+                            .context("Failed to deserialize prompt")?;
+                    let img2img_api = ComfyPromptApi::new(img2img_prompt)?;
+                    (Box::new(txt2img_api), Box::new(img2img_api))
                 }
                 ApiType::StableDiffusionWebUi => {
                     let api = Api::new_with_client_and_url(client, self.sd_api_url.clone())
