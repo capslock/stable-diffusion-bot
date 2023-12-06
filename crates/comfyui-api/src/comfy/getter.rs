@@ -563,8 +563,27 @@ where
 
 create_getter!(f32, KSampler, accessors::CfgT<KSampler>, cfg);
 create_getter!(f32, SamplerCustom, accessors::CfgT<SamplerCustom>, cfg);
-
 create_ext_trait!(f32, accessors::Cfg, cfg, cfg_mut, CfgExt);
 
 create_getter!(f32, KSampler, accessors::Denoise, denoise);
 create_ext_trait!(f32, accessors::Denoise, denoise, denoise_mut, DenoiseExt);
+
+create_getter!(
+    String,
+    KSampler,
+    accessors::SamplerT<KSampler>,
+    sampler_name
+);
+create_getter!(
+    String,
+    KSamplerSelect,
+    accessors::SamplerT<KSamplerSelect>,
+    sampler_name
+);
+create_ext_trait!(
+    String,
+    accessors::Sampler,
+    sampler_name,
+    sampler_name_mut,
+    SamplerExt
+);

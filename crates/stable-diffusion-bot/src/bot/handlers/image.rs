@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context};
-use sal_e_api::{GenParams, Image};
-use stable_diffusion_api::{ImgInfo, ImgResponse};
+use sal_e_api::{GenParams, ImageParams, Response};
 use teloxide::{
     dispatching::UpdateHandler,
     dptree::case,
@@ -43,51 +42,34 @@ enum Photo {
 
 impl Photo {
     #[allow(dead_code)]
-    pub fn single(photo: String) -> anyhow::Result<Self> {
-        use base64::{engine::general_purpose, Engine as _};
-        Ok(Self::Single(
-            general_purpose::STANDARD
-                .decode(photo)
-                .context("Failed to decode image")?,
-        ))
+    pub fn single(photo: Vec<u8>) -> anyhow::Result<Self> {
+        Ok(Self::Single(photo))
     }
 
-    pub fn album(photos: Vec<String>) -> anyhow::Result<Self> {
-        use base64::{engine::general_purpose, Engine as _};
-        let images = photos
-            .into_iter()
-            .map(|i| {
-                general_purpose::STANDARD
-                    .decode(i)
-                    .context("Failed to decode image")
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        let images = match images.len() {
-            1 => Photo::Single(
-                images
-                    .into_iter()
-                    .next()
-                    .ok_or_else(|| anyhow!("Failed to get image"))?,
-            ),
-            2.. => Photo::Album(images),
-            _ => return Err(anyhow!("Must provide at least one image!")),
-        };
-
-        Ok(images)
+    pub fn album(photos: Vec<Vec<u8>>) -> anyhow::Result<Self> {
+        if photos.len() == 1 {
+            let images = photos
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow!("Failed to get image"))?;
+            Ok(Photo::Single(images))
+        } else {
+            Ok(Photo::Album(photos))
+        }
     }
 }
 
-struct Response {
+struct Reply {
     caption: String,
     images: Photo,
     source: MessageId,
     seed: i64,
 }
 
-impl Response {
-    pub fn _new(
+impl Reply {
+    pub fn new(
         caption: String,
-        images: Vec<String>,
+        images: Vec<Vec<u8>>,
         seed: i64,
         source: MessageId,
     ) -> anyhow::Result<Self> {
@@ -98,36 +80,6 @@ impl Response {
             source,
             seed,
         })
-    }
-
-    // TODO FIXME: Reconcile this with the above (remove the above?)
-    pub fn new_from_bytes(
-        caption: String,
-        images: Vec<Vec<u8>>,
-        seed: i64,
-        source: MessageId,
-    ) -> anyhow::Result<Self> {
-        if images.len() == 1 {
-            let images = images
-                .into_iter()
-                .next()
-                .ok_or_else(|| anyhow!("Failed to get image"))?;
-            let images = Photo::Single(images);
-            Ok(Self {
-                caption,
-                images,
-                source,
-                seed,
-            })
-        } else {
-            let images = Photo::Album(images);
-            Ok(Self {
-                caption,
-                images,
-                source,
-                seed,
-            })
-        }
     }
 
     pub async fn send(self, bot: &Bot, chat_id: ChatId) -> anyhow::Result<()> {
@@ -169,7 +121,7 @@ impl Response {
 struct MessageText(String);
 
 impl MessageText {
-    pub fn new_with_imginfo(prompt: &str, infotxt: &ImgInfo) -> Self {
+    pub fn new_with_image_params(prompt: &str, infotxt: &dyn ImageParams) -> Self {
         use teloxide::utils::markdown::escape;
 
         Self(format!(
@@ -177,26 +129,23 @@ impl MessageText {
             escape(prompt),
             [
                 infotxt
-                    .negative_prompt
+                    .negative_prompt()
                     .as_ref()
                     .and_then(|s| (!s.trim().is_empty()).then(|| escape(s)))
                     .map(|s| format!("Negative prompt: `{s}`")),
-                infotxt.steps.map(|s| format!("Steps: `{s}`")),
+                infotxt.steps().map(|s| format!("Steps: `{s}`")),
                 infotxt
-                    .sampler_name
+                    .sampler()
                     .as_ref()
                     .map(|s| format!("Sampler: `{s}`")),
-                infotxt.cfg_scale.map(|s| format!("CFG scale: `{s}`")),
-                infotxt.seed.map(|s| format!("Seed: `{s}`")),
+                infotxt.cfg().map(|s| format!("CFG scale: `{s}`")),
+                infotxt.seed().map(|s| format!("Seed: `{s}`")),
                 infotxt
-                    .width
-                    .and_then(|w| infotxt.height.map(|h| format!("Size: `{w}×{h}`"))),
+                    .width()
+                    .and_then(|w| infotxt.height().map(|h| format!("Size: `{w}×{h}`"))),
+                infotxt.model().as_ref().map(|s| format!("Model: `{s}`")),
                 infotxt
-                    .sd_model_name
-                    .as_ref()
-                    .map(|s| format!("Model: `{s}`")),
-                infotxt
-                    .denoising_strength
+                    .denoising()
                     .map(|s| format!("Denoising strength: `{s}`")),
             ]
             .into_iter()
@@ -207,43 +156,24 @@ impl MessageText {
     }
 }
 
-impl<T> TryFrom<ImgResponse<T>> for MessageText {
+impl TryFrom<&dyn ImageParams> for MessageText {
     type Error = anyhow::Error;
 
-    fn try_from(resp: ImgResponse<T>) -> Result<Self, Self::Error> {
-        resp.try_into()
-    }
-}
-
-impl<T> TryFrom<&ImgResponse<T>> for MessageText {
-    type Error = anyhow::Error;
-
-    fn try_from(resp: &ImgResponse<T>) -> Result<Self, Self::Error> {
-        let info = resp.info()?;
-        let prompt = if let Some(prompt) = &info.prompt {
+    fn try_from(params: &dyn ImageParams) -> Result<Self, Self::Error> {
+        let prompt = if let Some(prompt) = params.prompt() {
             prompt
         } else {
             return Err(anyhow!("No prompt in image info response"));
         };
-        Ok(Self::new_with_imginfo(prompt.as_str(), &info))
+        Ok(Self::new_with_image_params(prompt.as_str(), params))
     }
 }
 
-// TODO FIXME: Proper implementation.
-impl TryFrom<&Vec<Image>> for MessageText {
+impl TryFrom<Response> for MessageText {
     type Error = anyhow::Error;
 
-    fn try_from(_images: &Vec<Image>) -> Result<Self, Self::Error> {
-        Ok(Self("`hello`".to_string()))
-    }
-}
-
-// TODO FIXME: Proper implementation.
-impl TryFrom<Vec<Image>> for MessageText {
-    type Error = anyhow::Error;
-
-    fn try_from(_images: Vec<Image>) -> Result<Self, Self::Error> {
-        Ok(Self("`hello`".to_string()))
+    fn try_from(response: Response) -> Result<Self, Self::Error> {
+        Self::try_from(response.params.as_ref())
     }
 }
 
@@ -253,7 +183,7 @@ async fn do_img2img(
     img2img: &mut Box<dyn GenParams>,
     msg: &Message,
     photo: Vec<PhotoSize>,
-) -> anyhow::Result<Vec<Image>> {
+) -> anyhow::Result<Response> {
     let prompt = if let Some(caption) = msg.caption() {
         caption
     } else {
@@ -302,26 +232,19 @@ async fn handle_image(
 
     let resp = do_img2img(&bot, &cfg, &mut img2img, &msg, photo).await?;
 
-    // TODO FIXME: Add seed handling.
-    // let seed = if resp.info()?.seed == resp.parameters.seed {
-    //     -1
-    // } else {
-    //     resp.info()?.seed.unwrap_or(-1)
-    // };
-    let seed = -1;
+    let seed = if resp.params.seed() == resp.gen_params.seed() {
+        -1
+    } else {
+        resp.params.seed().unwrap_or(-1)
+    };
 
-    let caption = MessageText::try_from(&resp).context("Failed to build caption from response")?;
+    let caption = MessageText::try_from(resp.params.as_ref())
+        .context("Failed to build caption from response")?;
 
-    // TODO FIXME: Reconcile after fixing definition.
-    Response::new_from_bytes(
-        caption.0,
-        resp.into_iter().map(|i| i.data).collect(),
-        seed,
-        msg.id,
-    )
-    .context("Failed to create response!")?
-    .send(&bot, msg.chat.id)
-    .await?;
+    Reply::new(caption.0, resp.images, seed, msg.id)
+        .context("Failed to create response!")?
+        .send(&bot, msg.chat.id)
+        .await?;
 
     dialogue
         .update(State::Ready {
@@ -339,7 +262,7 @@ async fn do_txt2img(
     prompt: &str,
     cfg: &ConfigParameters,
     txt2img: &mut dyn GenParams,
-) -> anyhow::Result<Vec<Image>> {
+) -> anyhow::Result<Response> {
     txt2img.set_prompt(prompt.to_owned());
 
     let resp = cfg.txt2img_api.txt2img(txt2img).await?;
@@ -360,26 +283,19 @@ async fn handle_prompt(
 
     let resp = do_txt2img(text.as_str(), &cfg, txt2img.as_mut()).await?;
 
-    // TODO FIXME: Add seed handling.
-    //let seed = if resp.info()?.seed == resp.parameters.seed {
-    //    -1
-    //} else {
-    //    resp.info()?.seed.unwrap_or(-1)
-    //};
-    let seed = -1;
+    let seed = if resp.params.seed() == resp.gen_params.seed() {
+        -1
+    } else {
+        resp.params.seed().unwrap_or(-1)
+    };
 
-    let caption = MessageText::try_from(&resp).context("Failed to build caption from response")?;
+    let caption = MessageText::try_from(resp.params.as_ref())
+        .context("Failed to build caption from response")?;
 
-    // TODO FIXME: Adjust as needed.
-    Response::new_from_bytes(
-        caption.0,
-        resp.into_iter().map(|i| i.data).collect(),
-        seed,
-        msg.id,
-    )
-    .context("Failed to create response!")?
-    .send(&bot, msg.chat.id)
-    .await?;
+    Reply::new(caption.0, resp.images, seed, msg.id)
+        .context("Failed to create response!")?
+        .send(&bot, msg.chat.id)
+        .await?;
 
     dialogue
         .update(State::Ready {

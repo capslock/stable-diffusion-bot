@@ -100,8 +100,8 @@ impl Api {
 
 /// A struct that represents the response from the Stable Diffusion WebUI API endpoint.
 #[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
-pub struct ImgResponse<T> {
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
+pub struct ImgResponse<T: Clone> {
     /// A vector of strings containing base64-encoded images.
     pub images: Vec<String>,
     /// The parameters that were provided for the generation request.
@@ -110,7 +110,7 @@ pub struct ImgResponse<T> {
     pub info: String,
 }
 
-impl<T> ImgResponse<T> {
+impl<T: Clone> ImgResponse<T> {
     /// Parses and returns a new `ImgInfo` instance from the `info` field of the `ImgResponse`.
     ///
     /// # Errors
@@ -139,7 +139,7 @@ impl<T> ImgResponse<T> {
 }
 
 #[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 /// Information about the generated images.
 pub struct ImgInfo {
     /// The prompt used when generating the image.
@@ -207,7 +207,7 @@ pub struct ImgInfo {
 }
 
 #[skip_serializing_none]
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 /// Extra parameters describing image generation.
 pub struct ExtraGenParams {
     /// Names and hashes of LORA models used for image generation.
