@@ -16,7 +16,7 @@ pub use visitor::Visitor;
 pub mod setter;
 
 pub mod getter;
-pub use getter::*;
+use getter::*;
 
 mod accessors;
 
