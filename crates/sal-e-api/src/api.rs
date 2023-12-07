@@ -6,22 +6,40 @@ use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 
 use crate::{ComfyParams, Img2ImgParams, Txt2ImgParams};
 
+/// Struct representing a response from a Stable Diffusion API image generation endpoint.
 #[derive(Debug, Clone)]
 pub struct Response {
+    /// A vector of images.
     pub images: Vec<Vec<u8>>,
+    /// The parameters describing the generated image.
     pub params: Box<dyn crate::image_params::ImageParams>,
+    /// The parameters that were provided for the generation request.
     pub gen_params: Box<dyn crate::gen_params::GenParams>,
 }
 
+/// Struct wrapping a connection to the ComfyUI API.
 #[derive(Debug, Clone, Default)]
 pub struct ComfyPromptApi {
+    /// The ComfyUI client.
     pub client: comfyui_api::comfy::Comfy,
+    /// Default parameters for the ComfyUI API.
     pub params: crate::gen_params::ComfyParams,
+    /// The output node.
     pub output_node: Option<String>,
+    /// The prompt node.
     pub prompt_node: Option<String>,
 }
 
 impl ComfyPromptApi {
+    /// Constructs a new `ComfyPromptApi` client with the provided prompt.
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - The prompt to use for the API.
+    ///
+    /// # Returns
+    ///
+    /// A new `ComfyPromptApi` instance on success, or an error if there was a failure in the ComfyUI API client.
     pub fn new(prompt: comfyui_api::models::Prompt) -> anyhow::Result<Self> {
         Ok(Self {
             client: comfyui_api::comfy::Comfy::new()?,
@@ -38,11 +56,29 @@ impl ComfyPromptApi {
 
 dyn_clone::clone_trait_object!(Txt2ImgApi);
 
-/// Struct representing a connection to a Stable Diffusion API.
+/// Trait representing a Txt2Img endpoint.
 #[async_trait]
 pub trait Txt2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
+    /// Generates an image using text-to-image.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The configuration to use for the generation.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Response` on success, or an error if the request failed.
     async fn txt2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response>;
 
+    /// Returns the default generation parameters for this endpoint.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_settings` - The user settings to merge with the defaults.
+    ///
+    /// # Returns
+    ///
+    /// A `Box<dyn crate::gen_params::GenParams>` containing the generation parameters.
     fn gen_params(
         &self,
         user_settings: Option<&dyn crate::gen_params::GenParams>,
@@ -51,11 +87,29 @@ pub trait Txt2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
 
 dyn_clone::clone_trait_object!(Img2ImgApi);
 
-/// Struct representing a connection to a Stable Diffusion API.
+/// Trait representing an Img2Img endpoint.
 #[async_trait]
 pub trait Img2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
+    /// Generates an image using image-to-image.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The configuration to use for the generation.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Response` on success, or an error if the request failed.
     async fn img2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response>;
 
+    /// Returns the default generation parameters for this endpoint.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_settings` - The user settings to merge with the defaults.
+    ///
+    /// # Returns
+    ///
+    /// A `Box<dyn crate::gen_params::GenParams>` containing the generation parameters.
     fn gen_params(
         &self,
         user_settings: Option<&dyn crate::gen_params::GenParams>,
@@ -141,14 +195,19 @@ impl Img2ImgApi for ComfyPromptApi {
     }
 }
 
+/// Struct wrapping a connection to the Stable Diffusion WebUI API.
 #[derive(Debug, Clone, Default)]
 pub struct StableDiffusionWebUiApi {
+    /// The Stable Diffusion WebUI client.
     pub client: stable_diffusion_api::Api,
+    /// Default parameters for the Txt2Img endpoint.
     pub txt2img_defaults: Txt2ImgRequest,
+    /// Default parameters for the Img2Img endpoint.
     pub img2img_defaults: Img2ImgRequest,
 }
 
 impl StableDiffusionWebUiApi {
+    /// Constructs a new `StableDiffusionWebUiApi` client with the default parameters.
     pub fn new() -> Self {
         Self::default()
     }

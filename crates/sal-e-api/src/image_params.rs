@@ -4,16 +4,27 @@ use stable_diffusion_api::ImgInfo;
 
 dyn_clone::clone_trait_object!(ImageParams);
 
+/// Trait representing an interface to the parameters used to generate an image.
 pub trait ImageParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {
+    /// Returns the seed.
     fn seed(&self) -> Option<i64>;
+    /// Returns the number of steps.
     fn steps(&self) -> Option<u32>;
+    /// Returns the CFG scale.
     fn cfg(&self) -> Option<f32>;
+    /// Returns the width.
     fn width(&self) -> Option<u32>;
+    /// Returns the height.
     fn height(&self) -> Option<u32>;
+    /// Returns the prompt.
     fn prompt(&self) -> Option<String>;
+    /// Returns the negative prompt.
     fn negative_prompt(&self) -> Option<String>;
+    /// Returns the denoising strength.
     fn denoising(&self) -> Option<f32>;
+    /// Returns the model.
     fn model(&self) -> Option<String>;
+    /// Returns the sampler.
     fn sampler(&self) -> Option<String>;
 }
 
