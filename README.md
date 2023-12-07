@@ -157,7 +157,20 @@ sd_api_url = "http://localhost:7860"
 * `db_path` is optional; user settings will not persist on bot restart if not
   provided.
 * `sd_api_url` is required and should be set to the url of a
-  `Stable Diffusion web UI` API instance.
+  `Stable Diffusion web UI` or `ComfyUI` API instance.
+
+For ComfyUI, you'll also want to specify a workflow to use for text-to-image and
+image-to-image:
+
+```toml
+[comfyui]
+txt2img_prompt_file = "path/to/workflow_api.json"
+img2img_prompt_file = "path/to/workflow_api.json"
+```
+
+To get a workflow in API format, open your workflow in ComfyUI and check the
+"Enable Dev mode Options" box in the settings. Then, press the new "Save (API
+Format)" button below the normal "Save" button.
 
 ### Run
 
@@ -204,7 +217,11 @@ that image and the prompt.
 
 #### Stable Diffusion Settings
 
-You can set the default `txt2img` and `img2img` parameters via the `config.toml` file.
+For ComfyUI, you can configure the base workflow to contain the default settings
+you want to use.
+
+For the Stable Diffusion WebUI, you can set the default `txt2img` and `img2img`
+parameters via the `config.toml` file:
 
 ```toml
 [txt2img]
@@ -226,12 +243,14 @@ for all of the available options.
 
 ### Using the sub-crates.
 
-This projects consists of three crates:
+This projects consists of four crates:
 * the `stable-diffusion-bot` crate containing the main program and bot
   implementation.
 * the `stable-diffusion-api` crate containing a wrapper around the Stable
   Diffusion web UI API.
 * the `comfyui-api` crate containing a wrapper around the ComfyUI API.
+* the `sal-e-api` crate containing a API abstraction layer over ComfyUI and
+  Stable Diffusion Web UI.
 
 All can be used as standalone libraries:
 
@@ -267,4 +286,15 @@ the ComfyUI API.
 
 ```shell
 cargo add --git https://github.com/capslock/stable-diffusion-bot comfyui-api
+```
+
+#### sal-e-api
+
+[Crate Documentation](https://capslock.github.io/stable-diffusion-bot/sal_e_api/index.html)
+
+You can use these API bindings to build an application that accepts either a
+Stable Diffusion web UI API or ComfyUI API backend.
+
+```shell
+cargo add --git https://github.com/capslock/stable-diffusion-bot sal-e-api
 ```
