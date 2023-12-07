@@ -24,7 +24,3 @@ use comfyui_api::*;
 
 See `examples/simple.rs` for a full-featured usage example of the low-level API.
 See `examples/comfy.rs` for an example of using the higher-level Comfy API.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE.md file for details.
