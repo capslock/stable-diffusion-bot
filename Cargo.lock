@@ -2018,7 +2018,7 @@ dependencies = [
 
 [[package]]
 name = "stable-diffusion-api"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
@@ -2030,7 +2030,7 @@ dependencies = [
 
 [[package]]
 name = "stable-diffusion-bot"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
