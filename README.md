@@ -147,7 +147,7 @@ api_key = "your_telegram_bot_api_key"
 allowed_users = [ 123, 456, 789 ]
 # Path to where the DB should be stored. If not provided, user settings are not persisted.
 db_path = "./db.sqlite"
-# URL of the Stable Diffusion to use to generate images.
+# URL of the backend to use to generate images.
 sd_api_url = "http://localhost:7860"
 ```
 
@@ -159,14 +159,23 @@ sd_api_url = "http://localhost:7860"
 * `sd_api_url` is required and should be set to the url of a
   `Stable Diffusion web UI` or `ComfyUI` API instance.
 
-For ComfyUI, you'll also want to specify a workflow to use for text-to-image and
-image-to-image:
+For ComfyUI, you'll additionally want to set the `api_type` to `"ComfyUI"` and
+specify a workflow to use for text-to-image and image-to-image:
 
 ```toml
+api_type = "ComfyUI"
+
 [comfyui]
 txt2img_prompt_file = "path/to/workflow_api.json"
 img2img_prompt_file = "path/to/workflow_api.json"
 ```
+
+* `api_type` is either `"ComfyUI"` or `"StableDiffusionWebUI"` (default).
+  Default if left unset.
+* `txt2img_prompt_file` should be a path to a `ComfyUI` workflow in API format that generates
+  an image from a prompt.
+* `img2img_prompt_file` should be a path to a `ComfyUI` workflow in API format that has a
+  `LoadImage` node and generates an image based on that and a prompt.
 
 To get a workflow in API format, open your workflow in ComfyUI and check the
 "Enable Dev mode Options" box in the settings. Then, press the new "Save (API
