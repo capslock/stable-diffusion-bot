@@ -7,21 +7,21 @@ use crate::{comfy::visitor::FindNode, comfy::Visitor};
 
 use super::accessors;
 
-/// A trait for setting values on nodes.
+/// A trait for getting values from nodes.
 pub trait Getter<T, N>
 where
     N: Node + 'static,
     Self: Default,
 {
-    /// Uses a heuristic to find a `Node` and set the value on it.
+    /// Uses a heuristic to find a `Node` and get the value from it.
     ///
     /// # Inputs
     ///
-    /// * `prompt` - A mutable reference to a `Prompt`.
+    /// * `prompt` - A reference to a `Prompt`.
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// A reference to the value on success, or an error if the node could not be found.
     fn get<'a>(&self, prompt: &'a Prompt) -> anyhow::Result<&'a T> {
         let node = if let Some(node) = Self::guess_node(prompt, None) {
             node
@@ -31,6 +31,15 @@ where
         self.get_value(node)
     }
 
+    /// Uses a heuristic to find a `Node` and get the value from it.
+    ///
+    /// # Inputs
+    ///
+    /// * `prompt` - A mutable reference to a `Prompt`.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to the value on success, or an error if the node could not be found.
     fn get_mut<'a>(&self, prompt: &'a mut Prompt) -> anyhow::Result<&'a mut T> {
         let node = if let Some(node) = Self::guess_node_mut(prompt, None) {
             node
@@ -40,15 +49,15 @@ where
         self.get_value_mut(node)
     }
 
-    /// Finds a `Node` leading into the given `output_node` and sets the value on it.
+    /// Finds a `Node` leading into the given `output_node` and gets the value from it.
     ///
     /// # Inputs
     ///
-    /// * `prompt` - A mutable reference to a `Prompt`.
+    /// * `prompt` - A reference to a `Prompt`.
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// A reference to the value on success, or an error if the node could not be found.
     fn get_from<'a>(&self, prompt: &'a Prompt, output_node: &str) -> anyhow::Result<&'a T> {
         let node = if let Some(node) = Self::find_node(prompt, Some(output_node)) {
             prompt
@@ -60,6 +69,15 @@ where
         self.get_value(node)
     }
 
+    /// Finds a `Node` leading into the given `output_node` and gets the value from it.
+    ///
+    /// # Inputs
+    ///
+    /// * `prompt` - A mutable reference to a `Prompt`.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to the value on success, or an error if the node could not be found.
     fn get_from_mut<'a>(
         &self,
         prompt: &'a mut Prompt,
@@ -75,7 +93,22 @@ where
         self.get_value_mut(node)
     }
 
-    /// Sets the value on the node with id `node`.
+    /// Gets a value from the node with id `node`.
+    ///
+    /// # Inputs
+    ///
+    /// * `prompt` - A reference to a `Prompt`.
+    /// * `node` - The id of the node to set the value on.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the value on success, or an error if the node could not be found.
+    fn get_node<'a>(&self, prompt: &'a Prompt, node: &str) -> anyhow::Result<&'a T> {
+        let node = prompt.get_node_by_id(node).unwrap();
+        self.get_value(node)
+    }
+
+    /// Gets a value from the node with id `node`.
     ///
     /// # Inputs
     ///
@@ -84,18 +117,24 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
-    fn get_node<'a>(&self, prompt: &'a Prompt, node: &str) -> anyhow::Result<&'a T> {
-        let node = prompt.get_node_by_id(node).unwrap();
-        self.get_value(node)
-    }
-
+    /// A mutable reference to the value on success, or an error if the node could not be found.
     fn get_node_mut<'a>(&self, prompt: &'a mut Prompt, node: &str) -> anyhow::Result<&'a mut T> {
         let node = prompt.get_node_by_id_mut(node).unwrap();
         self.get_value_mut(node)
     }
 
-    /// Sets the value on the given `Node`.
+    /// Gets a value from the given `Node`.
+    ///
+    /// # Inputs
+    ///
+    /// * `node` - A reference to a `Node`.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the value on success, or an error if the node could not be found.
+    fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a T>;
+
+    /// Gets a value from the given `Node`.
     ///
     /// # Inputs
     ///
@@ -103,9 +142,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
-    fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a T>;
-
+    /// A mutable reference to the value on success, or an error if the node could not be found.
     fn get_value_mut<'a>(&self, node: &'a mut dyn Node) -> anyhow::Result<&'a mut T>;
 
     /// Finds a `Node` leading into the given `output_node`.
@@ -121,6 +158,16 @@ where
         find_node::<N>(prompt, output_node)
     }
 
+    /// Uses a heuristic to find a `Node`.
+    ///
+    /// # Inputs
+    ///
+    /// * `prompt` - A reference to a `Prompt`.
+    /// * `output_node` - The id of the node to search from.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the node on success, or `None` if the node could not be found.
     fn guess_node<'a>(prompt: &'a Prompt, output_node: Option<&str>) -> Option<&'a dyn Node> {
         if let Some(node) = Self::find_node(prompt, output_node) {
             prompt.get_node_by_id(&node)
@@ -131,6 +178,16 @@ where
         }
     }
 
+    /// Uses a heuristic to find a `Node`.
+    ///
+    /// # Inputs
+    ///
+    /// * `prompt` - A mutable reference to a `Prompt`.
+    /// * `output_node` - The id of the node to search from.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference to the node on success, or `None` if the node could not be found.
     fn guess_node_mut<'a>(
         prompt: &'a mut Prompt,
         output_node: Option<&str>,
@@ -145,7 +202,7 @@ where
     }
 }
 
-/// Extension methods for `Prompt` to get values from nodes.
+/// Extension methods for `Prompt` to get nodes.
 pub trait GetExt<N>
 where
     N: Node + 'static,
@@ -187,7 +244,7 @@ impl<N: Node + 'static> GetExt<N> for Prompt {
     }
 }
 
-pub trait GetterExt<T, N>
+trait GetterExt<T, N>
 where
     N: Node + 'static,
 {
@@ -370,8 +427,20 @@ macro_rules! create_getter {
 #[macro_export]
 macro_rules! create_ext_trait {
     ($ValueType:ty, $AccessorType:ty, $getter_name:ident, $getter_name_mut:ident, $TraitName:ident) => {
+        /// Trait to get references to values from a `Prompt``.
         pub trait $TraitName {
+            /// Get a reference to the value.
+            ///
+            /// # Returns
+            ///
+            /// A `Result` containing the reference on success, or an error if the node could not be found.
             fn $getter_name(&self) -> anyhow::Result<&$ValueType>;
+
+            /// Get a mutable reference to the value.
+            ///
+            /// # Returns
+            ///
+            /// A `Result` containing the mutable reference on success, or an error if the node could not be found.
             fn $getter_name_mut(&mut self) -> anyhow::Result<&mut $ValueType>;
         }
 
@@ -419,8 +488,20 @@ impl Getter<String, CLIPTextEncode> for accessors::Prompt {
     }
 }
 
+/// Trait to get references to values from a `Prompt``.
 pub trait PromptExt {
+    /// Get a reference to the value.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the reference on success, or an error if the node could not be found.
     fn prompt(&self) -> anyhow::Result<&String>;
+
+    /// Get a mutable reference to the value.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the mutable reference on success, or an error if the node could not be found.
     fn prompt_mut(&mut self) -> anyhow::Result<&mut String>;
 }
 
@@ -458,8 +539,20 @@ impl Getter<String, CLIPTextEncode> for accessors::NegativePrompt {
     }
 }
 
+/// Trait to get references to values from a `Prompt``.
 pub trait NegativePromptExt {
+    /// Get a reference to the value.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the reference on success, or an error if the node could not be found.
     fn negative_prompt(&self) -> anyhow::Result<&String>;
+
+    /// Get a mutable reference to the value.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the mutable reference on success, or an error if the node could not be found.
     fn negative_prompt_mut(&mut self) -> anyhow::Result<&mut String>;
 }
 

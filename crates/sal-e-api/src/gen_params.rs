@@ -9,64 +9,112 @@ use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
 
 dyn_clone::clone_trait_object!(GenParams);
 
+/// Trait representing an interface to image generation parameters.
 #[typetag::serde]
 pub trait GenParams: std::fmt::Debug + AsAny + Send + Sync + DynClone {
+    /// Gets the seed.
     fn seed(&self) -> Option<i64>;
+    /// Sets the seed.
     fn set_seed(&mut self, seed: i64);
 
+    /// Gets the number of steps.
     fn steps(&self) -> Option<u32>;
+    /// Sets the number of steps.
     fn set_steps(&mut self, steps: u32);
 
+    /// Gets the number of images to generate.
     fn count(&self) -> Option<u32>;
+    /// Sets the number of images to generate.
     fn set_count(&mut self, count: u32);
 
+    /// Gets the CFG scale.
     fn cfg(&self) -> Option<f32>;
+    /// Sets the CFG scale.
     fn set_cfg(&mut self, cfg: f32);
 
+    /// Gets the image width.
     fn width(&self) -> Option<u32>;
+    /// Sets the image width.
     fn set_width(&mut self, width: u32);
 
+    /// Gets the image height.
     fn height(&self) -> Option<u32>;
+    /// Sets the image height.
     fn set_height(&mut self, height: u32);
 
+    /// Gets the prompt.
     fn prompt(&self) -> Option<String>;
+    /// Sets the prompt.
     fn set_prompt(&mut self, prompt: String);
 
+    /// Gets the negative prompt.
     fn negative_prompt(&self) -> Option<String>;
+    /// Sets the negative prompt.
     fn set_negative_prompt(&mut self, negative_prompt: String);
 
+    /// Gets the denoising strength.
     fn denoising(&self) -> Option<f32>;
+    /// Sets the denoising strength.
     fn set_denoising(&mut self, denoising: f32);
 
+    /// Gets the sampler.
     fn sampler(&self) -> Option<String>;
+    /// Sets the sampler.
     fn set_sampler(&mut self, sampler: String);
 
+    /// Gets the batch size.
     fn batch_size(&self) -> Option<u32>;
+    /// Sets the batch size.
     fn set_batch_size(&mut self, batch_size: u32);
 
+    /// Gets the image.
     fn image(&self) -> Option<Vec<u8>>;
+    /// Sets the image.
     fn set_image(&mut self, image: Option<Vec<u8>>);
 }
 
+/// A struct representing the parameters for ComfyUI image generation.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ComfyParams {
+    /// The ComfyUI prompt to use for generation.
     #[serde(skip)]
     pub prompt: Option<comfyui_api::models::Prompt>,
+    /// The random seed to use for generation.
     pub seed: Option<i64>,
+    /// The number of steps to take for generation.
     pub steps: Option<u32>,
+    /// The number of images to generate.
     pub count: u32,
+    /// The CFG scale to use for generation.
     pub cfg: Option<f32>,
+    /// The image width to use for generation.
     pub width: Option<u32>,
+    /// The image height to use for generation.
     pub height: Option<u32>,
+    /// The prompt text to use for generation.
     pub prompt_text: Option<String>,
+    /// The negative prompt text to use for generation.
     pub negative_prompt_text: Option<String>,
+    /// The denoising strength to use for generation.
     pub denoising: Option<f32>,
+    /// The sampler to use for generation.
     pub sampler: Option<String>,
+    /// The batch size to use for generation.
     pub batch_size: Option<u32>,
+    /// The image to use for generation.
     pub image: Option<Vec<u8>>,
 }
 
 impl ComfyParams {
+    /// Applies the parameters to the provided prompt.
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - The prompt to apply the parameters to.
+    ///
+    /// # Returns
+    ///
+    /// The prompt with the parameters applied.
     pub fn apply_to(&self, prompt: &Prompt) -> Prompt {
         let mut prompt = prompt.clone();
 
@@ -115,6 +163,11 @@ impl ComfyParams {
         prompt
     }
 
+    /// Applies the parameters to the current prompt.
+    ///
+    /// # Returns
+    ///
+    /// The prompt with the parameters applied.
     pub fn apply(&self) -> Option<Prompt> {
         self.prompt.as_ref().map(|prompt| self.apply_to(prompt))
     }
@@ -252,9 +305,12 @@ impl GenParams for ComfyParams {
     }
 }
 
+/// A struct representing the parameters for image generation in the Stable Diffusion WebUI API.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Txt2ImgParams {
+    /// The parameters provided by the user.
     pub user_params: Txt2ImgRequest,
+    /// The default parameters.
     #[serde(skip)]
     pub defaults: Option<Txt2ImgRequest>,
 }
@@ -405,9 +461,12 @@ impl GenParams for Txt2ImgParams {
     fn set_image(&mut self, _image: Option<Vec<u8>>) {}
 }
 
+/// A struct representing the parameters for image generation in the Stable Diffusion WebUI API.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Img2ImgParams {
+    /// The parameters provided by the user.
     pub user_params: Img2ImgRequest,
+    /// The default parameters.
     #[serde(skip)]
     pub defaults: Option<Img2ImgRequest>,
 }

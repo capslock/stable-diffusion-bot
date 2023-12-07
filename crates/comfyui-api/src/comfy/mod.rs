@@ -247,11 +247,17 @@ impl Comfy {
 /// Information about the generated image.
 #[derive(Debug, Clone, Default)]
 pub struct ImageInfo {
+    /// The prompt used to generate the image.
     pub prompt: Option<String>,
+    /// The negative prompt used to generate the image.
     pub negative_prompt: Option<String>,
+    /// The model used to generate the image.
     pub model: Option<String>,
+    /// The width of the image.
     pub width: Option<u32>,
+    /// The height of the image.
     pub height: Option<u32>,
+    /// The seed used to generate the image.
     pub seed: Option<i64>,
 }
 
