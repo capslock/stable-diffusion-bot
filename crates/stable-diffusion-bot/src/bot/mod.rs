@@ -128,12 +128,14 @@ impl StableDiffusionBot {
             |dialogue: Dialogue<State, S>, cfg: ConfigParameters| async move {
                 match dialogue.get().await {
                     Ok(dialogue) => {
-                        let mut dialogue = dialogue.unwrap_or_else(|| {
-                            State::new_with_defaults(
+                        let mut dialogue = if let Some(dialogue) = dialogue {
+                            dialogue
+                        } else {
+                            return Some(State::new_with_defaults(
                                 cfg.txt2img_api.gen_params(None),
                                 cfg.img2img_api.gen_params(None),
-                            )
-                        });
+                            ));
+                        };
                         match dialogue {
                             State::New => {}
                             State::Ready {
