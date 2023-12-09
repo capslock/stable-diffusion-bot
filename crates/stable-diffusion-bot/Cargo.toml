@@ -2,6 +2,13 @@
 name = "stable-diffusion-bot"
 version = "0.2.0"
 edition = "2021"
+description = "Stable Diffusion Telegram Bot"
+readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/capslock/stable-diffusion-bot"
+repository = "https://github.com/capslock/stable-diffusion-bot"
+keywords = ["stable-diffusion", "stable diffusion", "comfyui", "telegram"]
+categories = ["command-line-utility"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

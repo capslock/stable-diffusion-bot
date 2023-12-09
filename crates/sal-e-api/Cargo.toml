@@ -2,6 +2,13 @@
 name = "sal-e-api"
 version = "0.1.0"
 edition = "2021"
+description = "Stable-Diffusion Abstraction Layer"
+readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/capslock/stable-diffusion-bot"
+repository = "https://github.com/capslock/stable-diffusion-bot"
+keywords = ["stable-diffusion", "stable diffusion", "sal-e", "comfyui"]
+categories = ["api-bindings"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
