@@ -1,6 +1,7 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context};
+use comfyui_api::comfy::getter::{LoadImageExt, PromptExt, SeedExt};
 use sal_e_api::{ComfyPromptApi, GenParams, Img2ImgApi, StableDiffusionWebUiApi, Txt2ImgApi};
 use serde::{Deserialize, Serialize};
 use teloxide::{
@@ -446,11 +447,29 @@ impl StableDiffusionBotBuilder {
                     serde_json::from_str::<comfyui_api::models::Prompt>(&txt2img_prompt)
                         .context("Failed to deserialize prompt")?;
 
+                _ = txt2img_prompt
+                    .prompt()
+                    .context("Failed to find a valid txt2img prompt node.")?;
+                _ = txt2img_prompt
+                    .seed()
+                    .context("Failed to find a valid txt2img seed node.")?;
+
                 let txt2img_api = ComfyPromptApi::new(txt2img_prompt)?;
 
                 let img2img_prompt =
                     serde_json::from_str::<comfyui_api::models::Prompt>(&img2img_prompt)
                         .context("Failed to deserialize prompt")?;
+
+                _ = img2img_prompt
+                    .prompt()
+                    .context("Failed to find a valid img2img prompt node.")?;
+                _ = img2img_prompt
+                    .image()
+                    .context("Failed to find a valid img2img image node.")?;
+                _ = img2img_prompt
+                    .seed()
+                    .context("Failed to find a valid img2img seed node.")?;
+
                 let img2img_api = ComfyPromptApi::new(img2img_prompt)?;
                 (Box::new(txt2img_api), Box::new(img2img_api))
             }
