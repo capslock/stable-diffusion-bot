@@ -14,6 +14,8 @@ Add this to your `Cargo.toml`:
 comfyui-api = "0.1.0"
 ```
 
+## Usage
+
 ### Low-level API
 
 The low-level API directly wraps the ComfyUI API. This API is available in the
