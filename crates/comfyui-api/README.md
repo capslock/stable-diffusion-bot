@@ -14,10 +14,23 @@ Add this to your `Cargo.toml`:
 comfyui-api = "0.1.0"
 ```
 
-Then in your code,
+### Low-level API
+
+The low-level API directly wraps the ComfyUI API. This API is available in the
+`api` module, with the models in the `models` module.
 
 ```rust
-use comfyui_api::*;
+use comfyui_api::{api::*, models::*};
+```
+
+### High-level API
+
+The high-level API wraps the low-level API with simplified functions that are
+well-suited to directly running a prompt and fetching the resulting image. This
+API is available in the `comfy` module, and uses types from the `models` module.
+
+```rust
+use comfyui_api::comfy::*;
 ```
 
 ## Usage
