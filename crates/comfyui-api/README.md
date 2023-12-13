@@ -35,7 +35,7 @@ API is available in the `comfy` module, and uses types from the `models` module.
 use comfyui_api::comfy::*;
 ```
 
-## Usage
+### Usage Examples
 
 See `examples/simple.rs` for a full-featured usage example of the low-level API.
 See `examples/comfy.rs` for an example of using the higher-level Comfy API.

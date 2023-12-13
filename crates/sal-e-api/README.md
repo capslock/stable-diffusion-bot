@@ -39,7 +39,7 @@ To use, create a concrete instance, set the generation parameters, and then call
 use sal_e_api::*;
 
 let api = StableDiffusionWebUiApi::new();
-let parameters = Txt2ImgParams::default();
+let mut parameters = Txt2ImgParams::default();
 parameters.set_prompt("a watercolor of a corgi wearing a tophat");
 let result = api.txt2img(&parameters).await?;
 ```

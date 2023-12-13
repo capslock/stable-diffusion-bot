@@ -14,8 +14,18 @@ Add this to your `Cargo.toml`:
 stable-diffusion-api = "0.1.2"
 ```
 
-Then in your code,
+## Usage
+
+To use, create an `Api` object, which can then be used to talk to the `Txt2Img`
+or `Img2Img` endpoints. Then configure a `Txt2ImgRequest` or `Img2ImgRequest`
+with your desired generation parameters:
 
 ```rust
 use stable_diffusion_api::*;
+
+let api = Api::default();
+let txt2img = api.txt2img()?;
+let mut request = Txt2ImgRequest::default();
+request.with_prompt("a watercolor of a corgi wearing a tophat".to_string());
+let resp = txt2img.send(&request).await?;
 ```
