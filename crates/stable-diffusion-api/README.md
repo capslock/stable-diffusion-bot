@@ -16,8 +16,16 @@ stable-diffusion-api = "0.1.2"
 
 ## Usage
 
-To use, create an `Api` object, which can then be used to talk to the `Txt2Img`
-or `Img2Img` endpoints. Then configure a `Txt2ImgRequest` or `Img2ImgRequest`
+To use, create an
+[`Api`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Api.html)
+object, which can then be used to talk to the
+[`Txt2Img`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Txt2Img.html)
+or
+[`Img2Img`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Img2Img.html)
+endpoints. Then configure a
+[`Txt2ImgRequest`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Txt2ImgRequest.html)
+or
+[`Img2ImgRequest`](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Img2ImgRequest.html)
 with your desired generation parameters:
 
 ```rust

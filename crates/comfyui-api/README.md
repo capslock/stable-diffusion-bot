@@ -19,7 +19,10 @@ comfyui-api = "0.1.0"
 ### Low-level API
 
 The low-level API directly wraps the ComfyUI API. This API is available in the
-`api` module, with the models in the `models` module.
+[`api`](https://capslock.github.io/stable-diffusion-bot/comfyui_api/api/index.html)
+module, with the models in the
+[`models`](https://capslock.github.io/stable-diffusion-bot/comfyui_api/models/index.html)
+module.
 
 ```rust
 use comfyui_api::{api::*, models::*};
@@ -29,7 +32,11 @@ use comfyui_api::{api::*, models::*};
 
 The high-level API wraps the low-level API with simplified functions that are
 well-suited to directly running a prompt and fetching the resulting image. This
-API is available in the `comfy` module, and uses types from the `models` module.
+API is available in the
+[`comfy`](https://capslock.github.io/stable-diffusion-bot/comfyui_api/comfy/index.html)
+module, and uses types from the 
+[`models`](https://capslock.github.io/stable-diffusion-bot/comfyui_api/models/index.html)
+module.
 
 ```rust
 use comfyui_api::comfy::*;
