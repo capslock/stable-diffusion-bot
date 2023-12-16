@@ -277,6 +277,8 @@ cargo add --git https://github.com/capslock/stable-diffusion-bot stable-diffusio
 
 #### stable-diffusion-api
 
+[README](https://github.com/capslock/stable-diffusion-bot/blob/main/crates/stable-diffusion-api/README.md)
+
 [Crate Documentation](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/index.html)
 
 You can use these simple API bindings to build another application that utilizes
@@ -288,6 +290,8 @@ cargo add --git https://github.com/capslock/stable-diffusion-bot stable-diffusio
 
 #### comfyui-api
 
+[README](https://github.com/capslock/stable-diffusion-bot/blob/main/crates/comfyui-api/README.md)
+
 [Crate Documentation](https://capslock.github.io/stable-diffusion-bot/comfyui_api/index.html)
 
 You can use these simple API bindings to build another application that utilizes
@@ -298,6 +302,8 @@ cargo add --git https://github.com/capslock/stable-diffusion-bot comfyui-api
 ```
 
 #### sal-e-api
+
+[README](https://github.com/capslock/stable-diffusion-bot/blob/main/crates/sal-e-api/README.md)
 
 [Crate Documentation](https://capslock.github.io/stable-diffusion-bot/sal_e_api/index.html)
 
