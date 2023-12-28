@@ -1,6 +1,6 @@
 [package]
 name = "sal-e-api"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Stable-Diffusion Abstraction Layer"
 readme = "README.md"
@@ -22,6 +22,7 @@ futures-util = "0.3.29"
 rand = "0.8.5"
 serde = "1.0.157"
 stable-diffusion-api = { path = "../stable-diffusion-api" }
+thiserror = "1.0.52"
 tracing = "0.1.37"
 typetag = "0.2"
 

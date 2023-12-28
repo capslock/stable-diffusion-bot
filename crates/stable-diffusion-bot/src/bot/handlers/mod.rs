@@ -122,7 +122,10 @@ pub(crate) fn authenticated_command_handler() -> UpdateHandler<anyhow::Error> {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use sal_e_api::{GenParams, Img2ImgApi, Img2ImgParams, Response, Txt2ImgApi, Txt2ImgParams};
+    use sal_e_api::{
+        GenParams, Img2ImgApi, Img2ImgApiError, Img2ImgParams, Response, Txt2ImgApi,
+        Txt2ImgApiError, Txt2ImgParams,
+    };
     use teloxide::types::{Me, UpdateKind, User};
 
     fn create_message(text: &str) -> Message {
@@ -179,8 +182,8 @@ mod tests {
             Box::<Txt2ImgParams>::default()
         }
 
-        async fn txt2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {
-            Err(anyhow!("Not implemented"))
+        async fn txt2img(&self, _config: &dyn GenParams) -> Result<Response, Txt2ImgApiError> {
+            Err(anyhow!("Not implemented"))?
         }
     }
 
@@ -190,8 +193,8 @@ mod tests {
             Box::<Img2ImgParams>::default()
         }
 
-        async fn img2img(&self, _config: &dyn GenParams) -> anyhow::Result<Response> {
-            Err(anyhow!("Not implemented"))
+        async fn img2img(&self, _config: &dyn GenParams) -> Result<Response, Img2ImgApiError> {
+            Err(anyhow!("Not implemented"))?
         }
     }
 

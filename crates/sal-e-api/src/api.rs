@@ -17,6 +17,14 @@ pub struct Response {
     pub gen_params: Box<dyn crate::gen_params::GenParams>,
 }
 
+#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
+pub enum ComfyPromptApiError {
+    /// Error creating a ComfyUI Client
+    #[error("Error creating a ComfyUI Client")]
+    CreateClient(#[from] anyhow::Error),
+}
+
 /// Struct wrapping a connection to the ComfyUI API.
 #[derive(Debug, Clone, Default)]
 pub struct ComfyPromptApi {
@@ -40,7 +48,7 @@ impl ComfyPromptApi {
     /// # Returns
     ///
     /// A new `ComfyPromptApi` instance on success, or an error if there was a failure in the ComfyUI API client.
-    pub fn new(prompt: comfyui_api::models::Prompt) -> anyhow::Result<Self> {
+    pub fn new(prompt: comfyui_api::models::Prompt) -> Result<Self, ComfyPromptApiError> {
         Ok(Self {
             client: comfyui_api::comfy::Comfy::new()?,
             params: crate::gen_params::ComfyParams {
@@ -52,6 +60,20 @@ impl ComfyPromptApi {
             ..Default::default()
         })
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
+pub enum Txt2ImgApiError {
+    /// Prompt was empty.
+    #[error("Prompt was empty.")]
+    EmptyPrompt,
+    /// Error running txt2img.
+    #[error("Error running txt2img.")]
+    Txt2Img(#[from] anyhow::Error),
+    /// Error parsing response.
+    #[error("Error parsing response.")]
+    ParseResponse(#[source] anyhow::Error),
 }
 
 dyn_clone::clone_trait_object!(Txt2ImgApi);
@@ -68,7 +90,10 @@ pub trait Txt2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
     /// # Returns
     ///
     /// A `Result` containing a `Response` on success, or an error if the request failed.
-    async fn txt2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response>;
+    async fn txt2img(
+        &self,
+        config: &dyn crate::gen_params::GenParams,
+    ) -> Result<Response, Txt2ImgApiError>;
 
     /// Returns the default generation parameters for this endpoint.
     ///
@@ -85,6 +110,26 @@ pub trait Txt2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
     ) -> Box<dyn crate::gen_params::GenParams>;
 }
 
+#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
+pub enum Img2ImgApiError {
+    /// Prompt was empty.
+    #[error("Prompt was empty.")]
+    EmptyPrompt,
+    /// Error running txt2img.
+    #[error("Error running txt2img.")]
+    Img2Img(#[from] anyhow::Error),
+    /// Error parsing response.
+    #[error("Error parsing response.")]
+    ParseResponse(#[source] anyhow::Error),
+    /// No image provided.
+    #[error("No image provided.")]
+    NoImage,
+    /// Error uploading image.
+    #[error("Error uploading image.")]
+    UploadImage(#[source] anyhow::Error),
+}
+
 dyn_clone::clone_trait_object!(Img2ImgApi);
 
 /// Trait representing an Img2Img endpoint.
@@ -99,7 +144,10 @@ pub trait Img2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
     /// # Returns
     ///
     /// A `Result` containing a `Response` on success, or an error if the request failed.
-    async fn img2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response>;
+    async fn img2img(
+        &self,
+        config: &dyn crate::gen_params::GenParams,
+    ) -> Result<Response, Img2ImgApiError>;
 
     /// Returns the default generation parameters for this endpoint.
     ///
@@ -118,7 +166,10 @@ pub trait Img2ImgApi: std::fmt::Debug + DynClone + Send + Sync + AsAny {
 
 #[async_trait]
 impl Txt2ImgApi for ComfyPromptApi {
-    async fn txt2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response> {
+    async fn txt2img(
+        &self,
+        config: &dyn crate::gen_params::GenParams,
+    ) -> Result<Response, Txt2ImgApiError> {
         let base_prompt = config.as_any().downcast_ref().unwrap_or(&self.params);
 
         let mut new_prompt = base_prompt.clone();
@@ -126,7 +177,7 @@ impl Txt2ImgApi for ComfyPromptApi {
             new_prompt.seed = Some(rand::random::<i64>().abs());
         }
 
-        let prompt = new_prompt.apply().context("Prompt was empty.")?;
+        let prompt = new_prompt.apply().context(Txt2ImgApiError::EmptyPrompt)?;
 
         let images = self.client.execute_prompt(&prompt).await?;
         Ok(Response {
@@ -152,16 +203,19 @@ impl Txt2ImgApi for ComfyPromptApi {
 
 #[async_trait]
 impl Img2ImgApi for ComfyPromptApi {
-    async fn img2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response> {
+    async fn img2img(
+        &self,
+        config: &dyn crate::gen_params::GenParams,
+    ) -> Result<Response, Img2ImgApiError> {
         let base_prompt = config.as_any().downcast_ref().unwrap_or(&self.params);
 
         let resp = if let Some(image) = &base_prompt.image {
             self.client
                 .upload_file(image.clone())
                 .await
-                .context("Failed to upload file")?
+                .map_err(Img2ImgApiError::UploadImage)?
         } else {
-            return Err(anyhow::anyhow!("Required image was not provided"));
+            return Err(Img2ImgApiError::NoImage);
         };
 
         let mut new_prompt = base_prompt.clone();
@@ -169,7 +223,7 @@ impl Img2ImgApi for ComfyPromptApi {
             new_prompt.seed = Some(rand::random::<i64>().abs());
         }
 
-        let mut prompt = new_prompt.apply().context("Prompt was empty.")?;
+        let mut prompt = new_prompt.apply().context(Img2ImgApiError::EmptyPrompt)?;
 
         *prompt.image_mut()? = resp.name;
 
@@ -215,13 +269,16 @@ impl StableDiffusionWebUiApi {
 
 #[async_trait]
 impl Txt2ImgApi for StableDiffusionWebUiApi {
-    async fn txt2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response> {
+    async fn txt2img(
+        &self,
+        config: &dyn crate::gen_params::GenParams,
+    ) -> Result<Response, Txt2ImgApiError> {
         let config = Txt2ImgParams::from(config);
         let txt2img = self.client.txt2img()?;
         let resp = txt2img.send(&config.user_params).await?;
-        let params = Box::new(resp.info()?);
+        let params = Box::new(resp.info().map_err(Txt2ImgApiError::ParseResponse)?);
         Ok(Response {
-            images: resp.images()?,
+            images: resp.images().map_err(Txt2ImgApiError::ParseResponse)?,
             params: params.clone(),
             gen_params: Box::new(Txt2ImgParams {
                 user_params: resp.parameters.clone(),
@@ -250,13 +307,16 @@ impl Txt2ImgApi for StableDiffusionWebUiApi {
 
 #[async_trait]
 impl Img2ImgApi for StableDiffusionWebUiApi {
-    async fn img2img(&self, config: &dyn crate::gen_params::GenParams) -> anyhow::Result<Response> {
+    async fn img2img(
+        &self,
+        config: &dyn crate::gen_params::GenParams,
+    ) -> Result<Response, Img2ImgApiError> {
         let config = Img2ImgParams::from(config);
         let img2img = self.client.img2img()?;
         let resp = img2img.send(&config.user_params).await?;
-        let params = Box::new(resp.info()?);
+        let params = Box::new(resp.info().map_err(Img2ImgApiError::ParseResponse)?);
         Ok(Response {
-            images: resp.images()?,
+            images: resp.images().map_err(Img2ImgApiError::ParseResponse)?,
             params: params.clone(),
             gen_params: Box::new(Img2ImgParams {
                 user_params: resp.parameters.clone(),

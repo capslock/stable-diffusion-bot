@@ -32,8 +32,8 @@ stable-diffusion-api = { path = "../stable-diffusion-api" }
 teloxide = { version = "0.12", features = ["macros", "sqlite-storage"] }
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 tracing-journald = "0.3.0"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libsystemd = "0.7.0"
