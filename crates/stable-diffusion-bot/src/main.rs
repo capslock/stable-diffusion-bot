@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use clap::Parser;
 use figment::{
     providers::{Env, Format, Toml},
@@ -25,6 +25,9 @@ struct Args {
         default_value = "config.toml"
     )]
     config: Vec<PathBuf>,
+    /// Output logs directly to systemd
+    #[arg(long, default_value = "false")]
+    log_to_systemd: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -42,10 +45,12 @@ struct Config {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+
     let registry = tracing_subscriber::registry();
     let layer = {
         #[cfg(target_os = "linux")]
-        if daemon::booted() {
+        if args.log_to_systemd && daemon::booted() {
             tracing_journald::layer()
                 .context("tracing_journald layer")?
                 .boxed()
@@ -56,7 +61,11 @@ async fn main() -> anyhow::Result<()> {
                 .boxed()
         }
         #[cfg(not(target_os = "linux"))]
-        tracing_subscriber::fmt::layer().pretty().with_target(true)
+        if args.log_to_systemd {
+            return Err(anyhow!("Systemd logging is not supported on this platform"));
+        } else {
+            tracing_subscriber::fmt::layer().pretty().with_target(true)
+        }
     };
 
     let filter = EnvFilter::builder()
@@ -65,8 +74,6 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to parse filter from env")?;
 
     registry.with(filter).with(layer).init();
-
-    let args = Args::parse();
 
     let config: Config = args
         .config

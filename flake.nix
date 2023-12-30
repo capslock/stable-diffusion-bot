@@ -184,7 +184,7 @@
               in {
                 Type = "exec";
                 DynamicUser = true;
-                ExecStart = "${pkg}/bin/stable-diffusion-bot ${args}";
+                ExecStart = "${pkg}/bin/stable-diffusion-bot --log-to-systemd ${args}";
                 EnvironmentFile = mkIf (cfg.environmentFile != null) cfg.environmentFile;
                 Environment = cfg.environment;
                 LoadCredential = mkIf (cfg.telegramApiKeyFile != null) "sdbot.toml:${cfg.telegramApiKeyFile}";
