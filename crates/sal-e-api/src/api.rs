@@ -60,6 +60,66 @@ impl ComfyPromptApi {
             ..Default::default()
         })
     }
+
+    /// Constructs a new `ComfyPromptApi` client with the provided url and prompt.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The URL to use for the API. Must be a valid URL, e.g. `http://localhost:8188
+    /// * `prompt` - The prompt to use for the API.
+    ///
+    /// # Returns
+    ///
+    /// A new `ComfyPromptApi` instance on success, or an error if there was a failure in the ComfyUI API client.
+    pub fn new_with_url<S>(
+        url: S,
+        prompt: comfyui_api::models::Prompt,
+    ) -> Result<Self, ComfyPromptApiError>
+    where
+        S: AsRef<str>,
+    {
+        Ok(Self {
+            client: comfyui_api::comfy::Comfy::new_with_url(url)?,
+            params: crate::gen_params::ComfyParams {
+                prompt: Some(prompt),
+                count: 1,
+                seed: Some(-1),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    }
+
+    /// Constructs a new `ComfyPromptApi` client with the provided url and prompt.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - An instance of `reqwest::Client`.
+    /// * `url` - The URL to use for the API. Must be a valid URL, e.g. `http://localhost:8188
+    /// * `prompt` - The prompt to use for the API.
+    ///
+    /// # Returns
+    ///
+    /// A new `ComfyPromptApi` instance on success, or an error if there was a failure in the ComfyUI API client.
+    pub fn new_with_client_and_url<S>(
+        client: reqwest::Client,
+        url: S,
+        prompt: comfyui_api::models::Prompt,
+    ) -> anyhow::Result<Self>
+    where
+        S: AsRef<str>,
+    {
+        Ok(Self {
+            client: comfyui_api::comfy::Comfy::new_with_client_and_url(client, url)?,
+            params: crate::gen_params::ComfyParams {
+                prompt: Some(prompt),
+                count: 1,
+                seed: Some(-1),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
