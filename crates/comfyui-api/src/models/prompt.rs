@@ -115,6 +115,13 @@ pub trait Node: std::fmt::Debug + Send + Sync + AsAny + DynClone {
     }
 }
 
+/// Struct representing a node metadata.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Meta {
+    /// Node title.
+    pub title: String,
+}
+
 /// Struct representing a generic node.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenericNode {
@@ -122,6 +129,9 @@ pub struct GenericNode {
     pub class_type: String,
     /// The node inputs.
     pub inputs: HashMap<String, GenericValue>,
+    /// Node metadata.
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
 }
 
 #[typetag::serde]
@@ -480,8 +490,7 @@ impl Node for ImageOnlyCheckpointLoader {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoadImage {
     /// UI file selection button.
-    #[serde(rename = "choose file to upload")]
-    pub file_to_upload: Input<String>,
+    pub upload: Input<String>,
     /// The name of the image to load.
     pub image: Input<String>,
 }
@@ -490,7 +499,7 @@ pub struct LoadImage {
 impl Node for LoadImage {
     fn connections(&'_ self) -> Box<dyn Iterator<Item = &str> + '_> {
         Box::new(
-            [self.file_to_upload.node_id(), self.image.node_id()]
+            [self.upload.node_id(), self.image.node_id()]
                 .into_iter()
                 .flatten(),
         )
