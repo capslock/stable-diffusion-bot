@@ -41,10 +41,11 @@ impl WebsocketApi {
         Self { endpoint }
     }
 
-    async fn connect_impl(
+    async fn connect_to_endpoint(
         &self,
+        endpoint: &Url,
     ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
-        let (connection, _) = connect_async(&self.endpoint)
+        let (connection, _) = connect_async(endpoint)
             .await
             .context("WebSocket connection failed")?;
         Ok(connection.filter_map(|m| async {
@@ -66,6 +67,12 @@ impl WebsocketApi {
                 Err(e) => Some(Err(anyhow!("websocket error: {}", e))),
             }
         }))
+    }
+
+    async fn connect_impl(
+        &self,
+    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
+        self.connect_to_endpoint(&self.endpoint).await
     }
 
     /// Connects to the websocket endpoint and returns a stream of `PreviewOrUpdate` values.
@@ -97,6 +104,33 @@ impl WebsocketApi {
         }))
     }
 
+    /// Connects to the websocket endpoint and returns a stream of `Update` values.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - A `uuid::Uuid` representing the client id to use.
+    ///
+    /// # Returns
+    ///
+    /// A `Stream` of `Update` values. These contain progress updates for a task.
+    pub async fn updates_for_client(
+        &self,
+        client_id: uuid::Uuid,
+    ) -> anyhow::Result<impl FusedStream<Item = Result<Update, anyhow::Error>>> {
+        let mut endpoint = self.endpoint.clone();
+        endpoint.set_query(Some(format!("clientId={}", client_id).as_str()));
+        Ok(self
+            .connect_to_endpoint(&endpoint)
+            .await?
+            .filter_map(|m| async {
+                match m {
+                    Ok(PreviewOrUpdate::Update(u)) => Some(Ok(u)),
+                    Ok(PreviewOrUpdate::Preview(_)) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            }))
+    }
+
     /// Connects to the websocket endpoint and returns a stream of `Preview` values.
     ///
     /// # Returns
@@ -112,5 +146,15 @@ impl WebsocketApi {
                 Err(e) => Some(Err(e)),
             }
         }))
+    }
+
+    /// Sets the client id to use.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - A `uuid::Uuid` representing the client id to use.
+    pub fn set_client_id(&mut self, client_id: uuid::Uuid) {
+        self.endpoint
+            .set_query(Some(format!("ws?clientId={}", client_id).as_str()));
     }
 }

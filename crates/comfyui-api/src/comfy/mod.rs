@@ -7,6 +7,7 @@ use futures_util::{
     stream::{FusedStream, FuturesOrdered},
     Stream, StreamExt,
 };
+use uuid::Uuid;
 
 use crate::{api::*, models::*};
 
@@ -119,11 +120,18 @@ impl Comfy {
         })
     }
 
-    async fn filter_update(&self, update: Update) -> anyhow::Result<Option<State>> {
+    async fn filter_update(
+        &self,
+        update: Update,
+        target_prompt_id: Uuid,
+    ) -> anyhow::Result<Option<State>> {
         match update {
             Update::Executing(data) => {
                 if data.node.is_none() {
                     if let Some(prompt_id) = data.prompt_id {
+                        if prompt_id != target_prompt_id {
+                            return Ok(None);
+                        }
                         let task = self.history.get_prompt(&prompt_id).await.unwrap();
                         let images = task
                             .outputs
@@ -142,11 +150,24 @@ impl Comfy {
                 }
                 Ok(None)
             }
-            Update::Executed(data) => Ok(Some(State::Executing(data.node, data.output.images))),
+            Update::Executed(data) => {
+                if data.prompt_id != target_prompt_id {
+                    return Ok(None);
+                }
+                Ok(Some(State::Executing(data.node, data.output.images)))
+            }
             Update::ExecutionInterrupted(data) => {
+                if data.prompt_id != target_prompt_id {
+                    return Ok(None);
+                }
                 Err(anyhow::anyhow!("Execution interrupted: {:?}", data))
             }
-            Update::ExecutionError(data) => Err(anyhow::anyhow!("Execution error: {:?}", data)),
+            Update::ExecutionError(data) => {
+                if data.execution_status.prompt_id != target_prompt_id {
+                    return Ok(None);
+                }
+                Err(anyhow::anyhow!("Execution error: {:?}", data))
+            }
             _ => Ok(None),
         }
     }
@@ -155,11 +176,13 @@ impl Comfy {
         &'a self,
         prompt: &'a Prompt,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<State>> + 'a> {
-        let stream = self.websocket.updates().await?;
-        let _response = self.prompt.send(prompt).await?;
-        Ok(stream.filter_map(move |msg| async {
+        let client_id = Uuid::new_v4();
+        let stream = self.websocket.updates_for_client(client_id).await?;
+        let response = self.prompt.send_as_client(prompt, client_id).await?;
+        let prompt_id = response.prompt_id;
+        Ok(stream.filter_map(move |msg| async move {
             match msg {
-                Ok(msg) => match self.filter_update(msg).await {
+                Ok(msg) => match self.filter_update(msg, prompt_id).await {
                     Ok(Some(images)) => Some(Ok(images)),
                     Ok(None) => None,
                     Err(e) => Some(Err(e)),

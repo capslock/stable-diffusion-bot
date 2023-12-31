@@ -72,12 +72,30 @@ impl PromptApi {
     ///
     /// A `Result` containing a `Response` on success, or an error if the request failed.
     pub async fn send(&self, prompt: &Prompt) -> anyhow::Result<Response> {
+        self.send_as_client(prompt, self.client_id).await
+    }
+
+    /// Sends a prompt request using the `PromptApi` client and the given `client_id`.
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - A `Prompt` to send to the ComfyUI API.
+    /// * `client_id` - A `uuid::Uuid` representing the client id to use for the request.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Response` on success, or an error if the request failed.
+    pub async fn send_as_client(
+        &self,
+        prompt: &Prompt,
+        client_id: uuid::Uuid,
+    ) -> anyhow::Result<Response> {
         let response = self
             .client
             .post(self.endpoint.clone())
             .json(&PromptWrapper {
                 prompt,
-                client_id: Some(self.client_id),
+                client_id: Some(client_id),
             })
             .send()
             .await
