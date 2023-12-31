@@ -11,7 +11,7 @@ use teloxide::{
         InputMediaPhoto, MessageId, PhotoSize,
     },
 };
-use tracing::info;
+use tracing::{info, instrument, warn};
 
 use crate::{
     bot::{helpers, State},
@@ -320,6 +320,7 @@ fn keyboard(seed: i64) -> InlineKeyboardMarkup {
     ]])
 }
 
+#[instrument(skip_all)]
 async fn handle_rerun(
     bot: Bot,
     cfg: ConfigParameters,
@@ -351,9 +352,14 @@ async fn handle_rerun(
     };
 
     if let Some(photo) = parent.photo().map(ToOwned::to_owned) {
-        bot.answer_callback_query(q.id)
+        if let Err(e) = bot
+            .answer_callback_query(q.id)
+            .cache_time(60)
             .text("Rerunning this image...")
-            .await?;
+            .await
+        {
+            warn!("Failed to answer image rerun callback query: {}", e)
+        }
         handle_image(
             bot.clone(),
             cfg,
@@ -364,9 +370,14 @@ async fn handle_rerun(
         )
         .await?;
     } else if let Some(text) = parent.text().map(ToOwned::to_owned) {
-        bot.answer_callback_query(q.id)
+        if let Err(e) = bot
+            .answer_callback_query(q.id)
+            .cache_time(60)
             .text("Rerunning this prompt...")
-            .await?;
+            .await
+        {
+            warn!("Failed to answer prompt rerun callback query: {}", e)
+        }
         handle_prompt(bot.clone(), cfg, dialogue, (txt2img, img2img), parent, text).await?;
     } else {
         bot.answer_callback_query(q.id)
@@ -442,13 +453,21 @@ async fn handle_reuse(
         return Ok(());
     }
     if seed == -1 {
-        bot.answer_callback_query(q.id)
+        if let Err(e) = bot
+            .answer_callback_query(q.id)
             .text("Seed randomized.")
-            .await?;
+            .await
+        {
+            warn!("Failed to answer randomize seed callback query: {}", e)
+        }
     } else {
-        bot.answer_callback_query(q.id)
+        if let Err(e) = bot
+            .answer_callback_query(q.id)
             .text(format!("Seed set to {seed}."))
-            .await?;
+            .await
+        {
+            warn!("Failed to answer set seed callback query: {}", e)
+        }
         bot.edit_message_reply_markup(chat_id, id)
             .reply_markup(keyboard(-1))
             .send()

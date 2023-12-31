@@ -9,7 +9,7 @@ use teloxide::{
     prelude::*,
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
 };
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::{bot::ConfigParameters, BotState};
 
@@ -187,7 +187,9 @@ pub(crate) async fn handle_settings(
         return Ok(());
     };
 
-    bot.answer_callback_query(q.id).await?;
+    if let Err(e) = bot.answer_callback_query(q.id).await {
+        warn!("Failed to answer settings callback query: {}", e)
+    }
     bot.send_message(chat_id, "Please make a selection.")
         .reply_markup(settings.keyboard())
         .send()
@@ -238,7 +240,10 @@ pub(crate) async fn handle_settings_button(
             })
             .await
             .map_err(|e| anyhow!(e))?;
-        bot.answer_callback_query(q.id).text("Canceled.").await?;
+        if let Err(e) = bot.answer_callback_query(q.id).text("Canceled.").await {
+            warn!("Failed to answer back button callback query: {}", e)
+        }
+
         if let Err(e) = bot.delete_message(message.chat.id, message.id).await {
             error!("Failed to delete message: {:?}", e);
             bot.edit_message_text(message.chat.id, message.id, "Please enter a prompt.")
@@ -276,7 +281,9 @@ pub(crate) async fn handle_settings_button(
         }
     }
 
-    bot.answer_callback_query(q.id).await?;
+    if let Err(e) = bot.answer_callback_query(q.id).await {
+        warn!("Failed to answer settings button callback query: {}", e)
+    }
     dialogue.update(state).await.map_err(|e| anyhow!(e))?;
 
     bot.send_message(message.chat.id, "Please enter a new value.")
