@@ -13,18 +13,21 @@ pub struct WebsocketApi {
 }
 
 impl WebsocketApi {
-    /// Constructs a new `WebsocketApi` client with a given ComfyUI API endpoint `String`.
+    /// Constructs a new `WebsocketApi` client with a given ComfyUI API endpoint.
     ///
     /// # Arguments
     ///
-    /// * `endpoint` - A `String` representation of the endpoint url.
+    /// * `endpoint` - A `str` representation of the endpoint url.
     ///
     /// # Returns
     ///
     /// A `Result` containing a new `WebsocketApi` instance on success, or an error if url parsing failed.
-    pub fn new(endpoint: String) -> anyhow::Result<Self> {
+    pub fn new<S>(endpoint: S) -> anyhow::Result<Self>
+    where
+        S: AsRef<str>,
+    {
         Ok(Self::new_with_url(
-            Url::parse(&endpoint).context("failed to parse endpoint url")?,
+            Url::parse(endpoint.as_ref()).context("failed to parse endpoint url")?,
         ))
     }
 

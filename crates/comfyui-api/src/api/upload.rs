@@ -23,20 +23,23 @@ pub struct UploadApi {
 
 impl UploadApi {
     /// Constructs a new `UploadApi` client with a given `reqwest::Client` and ComfyUI API
-    /// endpoint `String`.
+    /// endpoint.
     ///
     /// # Arguments
     ///
     /// * `client` - A `reqwest::Client` used to send requests.
-    /// * `endpoint` - A `String` representation of the endpoint url.
+    /// * `endpoint` - A `str` representation of the endpoint url.
     ///
     /// # Returns
     ///
     /// A `Result` containing a new `UploadApi` instance on success, or an error if url parsing failed.
-    pub fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
+    pub fn new<S>(client: reqwest::Client, endpoint: S) -> anyhow::Result<Self>
+    where
+        S: AsRef<str>,
+    {
         Ok(Self::new_with_url(
             client,
-            Url::parse(&endpoint).context("failed to parse endpoint url")?,
+            Url::parse(endpoint.as_ref()).context("failed to parse endpoint url")?,
         ))
     }
 
