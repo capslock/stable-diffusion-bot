@@ -181,6 +181,12 @@ To get a workflow in API format, open your workflow in ComfyUI and check the
 "Enable Dev mode Options" box in the settings. Then, press the new "Save (API
 Format)" button below the normal "Save" button.
 
+You can take a look at [ComfyUI
+Examples](https://comfyanonymous.github.io/ComfyUI_examples/) for some example
+[txt2img](https://comfyanonymous.github.io/ComfyUI_examples/sdxl/) and
+[img2img](https://comfyanonymous.github.io/ComfyUI_examples/img2img/)
+workflows.
+
 ### Run
 
 ```shell
