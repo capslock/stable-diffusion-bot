@@ -84,12 +84,27 @@ impl Api {
     ///
     /// If the URL fails to parse, an error will be returned.
     pub fn prompt(&self) -> anyhow::Result<PromptApi> {
+        self.prompt_with_client(self.client_id)
+    }
+
+    /// Returns a new instance of `PromptApi` with the API's cloned
+    /// `reqwest::Client` and the URL for the `prompt` endpoint and the
+    /// specified client id.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - A `uuid::Uuid` representing the client id to use for the request.
+    ///
+    /// # Errors
+    ///
+    /// If the URL fails to parse, an error will be returned.
+    pub fn prompt_with_client(&self, client_id: uuid::Uuid) -> anyhow::Result<PromptApi> {
         Ok(PromptApi::new_with_url(
             self.client.clone(),
             self.url
                 .join("prompt")
                 .context("Failed to parse comfyUI endpoint")?,
-            self.client_id,
+            client_id,
         ))
     }
 
@@ -146,12 +161,30 @@ impl Api {
     /// * If the URL fails to parse, an error will be returned.
     /// * On failure to set the `ws://` scheme on the URL, an error will be returned.
     pub fn websocket(&self) -> anyhow::Result<WebsocketApi> {
-        let mut url = self.url.clone();
+        self.websocket_with_client(self.client_id)
+    }
+
+    /// Returns a new instance of `WebsocketApi` with the API's cloned
+    /// `reqwest::Client` and the URL for the `ws` endpoint and the specified
+    /// client id.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - A `uuid::Uuid` representing the client id to use for the request.
+    ///
+    /// # Errors
+    ///
+    /// * If the URL fails to parse, an error will be returned.
+    /// * On failure to set the `ws://` scheme on the URL, an error will be returned.
+    pub fn websocket_with_client(&self, client_id: uuid::Uuid) -> anyhow::Result<WebsocketApi> {
+        let mut url = self
+            .url
+            .clone()
+            .join("ws")
+            .context("Failed to set websocket endpoint")?;
         url.set_scheme("ws")
             .map_err(|_| anyhow!("Failed to set scheme: ws://"))?;
-        Ok(WebsocketApi::new_with_url(
-            url.join(format!("ws?clientId={}", self.client_id).as_str())
-                .context("Failed to parse websocket endpoint")?,
-        ))
+        url.set_query(Some(format!("clientId={}", client_id).as_str()));
+        Ok(WebsocketApi::new_with_url(url))
     }
 }

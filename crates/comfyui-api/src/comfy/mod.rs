@@ -40,11 +40,10 @@ pub struct NodeOutput {
 /// Higher-level API for interacting with the ComfyUI API.
 #[derive(Clone, Debug)]
 pub struct Comfy {
+    api: Api,
     history: HistoryApi,
-    prompt: PromptApi,
     upload: UploadApi,
     view: ViewApi,
-    websocket: WebsocketApi,
 }
 
 impl Default for Comfy {
@@ -52,10 +51,9 @@ impl Default for Comfy {
         let api = Api::default();
         Self {
             history: api.history().expect("failed to create history api"),
-            prompt: api.prompt().expect("failed to create prompt api"),
             upload: api.upload().expect("failed to create upload api"),
             view: api.view().expect("failed to create view api"),
-            websocket: api.websocket().expect("failed to create websocket api"),
+            api,
         }
     }
 }
@@ -66,10 +64,9 @@ impl Comfy {
         let api = Api::default();
         Ok(Self {
             history: api.history()?,
-            prompt: api.prompt()?,
             upload: api.upload()?,
             view: api.view()?,
-            websocket: api.websocket()?,
+            api,
         })
     }
 
@@ -89,10 +86,9 @@ impl Comfy {
         let api = Api::new_with_url(url.as_ref())?;
         Ok(Self {
             history: api.history()?,
-            prompt: api.prompt()?,
             upload: api.upload()?,
             view: api.view()?,
-            websocket: api.websocket()?,
+            api,
         })
     }
 
@@ -113,10 +109,9 @@ impl Comfy {
         let api = Api::new_with_client_and_url(client, url.as_ref())?;
         Ok(Self {
             history: api.history()?,
-            prompt: api.prompt()?,
             upload: api.upload()?,
             view: api.view()?,
-            websocket: api.websocket()?,
+            api,
         })
     }
 
@@ -177,8 +172,10 @@ impl Comfy {
         prompt: &'a Prompt,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<State>> + 'a> {
         let client_id = Uuid::new_v4();
-        let stream = self.websocket.updates_for_client(client_id).await?;
-        let response = self.prompt.send_as_client(prompt, client_id).await?;
+        let prompt_api = self.api.prompt_with_client(client_id)?;
+        let websocket_api = self.api.websocket_with_client(client_id)?;
+        let stream = websocket_api.updates().await?;
+        let response = prompt_api.send(prompt).await?;
         let prompt_id = response.prompt_id;
         Ok(stream.filter_map(move |msg| async move {
             match msg {

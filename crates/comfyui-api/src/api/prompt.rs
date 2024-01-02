@@ -78,17 +78,7 @@ impl PromptApi {
         self.send_as_client(prompt, self.client_id).await
     }
 
-    /// Sends a prompt request using the `PromptApi` client and the given `client_id`.
-    ///
-    /// # Arguments
-    ///
-    /// * `prompt` - A `Prompt` to send to the ComfyUI API.
-    /// * `client_id` - A `uuid::Uuid` representing the client id to use for the request.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing a `Response` on success, or an error if the request failed.
-    pub async fn send_as_client(
+    async fn send_as_client(
         &self,
         prompt: &Prompt,
         client_id: uuid::Uuid,
@@ -116,5 +106,10 @@ impl PromptApi {
             status,
             text
         ))
+    }
+
+    /// Returns the client id used for requests.
+    pub fn client_id(&self) -> uuid::Uuid {
+        self.client_id
     }
 }
