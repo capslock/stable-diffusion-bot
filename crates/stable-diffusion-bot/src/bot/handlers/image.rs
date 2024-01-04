@@ -184,16 +184,9 @@ async fn do_img2img(
     img2img: &mut Box<dyn GenParams>,
     msg: &Message,
     photo: Vec<PhotoSize>,
+    prompt: String,
 ) -> anyhow::Result<Response> {
-    let prompt = if let Some(caption) = msg.caption() {
-        caption
-    } else {
-        bot.send_message(msg.chat.id, "A prompt is required to run img2img.")
-            .await?;
-        return Err(anyhow!("No prompt provided for img2img"));
-    };
-
-    img2img.set_prompt(prompt.to_owned());
+    img2img.set_prompt(prompt);
 
     let photo = if let Some(photo) = photo
         .iter()
@@ -219,6 +212,7 @@ async fn do_img2img(
 }
 
 async fn handle_image(
+    me: Me,
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
@@ -229,7 +223,24 @@ async fn handle_image(
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
-    let resp = do_img2img(&bot, &cfg, &mut img2img, &msg, photo).await?;
+    let text = if let Some(caption) = msg.caption() {
+        caption
+    } else {
+        bot.send_message(msg.chat.id, "A prompt is required to run img2img.")
+            .await?;
+        return Err(anyhow!("No prompt provided for img2img"));
+    };
+
+    let bot_name = me.user.username.expect("Bots must have a username");
+    let text = if let Ok(command) = GenCommands::parse(text, &bot_name) {
+        match command {
+            GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => s,
+        }
+    } else {
+        text.to_owned()
+    };
+
+    let resp = do_img2img(&bot, &cfg, &mut img2img, &msg, photo, text).await?;
 
     let seed = if resp.params.seed() == resp.gen_params.seed() {
         -1
@@ -258,11 +269,11 @@ async fn handle_image(
 }
 
 async fn do_txt2img(
-    prompt: &str,
+    prompt: String,
     cfg: &ConfigParameters,
     txt2img: &mut dyn GenParams,
 ) -> anyhow::Result<Response> {
-    txt2img.set_prompt(prompt.to_owned());
+    txt2img.set_prompt(prompt);
 
     let resp = cfg.txt2img_api.txt2img(txt2img).await?;
 
@@ -280,7 +291,7 @@ async fn handle_prompt(
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
-    let resp = do_txt2img(text.as_str(), &cfg, txt2img.as_mut()).await?;
+    let resp = do_txt2img(text, &cfg, txt2img.as_mut()).await?;
 
     let seed = if resp.params.seed() == resp.gen_params.seed() {
         -1
@@ -363,6 +374,7 @@ async fn handle_rerun(
             warn!("Failed to answer image rerun callback query: {}", e)
         }
         handle_image(
+            me,
             bot.clone(),
             cfg,
             dialogue,
@@ -493,10 +505,20 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         .chain(dptree::filter_map(|g: GenCommands| match g {
             GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => Some(s),
         }))
-        .chain(filter_map_bot_state())
-        .chain(case![BotState::Generate])
-        .chain(filter_map_settings())
-        .endpoint(handle_prompt);
+        .branch(
+            Message::filter_photo()
+                .chain(filter_map_bot_state())
+                .chain(case![BotState::Generate])
+                .chain(filter_map_settings())
+                .endpoint(handle_image),
+        )
+        .branch(
+            Message::filter_text()
+                .chain(filter_map_bot_state())
+                .chain(case![BotState::Generate])
+                .chain(filter_map_settings())
+                .endpoint(handle_prompt),
+        );
 
     let message_handler = Update::filter_message()
         .branch(
@@ -513,6 +535,7 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         )
         .branch(
             Message::filter_photo()
+                .filter_map(|msg: Message| msg.caption().map(str::to_string))
                 .chain(filter_map_bot_state())
                 .chain(case![BotState::Generate])
                 .chain(filter_map_settings())
