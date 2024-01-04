@@ -8,8 +8,9 @@ use teloxide::{
     prelude::*,
     types::{
         ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, InputMedia,
-        InputMediaPhoto, MessageId, PhotoSize,
+        InputMediaPhoto, Me, MessageId, PhotoSize,
     },
+    utils::command::BotCommands as _,
 };
 use tracing::{info, instrument, warn};
 
@@ -322,6 +323,7 @@ fn keyboard(seed: i64) -> InlineKeyboardMarkup {
 
 #[instrument(skip_all)]
 async fn handle_rerun(
+    me: Me,
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
@@ -378,6 +380,14 @@ async fn handle_rerun(
         {
             warn!("Failed to answer prompt rerun callback query: {}", e)
         }
+        let bot_name = me.user.username.expect("Bots must have a username");
+        let text = if let Ok(command) = GenCommands::parse(&text, &bot_name) {
+            match command {
+                GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => s,
+            }
+        } else {
+            text
+        };
         handle_prompt(bot.clone(), cfg, dialogue, (txt2img, img2img), parent, text).await?;
     } else {
         bot.answer_callback_query(q.id)
