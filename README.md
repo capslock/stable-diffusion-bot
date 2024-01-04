@@ -225,7 +225,7 @@ that image and the prompt.
 #### Specifying allowed users
 
 * User IDs can be specified individually, or Chat IDs can be specified to permit
-  all users in a group chat from using the bot.
+  all users in a group chat to use the bot.
 * The option `allow_all_users = true` can be set to instead allow any user to
   access the bot. Note that this means if someone finds your bot, there's no way
   to stop them from using it to generate images.
@@ -256,6 +256,21 @@ and
 [`Img2ImgRequest `](https://capslock.github.io/stable-diffusion-bot/stable_diffusion_api/struct.Img2ImgRequest.html)
 for all of the available options.
 
+#### Group Chats
+
+Here's a few tips for configuring the bot for use in a group chat:
+
+* As mentioned in the above section, *Specifying allowed users*, you can add the
+  chat id of the group chat to the list of `allowed_users` to allow any user in
+  the chat to have access to the bot.
+* If *Privacy Mode* is not enabled for the bot, the bot will receive all chat
+  messages in the group, which it will use as a prompt to generate an image.
+  This is often not desirable, so *Privacy Mode* should be enabled for the bot,
+  and the bot should not be a group admin. When set up like this, the bot will
+  only respond to `/slash` commands.
+* You can use the `/gen` command in the caption of a photo to use `img2img` in a
+  group chat.
+  
 ### Using the sub-crates.
 
 This projects consists of four crates:
