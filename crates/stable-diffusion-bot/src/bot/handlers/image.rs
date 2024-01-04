@@ -24,7 +24,7 @@ use super::{
 };
 
 /// BotCommands for generating images.
-#[derive(BotCommands, Clone)]
+#[derive(BotCommands, Debug, Clone)]
 #[command(rename_rule = "lowercase", description = "Image generation commands")]
 pub(crate) enum GenCommands {
     /// Command to generate an image
@@ -222,6 +222,13 @@ async fn handle_image(
     photo: Vec<PhotoSize>,
     text: String,
 ) -> anyhow::Result<()> {
+    if text.is_empty() {
+        bot.send_message(msg.chat.id, "A prompt is required.")
+            .reply_to_message_id(msg.id)
+            .await?;
+        return Ok(());
+    }
+
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
@@ -273,6 +280,13 @@ async fn handle_prompt(
     msg: Message,
     text: String,
 ) -> anyhow::Result<()> {
+    if text.is_empty() {
+        bot.send_message(msg.chat.id, "A prompt is required.")
+            .reply_to_message_id(msg.id)
+            .await?;
+        return Ok(());
+    }
+
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
 
@@ -513,8 +527,7 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
                 .endpoint(handle_image),
         )
         .branch(
-            Message::filter_text()
-                .chain(filter_map_bot_state())
+            filter_map_bot_state()
                 .chain(case![BotState::Generate])
                 .chain(filter_map_settings())
                 .endpoint(handle_prompt),
@@ -535,7 +548,7 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         )
         .branch(
             Message::filter_photo()
-                .filter_map(|msg: Message| msg.caption().map(str::to_string))
+                .map(|msg: Message| msg.caption().map(str::to_string).unwrap_or_default())
                 .chain(filter_map_bot_state())
                 .chain(case![BotState::Generate])
                 .chain(filter_map_settings())
