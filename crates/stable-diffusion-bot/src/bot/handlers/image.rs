@@ -19,7 +19,9 @@ use crate::{
     BotState,
 };
 
-use super::{filter_map_bot_state, filter_map_settings, ConfigParameters, DiffusionDialogue};
+use super::{
+    filter_command, filter_map_bot_state, filter_map_settings, ConfigParameters, DiffusionDialogue,
+};
 
 /// BotCommands for generating images.
 #[derive(BotCommands, Clone)]
@@ -212,33 +214,16 @@ async fn do_img2img(
 }
 
 async fn handle_image(
-    me: Me,
     bot: Bot,
     cfg: ConfigParameters,
     dialogue: DiffusionDialogue,
     (txt2img, mut img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
     msg: Message,
     photo: Vec<PhotoSize>,
+    text: String,
 ) -> anyhow::Result<()> {
     bot.send_chat_action(msg.chat.id, ChatAction::UploadPhoto)
         .await?;
-
-    let text = if let Some(caption) = msg.caption() {
-        caption
-    } else {
-        bot.send_message(msg.chat.id, "A prompt is required to run img2img.")
-            .await?;
-        return Err(anyhow!("No prompt provided for img2img"));
-    };
-
-    let bot_name = me.user.username.expect("Bots must have a username");
-    let text = if let Ok(command) = GenCommands::parse(text, &bot_name) {
-        match command {
-            GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => s,
-        }
-    } else {
-        text.to_owned()
-    };
 
     let resp = do_img2img(&bot, &cfg, &mut img2img, &msg, photo, text).await?;
 
@@ -365,24 +350,39 @@ async fn handle_rerun(
     };
 
     if let Some(photo) = parent.photo().map(ToOwned::to_owned) {
-        if let Err(e) = bot
-            .answer_callback_query(q.id)
-            .cache_time(60)
-            .text("Rerunning this image...")
-            .await
-        {
-            warn!("Failed to answer image rerun callback query: {}", e)
+        if let Some(text) = message.caption().map(ToOwned::to_owned) {
+            let bot_name = me.user.username.expect("Bots must have a username");
+            let text = if let Ok(command) = GenCommands::parse(&text, &bot_name) {
+                match command {
+                    GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => s,
+                }
+            } else {
+                text
+            };
+
+            if let Err(e) = bot
+                .answer_callback_query(q.id)
+                .cache_time(60)
+                .text("Rerunning this image...")
+                .await
+            {
+                warn!("Failed to answer image rerun callback query: {}", e)
+            }
+            handle_image(
+                bot.clone(),
+                cfg,
+                dialogue,
+                (txt2img, img2img),
+                parent,
+                photo,
+                text,
+            )
+            .await?;
+        } else {
+            bot.send_message(message.chat.id, "A prompt is required to run img2img.")
+                .await?;
+            return Err(anyhow!("No prompt provided for img2img"));
         }
-        handle_image(
-            me,
-            bot.clone(),
-            cfg,
-            dialogue,
-            (txt2img, img2img),
-            parent,
-            photo,
-        )
-        .await?;
     } else if let Some(text) = parent.text().map(ToOwned::to_owned) {
         if let Err(e) = bot
             .answer_callback_query(q.id)
@@ -501,7 +501,7 @@ async fn handle_reuse(
 
 pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
     let gen_command_handler = Update::filter_message()
-        .filter_command::<GenCommands>()
+        .chain(filter_command::<GenCommands>())
         .chain(dptree::filter_map(|g: GenCommands| match g {
             GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => Some(s),
         }))

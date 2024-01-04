@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use teloxide::{
     dispatching::UpdateHandler,
     prelude::*,
-    types::ParseMode,
+    types::{Me, ParseMode},
     utils::{command::BotCommands, markdown},
 };
 
@@ -101,6 +101,23 @@ pub(crate) fn auth_filter() -> UpdateHandler<anyhow::Error> {
                 .user()
                 .map(|user| cfg.chat_is_allowed(&user.id.into()))
                 .unwrap_or_default()
+    })
+}
+
+pub fn filter_command<C>() -> UpdateHandler<anyhow::Error>
+where
+    C: BotCommands + Send + Sync + 'static,
+{
+    dptree::filter_map(move |message: Message, me: Me| {
+        let bot_name = me.user.username.expect("Bots must have a username");
+        message
+            .text()
+            .and_then(|text| C::parse(text, &bot_name).ok())
+            .or_else(|| {
+                message
+                    .caption()
+                    .and_then(|text| C::parse(text, &bot_name).ok())
+            })
     })
 }
 
