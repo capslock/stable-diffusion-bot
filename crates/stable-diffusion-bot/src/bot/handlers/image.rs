@@ -519,19 +519,8 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         .chain(dptree::filter_map(|g: GenCommands| match g {
             GenCommands::Gen(s) | GenCommands::G(s) | GenCommands::Generate(s) => Some(s),
         }))
-        .branch(
-            Message::filter_photo()
-                .chain(filter_map_bot_state())
-                .chain(case![BotState::Generate])
-                .chain(filter_map_settings())
-                .endpoint(handle_image),
-        )
-        .branch(
-            filter_map_bot_state()
-                .chain(case![BotState::Generate])
-                .chain(filter_map_settings())
-                .endpoint(handle_prompt),
-        );
+        .branch(Message::filter_photo().endpoint(handle_image))
+        .branch(dptree::endpoint(handle_prompt));
 
     let message_handler = Update::filter_message()
         .branch(
@@ -549,23 +538,11 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         .branch(
             Message::filter_photo()
                 .map(|msg: Message| msg.caption().map(str::to_string).unwrap_or_default())
-                .chain(filter_map_bot_state())
-                .chain(case![BotState::Generate])
-                .chain(filter_map_settings())
                 .endpoint(handle_image),
         )
-        .branch(
-            Message::filter_text()
-                .chain(filter_map_bot_state())
-                .chain(case![BotState::Generate])
-                .chain(filter_map_settings())
-                .endpoint(handle_prompt),
-        );
+        .branch(Message::filter_text().endpoint(handle_prompt));
 
     let callback_handler = Update::filter_callback_query()
-        .chain(filter_map_bot_state())
-        .chain(case![BotState::Generate])
-        .chain(filter_map_settings())
         .branch(
             dptree::filter_map(|q: CallbackQuery| {
                 q.data
@@ -580,6 +557,9 @@ pub(crate) fn image_schema() -> UpdateHandler<anyhow::Error> {
         );
 
     dptree::entry()
+        .chain(filter_map_bot_state())
+        .chain(case![BotState::Generate])
+        .chain(filter_map_settings())
         .branch(gen_command_handler)
         .branch(message_handler)
         .branch(callback_handler)
