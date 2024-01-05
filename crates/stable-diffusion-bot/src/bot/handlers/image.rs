@@ -62,11 +62,32 @@ impl Photo {
     }
 }
 
+struct ReplyConfig {
+    disable_user_settings: bool,
+    hide_all_buttons: bool,
+    hide_settings_button: bool,
+    hide_reuse_button: bool,
+    hide_rerun_button: bool,
+}
+
+impl From<ConfigParameters> for ReplyConfig {
+    fn from(config: ConfigParameters) -> Self {
+        Self {
+            disable_user_settings: config.settings.disable_user_settings,
+            hide_all_buttons: config.ui.hide_all_buttons,
+            hide_settings_button: config.ui.hide_settings_button,
+            hide_reuse_button: config.ui.hide_reuse_button,
+            hide_rerun_button: config.ui.hide_rerun_button,
+        }
+    }
+}
+
 struct Reply {
     caption: String,
     images: Photo,
     source: MessageId,
     seed: i64,
+    config: ReplyConfig,
 }
 
 impl Reply {
@@ -75,6 +96,7 @@ impl Reply {
         images: Vec<Vec<u8>>,
         seed: i64,
         source: MessageId,
+        config: ReplyConfig,
     ) -> anyhow::Result<Self> {
         let images = Photo::album(images)?;
         Ok(Self {
@@ -82,16 +104,11 @@ impl Reply {
             images,
             source,
             seed,
+            config,
         })
     }
 
-    pub async fn send(
-        self,
-        bot: &Bot,
-        chat_id: ChatId,
-        cfg: ConfigParameters,
-        user_id: Option<UserId>,
-    ) -> anyhow::Result<()> {
+    pub async fn send(self, bot: &Bot, chat_id: ChatId) -> anyhow::Result<()> {
         match self.images {
             Photo::Single(image) => {
                 let mut message = bot
@@ -99,12 +116,8 @@ impl Reply {
                     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                     .caption(self.caption)
                     .reply_to_message_id(self.source);
-                if !cfg.ui.hide_all_buttons {
-                    message = message.reply_markup(keyboard(
-                        self.seed,
-                        cfg,
-                        user_id.map(Into::into).unwrap_or(chat_id),
-                    ))
+                if !self.config.hide_all_buttons {
+                    message = message.reply_markup(keyboard(self.seed, self.config.into()))
                 }
                 message.await?;
             }
@@ -120,16 +133,12 @@ impl Reply {
                 bot.send_media_group(chat_id, input_media)
                     .reply_to_message_id(self.source)
                     .await?;
-                if !cfg.ui.hide_all_buttons {
+                if !self.config.hide_all_buttons {
                     bot.send_message(
                         chat_id,
                         "What would you like to do? Select below, or enter a new prompt.",
                     )
-                    .reply_markup(keyboard(
-                        self.seed,
-                        cfg,
-                        user_id.map(Into::into).unwrap_or(chat_id),
-                    ))
+                    .reply_markup(keyboard(self.seed, self.config.into()))
                     .reply_to_message_id(self.source)
                     .await?;
                 }
@@ -271,9 +280,9 @@ async fn handle_image(
             .context("Failed to build caption from response")?
     };
 
-    Reply::new(caption.0, resp.images, seed, msg.id)
+    Reply::new(caption.0, resp.images, seed, msg.id, cfg.into())
         .context("Failed to create response!")?
-        .send(&bot, msg.chat.id, cfg, msg.from().map(|f| f.id))
+        .send(&bot, msg.chat.id)
         .await?;
 
     dialogue
@@ -333,9 +342,9 @@ async fn handle_prompt(
             .context("Failed to build caption from response")?
     };
 
-    Reply::new(caption.0, resp.images, seed, msg.id)
+    Reply::new(caption.0, resp.images, seed, msg.id, cfg.into())
         .context("Failed to create response!")?
-        .send(&bot, msg.chat.id, cfg, msg.from().map(|f| f.id))
+        .send(&bot, msg.chat.id)
         .await?;
 
     dialogue
@@ -350,15 +359,42 @@ async fn handle_prompt(
     Ok(())
 }
 
-fn keyboard(seed: i64, cfg: ConfigParameters, user: ChatId) -> InlineKeyboardMarkup {
-    let settings_button = if (!cfg.settings.disable_user_settings || cfg.user_is_admin(&user))
-        && !cfg.ui.hide_settings_button
-    {
+struct KeyboardConfig {
+    disable_user_settings: bool,
+    hide_settings_button: bool,
+    hide_reuse_button: bool,
+    hide_rerun_button: bool,
+}
+
+impl From<ReplyConfig> for KeyboardConfig {
+    fn from(config: ReplyConfig) -> Self {
+        Self {
+            disable_user_settings: config.disable_user_settings,
+            hide_settings_button: config.hide_settings_button,
+            hide_reuse_button: config.hide_reuse_button,
+            hide_rerun_button: config.hide_rerun_button,
+        }
+    }
+}
+
+impl From<ConfigParameters> for KeyboardConfig {
+    fn from(config: ConfigParameters) -> Self {
+        Self {
+            disable_user_settings: config.settings.disable_user_settings,
+            hide_settings_button: config.ui.hide_settings_button,
+            hide_reuse_button: config.ui.hide_reuse_button,
+            hide_rerun_button: config.ui.hide_rerun_button,
+        }
+    }
+}
+
+fn keyboard(seed: i64, cfg: KeyboardConfig) -> InlineKeyboardMarkup {
+    let settings_button = if (!cfg.disable_user_settings) && !cfg.hide_settings_button {
         vec![InlineKeyboardButton::callback("⚙️ Settings", "settings")]
     } else {
         vec![]
     };
-    let seed_button = if cfg.ui.hide_reuse_button {
+    let seed_button = if cfg.hide_reuse_button {
         vec![]
     } else if seed == -1 {
         vec![InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")]
@@ -368,7 +404,7 @@ fn keyboard(seed: i64, cfg: ConfigParameters, user: ChatId) -> InlineKeyboardMar
             format!("reuse/{seed}"),
         )]
     };
-    let rerun_button = if cfg.ui.hide_rerun_button {
+    let rerun_button = if cfg.hide_rerun_button {
         vec![]
     } else {
         vec![InlineKeyboardButton::callback("🔄 Rerun", "rerun")]
@@ -551,11 +587,7 @@ async fn handle_reuse(
             warn!("Failed to answer set seed callback query: {}", e)
         }
         bot.edit_message_reply_markup(chat_id, id)
-            .reply_markup(keyboard(
-                -1,
-                cfg,
-                message.from().map(|f| f.id.into()).unwrap_or(chat_id),
-            ))
+            .reply_markup(keyboard(-1, cfg.into()))
             .send()
             .await?;
     }
