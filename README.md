@@ -200,6 +200,18 @@ can pass it through as an environment variable:
 SD_TELEGRAM_API_KEY="your_telegram_bot_api_key" stable-diffusion-bot
 ```
 
+#### CLI Options
+
+```console
+$ stable-diffusion-bot --help
+Usage: stable-diffusion-bot [OPTIONS]
+
+Options:
+  -c, --config <CONFIG>  Path to the configuration file [default: config.toml]
+      --log-to-systemd   Output logs directly to systemd
+  -h, --help             Print help
+```
+
 ## Using the bot
 
 * `/start` to get started.
