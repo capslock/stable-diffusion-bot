@@ -26,7 +26,7 @@ mod helpers;
 use handlers::*;
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub enum State {
+pub(crate) enum State {
     #[default]
     New,
     Ready {
@@ -47,7 +47,7 @@ impl State {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub enum BotState {
+pub(crate) enum BotState {
     #[default]
     Generate,
     SettingsTxt2Img {
@@ -231,16 +231,22 @@ impl ConfigParameters {
     }
 }
 
+/// Enum representing the types of Stable Diffusion API.
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub enum ApiType {
+    /// ComfyUI API
     ComfyUI,
+    /// Stable Diffusion Web UI API
     #[default]
     StableDiffusionWebUi,
 }
 
+/// Struct that represents the configuration for the ComfyUI API.
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct ComfyUIConfig {
+    /// Path to the prompt file for text to image requests.
     pub txt2img_prompt_file: Option<PathBuf>,
+    /// Path to the prompt file for image to image requests.
     pub img2img_prompt_file: Option<PathBuf>,
 }
 
