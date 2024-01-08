@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use clap::Parser;
 use figment::{
     providers::{Env, Format, Toml},
@@ -12,6 +12,8 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 use std::path::PathBuf;
 
+#[cfg(not(target_os = "linux"))]
+use anyhow::anyhow;
 #[cfg(target_os = "linux")]
 use libsystemd::daemon;
 
