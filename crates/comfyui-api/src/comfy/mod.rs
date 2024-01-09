@@ -9,7 +9,10 @@ use futures_util::{
 };
 use uuid::Uuid;
 
-use crate::{api::*, models::*};
+use crate::{
+    api::{self, *},
+    models::*,
+};
 
 pub mod visitor;
 pub use visitor::Visitor;
@@ -37,6 +40,41 @@ pub struct NodeOutput {
     pub image: Vec<u8>,
 }
 
+/// Errors that can occur opening API endpoints.
+#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
+pub enum ComfyApiError {
+    /// Error parsing endpoint URL
+    #[error("Failed to create API")]
+    CreateApiFailed(#[from] api::ApiError),
+    /// Execution was interrupted
+    #[error("Execution was interrupted: node {} ({})", response.node_id, response.node_type)]
+    ExecutionInterrupted { response: ExecutionInterrupted },
+    /// Error occurred during execution
+    #[error("Error occurred during execution: {exception_type}: {exception_message}")]
+    ExecutionError {
+        exception_type: String,
+        exception_message: String,
+    },
+    /// Connection error occurred during prompt execution
+    #[error("Failed to get prompt execution update")]
+    ReceiveUpdateFailure(#[from] api::WebSocketApiError),
+    /// Prompt task not found
+    #[error("Failed to get task for prompt")]
+    PromptTaskNotFound(#[source] api::HistoryApiError),
+    /// Error sending prompt to API
+    #[error("Failed to send prompt to API")]
+    SendPromptFailed(#[from] PromptApiError),
+    /// Error getting image from API
+    #[error("Failed to get image from API")]
+    GetImageFailed(#[from] ViewApiError),
+    /// Error uploading image to API
+    #[error("Failed to upload image to API")]
+    UploadImageFailed(#[from] UploadApiError),
+}
+
+type Result<T> = std::result::Result<T, ComfyApiError>;
+
 /// Higher-level API for interacting with the ComfyUI API.
 #[derive(Clone, Debug)]
 pub struct Comfy {
@@ -60,7 +98,7 @@ impl Default for Comfy {
 
 impl Comfy {
     /// Returns a new `Comfy` instance with default settings.
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new() -> Result<Self> {
         let api = Api::default();
         Ok(Self {
             history: api.history()?,
@@ -79,7 +117,7 @@ impl Comfy {
     /// # Errors
     ///
     /// If the URL fails to parse, an error will be returned.
-    pub fn new_with_url<S>(url: S) -> anyhow::Result<Self>
+    pub fn new_with_url<S>(url: S) -> Result<Self>
     where
         S: AsRef<str>,
     {
@@ -102,7 +140,7 @@ impl Comfy {
     /// # Errors
     ///
     /// If the URL fails to parse, an error will be returned.
-    pub fn new_with_client_and_url<S>(client: reqwest::Client, url: S) -> anyhow::Result<Self>
+    pub fn new_with_client_and_url<S>(client: reqwest::Client, url: S) -> Result<Self>
     where
         S: AsRef<str>,
     {
@@ -115,11 +153,7 @@ impl Comfy {
         })
     }
 
-    async fn filter_update(
-        &self,
-        update: Update,
-        target_prompt_id: Uuid,
-    ) -> anyhow::Result<Option<State>> {
+    async fn filter_update(&self, update: Update, target_prompt_id: Uuid) -> Result<Option<State>> {
         match update {
             Update::Executing(data) => {
                 if data.node.is_none() {
@@ -127,7 +161,11 @@ impl Comfy {
                         if prompt_id != target_prompt_id {
                             return Ok(None);
                         }
-                        let task = self.history.get_prompt(&prompt_id).await.unwrap();
+                        let task = self
+                            .history
+                            .get_prompt(&prompt_id)
+                            .await
+                            .map_err(ComfyApiError::PromptTaskNotFound)?;
                         let images = task
                             .outputs
                             .nodes
@@ -155,13 +193,16 @@ impl Comfy {
                 if data.prompt_id != target_prompt_id {
                     return Ok(None);
                 }
-                Err(anyhow::anyhow!("Execution interrupted: {:?}", data))
+                Err(ComfyApiError::ExecutionInterrupted { response: data })
             }
             Update::ExecutionError(data) => {
                 if data.execution_status.prompt_id != target_prompt_id {
                     return Ok(None);
                 }
-                Err(anyhow::anyhow!("Execution error: {:?}", data))
+                Err(ComfyApiError::ExecutionError {
+                    exception_type: data.exception_type,
+                    exception_message: data.exception_message,
+                })
             }
             _ => Ok(None),
         }
@@ -170,11 +211,14 @@ impl Comfy {
     async fn prompt_impl<'a>(
         &'a self,
         prompt: &'a Prompt,
-    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<State>> + 'a> {
+    ) -> Result<impl Stream<Item = Result<State>> + 'a> {
         let client_id = Uuid::new_v4();
         let prompt_api = self.api.prompt_with_client(client_id)?;
         let websocket_api = self.api.websocket_with_client(client_id)?;
-        let stream = websocket_api.updates().await?;
+        let stream = websocket_api
+            .updates()
+            .await
+            .map_err(ComfyApiError::ReceiveUpdateFailure)?;
         let response = prompt_api.send(prompt).await?;
         let prompt_id = response.prompt_id;
         Ok(stream.filter_map(move |msg| async move {
@@ -184,7 +228,7 @@ impl Comfy {
                     Ok(None) => None,
                     Err(e) => Some(Err(e)),
                 },
-                Err(e) => Some(Err(anyhow::anyhow!("Error occurred: {:?}", e))),
+                Err(e) => Some(Err(ComfyApiError::ReceiveUpdateFailure(e))),
             }
         }))
     }
@@ -202,7 +246,7 @@ impl Comfy {
     pub async fn stream_prompt<'a>(
         &'a self,
         prompt: &'a Prompt,
-    ) -> anyhow::Result<impl FusedStream<Item = anyhow::Result<NodeOutput>> + 'a> {
+    ) -> Result<impl FusedStream<Item = Result<NodeOutput>> + 'a> {
         Ok(stream! {
             let mut executed = HashSet::new();
             let stream = self.prompt_impl(prompt).await?;
@@ -247,7 +291,7 @@ impl Comfy {
     ///
     /// A `Result` containing a pair of `String` and `Vec<u8>` values on success, or an error if the request failed.
     /// The `String` value is the output node name, and the `Vec<u8>` value is the image data.
-    pub async fn execute_prompt(&self, prompt: &Prompt) -> anyhow::Result<Vec<NodeOutput>> {
+    pub async fn execute_prompt(&self, prompt: &Prompt) -> Result<Vec<NodeOutput>> {
         let mut images = vec![];
         let mut stream = pin!(self.stream_prompt(prompt).await?);
         while let Some(image) = stream.next().await {
@@ -259,11 +303,8 @@ impl Comfy {
         Ok(images)
     }
 
-    pub async fn upload_file(&self, file: Vec<u8>) -> anyhow::Result<ImageUpload> {
-        self.upload
-            .image(file)
-            .await
-            .context("failed to upload file")
+    pub async fn upload_file(&self, file: Vec<u8>) -> Result<ImageUpload> {
+        Ok(self.upload.image(file).await?)
     }
 }
 

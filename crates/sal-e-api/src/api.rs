@@ -22,7 +22,7 @@ pub struct Response {
 pub enum ComfyPromptApiError {
     /// Error creating a ComfyUI Client
     #[error("Error creating a ComfyUI Client")]
-    CreateClient(#[from] anyhow::Error),
+    CreateClient(#[from] comfyui_api::comfy::ComfyApiError),
 }
 
 /// Struct wrapping a connection to the ComfyUI API.
@@ -239,7 +239,11 @@ impl Txt2ImgApi for ComfyPromptApi {
 
         let prompt = new_prompt.apply().context(Txt2ImgApiError::EmptyPrompt)?;
 
-        let images = self.client.execute_prompt(&prompt).await?;
+        let images = self
+            .client
+            .execute_prompt(&prompt)
+            .await
+            .context("Failed to execute prompt")?;
         Ok(Response {
             images: images.into_iter().map(|image| image.image).collect(),
             params: Box::new(prompt),
@@ -273,6 +277,7 @@ impl Img2ImgApi for ComfyPromptApi {
             self.client
                 .upload_file(image.clone())
                 .await
+                .context("Failed to upload image")
                 .map_err(Img2ImgApiError::UploadImage)?
         } else {
             return Err(Img2ImgApiError::NoImage);
@@ -287,7 +292,11 @@ impl Img2ImgApi for ComfyPromptApi {
 
         *prompt.image_mut()? = resp.name;
 
-        let images = self.client.execute_prompt(&prompt).await?;
+        let images = self
+            .client
+            .execute_prompt(&prompt)
+            .await
+            .context("Failed to execute prompt")?;
         Ok(Response {
             images: images.into_iter().map(|image| image.image).collect(),
             params: Box::new(prompt.clone()),
