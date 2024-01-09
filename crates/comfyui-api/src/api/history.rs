@@ -2,6 +2,7 @@ use reqwest::Url;
 
 use crate::models::{History, Task};
 
+/// Errors that can occur when interacting with `HistoryApi`.
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum HistoryApiError {

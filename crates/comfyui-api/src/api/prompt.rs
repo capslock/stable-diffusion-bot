@@ -4,6 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{Prompt, Response};
 
+/// Errors that can occur when interacting with `PromptApi`.
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum PromptApiError {

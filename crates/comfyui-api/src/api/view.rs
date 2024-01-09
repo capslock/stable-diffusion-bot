@@ -2,6 +2,7 @@ use reqwest::Url;
 
 use crate::models::Image;
 
+/// Errors that can occur when interacting with `ViewApi`.
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum ViewApiError {

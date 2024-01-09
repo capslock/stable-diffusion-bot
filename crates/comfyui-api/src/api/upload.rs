@@ -1,6 +1,7 @@
 use reqwest::{multipart, Url};
 use serde::{Deserialize, Serialize};
 
+/// Errors that can occur when interacting with `UploadApi`.
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum UploadApiError {

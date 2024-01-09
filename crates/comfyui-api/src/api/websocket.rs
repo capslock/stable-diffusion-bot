@@ -5,6 +5,7 @@ use tracing::warn;
 
 use crate::models::{Preview, PreviewOrUpdate, Update};
 
+/// Errors that can occur when interacting with `WebSocketApi`.
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum WebSocketApiError {
