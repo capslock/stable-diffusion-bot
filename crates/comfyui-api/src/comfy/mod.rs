@@ -260,7 +260,10 @@ impl Comfy {
     }
 
     pub async fn upload_file(&self, file: Vec<u8>) -> anyhow::Result<ImageUpload> {
-        self.upload.image(file).await
+        self.upload
+            .image(file)
+            .await
+            .context("failed to upload file")
     }
 }
 
