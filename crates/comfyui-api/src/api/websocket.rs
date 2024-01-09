@@ -1,10 +1,28 @@
-use anyhow::{anyhow, Context};
 use futures_util::{stream::FusedStream, StreamExt};
 use reqwest::Url;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::warn;
 
 use crate::models::{Preview, PreviewOrUpdate, Update};
+
+#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
+pub enum WebSocketApiError {
+    /// Error parsing endpoint URL
+    #[error("Failed to parse endpoint URL")]
+    ParseError(#[from] url::ParseError),
+    /// Error parsing endpoint URL
+    #[error("Failed to parse endpoint URL")]
+    ConnectFailed(#[from] tokio_tungstenite::tungstenite::Error),
+    /// An error occurred while parsing the response from the API.
+    #[error("Parsing response failed")]
+    InvalidResponse(#[from] serde_json::Error),
+    /// An error occurred while reading websocket message.
+    #[error("Error occurred while reading websocket message")]
+    ReadFailed(#[source] tokio_tungstenite::tungstenite::Error),
+}
+
+type Result<T> = std::result::Result<T, WebSocketApiError>;
 
 /// Struct representing a connection to the ComfyUI API `ws` endpoint.
 #[derive(Clone, Debug)]
@@ -22,13 +40,11 @@ impl WebsocketApi {
     /// # Returns
     ///
     /// A `Result` containing a new `WebsocketApi` instance on success, or an error if url parsing failed.
-    pub fn new<S>(endpoint: S) -> anyhow::Result<Self>
+    pub fn new<S>(endpoint: S) -> Result<Self>
     where
         S: AsRef<str>,
     {
-        Ok(Self::new_with_url(
-            Url::parse(endpoint.as_ref()).context("failed to parse endpoint url")?,
-        ))
+        Ok(Self::new_with_url(Url::parse(endpoint.as_ref())?))
     }
 
     /// Constructs a new `WebsocketApi` client with a given endpoint `Url`.
@@ -47,17 +63,15 @@ impl WebsocketApi {
     async fn connect_to_endpoint(
         &self,
         endpoint: &Url,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
-        let (connection, _) = connect_async(endpoint)
-            .await
-            .context("WebSocket connection failed")?;
+    ) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
+        let (connection, _) = connect_async(endpoint).await?;
         Ok(connection.filter_map(|m| async {
             match m {
                 Ok(m) => match m {
                     Message::Text(t) => Some(
                         serde_json::from_str::<Update>(t.as_str())
-                            .context(format!("failed to parse websocket message text: {}", t))
-                            .map(PreviewOrUpdate::Update),
+                            .map(PreviewOrUpdate::Update)
+                            .map_err(WebSocketApiError::InvalidResponse),
                     ),
                     Message::Binary(_) => {
                         Some(Ok(PreviewOrUpdate::Preview(Preview(m.into_data()))))
@@ -67,14 +81,12 @@ impl WebsocketApi {
                         None
                     }
                 },
-                Err(e) => Some(Err(anyhow!("websocket error: {}", e))),
+                Err(e) => Some(Err(WebSocketApiError::ReadFailed(e))),
             }
         }))
     }
 
-    async fn connect_impl(
-        &self,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
+    async fn connect_impl(&self) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
         self.connect_to_endpoint(&self.endpoint).await
     }
 
@@ -84,9 +96,7 @@ impl WebsocketApi {
     ///
     /// A `Stream` of `PreviewOrUpdate` values. These are either `Update` values, which contain
     /// progress updates for a task, or `Preview` values, which contain a preview image.
-    pub async fn connect(
-        &self,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<PreviewOrUpdate, anyhow::Error>>> {
+    pub async fn connect(&self) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
         self.connect_impl().await
     }
 
@@ -95,9 +105,7 @@ impl WebsocketApi {
     /// # Returns
     ///
     /// A `Stream` of `Update` values. These contain progress updates for a task.
-    pub async fn updates(
-        &self,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<Update, anyhow::Error>>> {
+    pub async fn updates(&self) -> Result<impl FusedStream<Item = Result<Update>>> {
         Ok(self.connect_impl().await?.filter_map(|m| async {
             match m {
                 Ok(PreviewOrUpdate::Update(u)) => Some(Ok(u)),
@@ -112,9 +120,7 @@ impl WebsocketApi {
     /// # Returns
     ///
     /// A `Stream` of `Preview` values. These contain preview images.
-    pub async fn previews(
-        &self,
-    ) -> anyhow::Result<impl FusedStream<Item = Result<Preview, anyhow::Error>>> {
+    pub async fn previews(&self) -> Result<impl FusedStream<Item = Result<Preview>>> {
         Ok(self.connect_impl().await?.filter_map(|m| async {
             match m {
                 Ok(PreviewOrUpdate::Update(_)) => None,
