@@ -390,7 +390,6 @@ pub(crate) fn find_output_node(prompt: &Prompt) -> Option<String> {
         .next()
 }
 
-#[macro_export]
 macro_rules! create_getter {
     ($ValueType:ty, $NodeType:ty, $AccessorType:ty, $field_name:ident) => {
         impl Getter<$ValueType, $NodeType> for $AccessorType {
@@ -424,7 +423,6 @@ macro_rules! create_getter {
     };
 }
 
-#[macro_export]
 macro_rules! create_ext_trait {
     ($ValueType:ty, $AccessorType:ty, $getter_name:ident, $getter_name_mut:ident, $TraitName:ident) => {
         /// Trait to get references to values from a `Prompt`.
@@ -488,32 +486,7 @@ impl Getter<String, CLIPTextEncode> for accessors::Prompt {
     }
 }
 
-/// Trait to get references to values from a `Prompt``.
-pub trait PromptExt {
-    /// Get a reference to the value.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the reference on success, or an error if the node could not be found.
-    fn prompt(&self) -> anyhow::Result<&String>;
-
-    /// Get a mutable reference to the value.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the mutable reference on success, or an error if the node could not be found.
-    fn prompt_mut(&mut self) -> anyhow::Result<&mut String>;
-}
-
-impl PromptExt for Prompt {
-    fn prompt(&self) -> anyhow::Result<&String> {
-        self.get::<accessors::Prompt>()
-    }
-
-    fn prompt_mut(&mut self) -> anyhow::Result<&mut String> {
-        self.get_mut::<accessors::Prompt>()
-    }
-}
+create_ext_trait!(String, accessors::Prompt, prompt, prompt_mut, PromptExt);
 
 impl Getter<String, CLIPTextEncode> for accessors::NegativePrompt {
     fn get_value<'a>(&self, node: &'a dyn Node) -> anyhow::Result<&'a String> {
@@ -539,32 +512,13 @@ impl Getter<String, CLIPTextEncode> for accessors::NegativePrompt {
     }
 }
 
-/// Trait to get references to values from a `Prompt``.
-pub trait NegativePromptExt {
-    /// Get a reference to the value.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the reference on success, or an error if the node could not be found.
-    fn negative_prompt(&self) -> anyhow::Result<&String>;
-
-    /// Get a mutable reference to the value.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the mutable reference on success, or an error if the node could not be found.
-    fn negative_prompt_mut(&mut self) -> anyhow::Result<&mut String>;
-}
-
-impl NegativePromptExt for Prompt {
-    fn negative_prompt(&self) -> anyhow::Result<&String> {
-        self.get::<accessors::NegativePrompt>()
-    }
-
-    fn negative_prompt_mut(&mut self) -> anyhow::Result<&mut String> {
-        self.get_mut::<accessors::NegativePrompt>()
-    }
-}
+create_ext_trait!(
+    String,
+    accessors::NegativePrompt,
+    negative_prompt,
+    negative_prompt_mut,
+    NegativePromptExt
+);
 
 create_getter!(String, CheckpointLoaderSimple, accessors::Model, ckpt_name);
 create_ext_trait!(String, accessors::Model, ckpt_name, ckpt_name_mut, ModelExt);
