@@ -18,7 +18,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set<S>(&mut self, value: T) -> anyhow::Result<()>
     where
         S: Setter<T, N>;
@@ -31,7 +31,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set_from<S>(&mut self, output_node: &str, value: T) -> anyhow::Result<()>
     where
         S: Setter<T, N>;
@@ -45,7 +45,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set_node<S>(&mut self, node: &str, value: T) -> anyhow::Result<()>
     where
         S: Setter<T, N>;
@@ -64,7 +64,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set_with<F>(&mut self, f: F) -> anyhow::Result<()>
     where
         F: FnOnce(&mut N) -> anyhow::Result<()>;
@@ -77,7 +77,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set_node_with<F>(&mut self, node: &str, f: F) -> anyhow::Result<()>
     where
         F: FnOnce(&mut N) -> anyhow::Result<()>;
@@ -140,7 +140,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set(&self, prompt: &mut crate::models::Prompt, value: T) -> anyhow::Result<()> {
         let node = if let Some(node) = guess_node_mut::<N>(prompt, None) {
             node
@@ -158,7 +158,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set_from(
         &self,
         prompt: &mut crate::models::Prompt,
@@ -184,7 +184,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set_node(
         &self,
         prompt: &mut crate::models::Prompt,
@@ -203,7 +203,7 @@ where
     ///
     /// # Returns
     ///
-    /// `Ok(())`` on success, or an error if the node could not be found.
+    /// `Ok(())` on success, or an error if the node could not be found.
     fn set_value(&self, node: &mut dyn Node, value: T) -> anyhow::Result<()> {
         *self.get_value_mut(node)? = value;
         Ok(())

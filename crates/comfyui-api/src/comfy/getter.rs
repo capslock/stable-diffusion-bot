@@ -427,7 +427,7 @@ macro_rules! create_getter {
 #[macro_export]
 macro_rules! create_ext_trait {
     ($ValueType:ty, $AccessorType:ty, $getter_name:ident, $getter_name_mut:ident, $TraitName:ident) => {
-        /// Trait to get references to values from a `Prompt``.
+        /// Trait to get references to values from a `Prompt`.
         pub trait $TraitName {
             /// Get a reference to the value.
             ///

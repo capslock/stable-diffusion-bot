@@ -14,11 +14,11 @@ pub(crate) struct NegativePrompt;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Model;
 
-/// A `Setter` for setting the image size.
+/// A `Setter` for setting the image width.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Width;
 
-/// A `Setter` for setting the image size.
+/// A `Setter` for setting the image height.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Height;
 
@@ -65,7 +65,7 @@ where
     }
 }
 
-/// A `Setter` for setting the seed.
+/// A `Setter` for setting the steps.
 pub(crate) type Steps =
     Delegating<StepsT<KSampler>, StepsT<SDTurboScheduler>, u32, KSampler, SDTurboScheduler>;
 
@@ -116,7 +116,7 @@ where
     }
 }
 
-/// A `Setter` for setting the seed.
+/// A `Setter` for setting the Cfg scale.
 pub(crate) type Cfg = Delegating<CfgT<KSampler>, CfgT<SamplerCustom>, f32, KSampler, SamplerCustom>;
 
 #[derive(Clone, Debug, Default)]
@@ -141,6 +141,7 @@ where
     }
 }
 
+/// A `Setter` for setting the Cfg sampler.
 pub(crate) type Sampler =
     Delegating<SamplerT<KSampler>, SamplerT<KSamplerSelect>, String, KSampler, KSamplerSelect>;
 
