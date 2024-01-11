@@ -344,7 +344,10 @@ impl Txt2ImgApi for StableDiffusionWebUiApi {
     ) -> Result<Response, Txt2ImgApiError> {
         let config = Txt2ImgParams::from(config);
         let txt2img = self.client.txt2img()?;
-        let resp = txt2img.send(&config.user_params).await?;
+        let resp = txt2img
+            .send(&config.user_params)
+            .await
+            .context("Failed to send request")?;
         let params = Box::new(resp.info().map_err(Txt2ImgApiError::ParseResponse)?);
         Ok(Response {
             images: resp.images().map_err(Txt2ImgApiError::ParseResponse)?,
