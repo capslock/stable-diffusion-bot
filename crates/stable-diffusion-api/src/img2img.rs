@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use anyhow::Context;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -522,6 +521,32 @@ impl Img2ImgRequest {
     }
 }
 
+/// Errors that can occur when interacting with the `Img2Img` API.
+#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
+pub enum Img2ImgError {
+    /// Error parsing endpoint URL
+    #[error("Failed to parse endpoint URL")]
+    ParseError(#[from] url::ParseError),
+    /// Error sending request
+    #[error("Failed to send request")]
+    RequestFailed(#[from] reqwest::Error),
+    /// An error occurred while parsing the response from the API.
+    #[error("Parsing response failed")]
+    InvalidResponse(#[source] reqwest::Error),
+    /// An error occurred getting response data.
+    #[error("Failed to get response data")]
+    GetDataFailed(#[source] reqwest::Error),
+    /// Server returned an error for img2img
+    #[error("Img2Img request failed: {status}: {error}")]
+    Img2ImgFailed {
+        status: reqwest::StatusCode,
+        error: String,
+    },
+}
+
+type Result<T> = std::result::Result<T, Img2ImgError>;
+
 /// A client for sending image requests to a specified endpoint.
 pub struct Img2Img {
     client: reqwest::Client,
@@ -540,11 +565,8 @@ impl Img2Img {
     /// # Returns
     ///
     /// A `Result` containing a new Img2Img instance on success, or an error if url parsing failed.
-    pub fn new(client: reqwest::Client, endpoint: String) -> anyhow::Result<Self> {
-        Ok(Self::new_with_url(
-            client,
-            Url::parse(&endpoint).context("failed to parse endpoint url")?,
-        ))
+    pub fn new(client: reqwest::Client, endpoint: String) -> Result<Self> {
+        Ok(Self::new_with_url(client, Url::parse(&endpoint)?))
     }
 
     /// Constructs a new Img2Img client with a given `reqwest::Client` and endpoint `Url`.
@@ -570,29 +592,21 @@ impl Img2Img {
     /// # Returns
     ///
     /// A `Result` containing an `ImgResponse<Img2ImgRequest>` on success, or an error if one occurred.
-    pub async fn send(
-        &self,
-        request: &Img2ImgRequest,
-    ) -> anyhow::Result<ImgResponse<Img2ImgRequest>> {
+    pub async fn send(&self, request: &Img2ImgRequest) -> Result<ImgResponse<Img2ImgRequest>> {
         let response = self
             .client
             .post(self.endpoint.clone())
             .json(&request)
             .send()
-            .await
-            .context("failed to send request")?;
+            .await?;
         if response.status().is_success() {
-            return response.json().await.context("failed to parse json");
+            return response.json().await.map_err(Img2ImgError::InvalidResponse);
         }
         let status = response.status();
-        let text = response
-            .text()
-            .await
-            .context("failed to get response text")?;
-        Err(anyhow::anyhow!(
-            "got error code: {}, message text: {}",
+        let text = response.text().await.map_err(Img2ImgError::GetDataFailed)?;
+        Err(Img2ImgError::Img2ImgFailed {
             status,
-            text
-        ))
+            error: text,
+        })
     }
 }

@@ -177,7 +177,7 @@ pub enum Img2ImgApiError {
     #[error("Prompt was empty.")]
     EmptyPrompt,
     /// Error running txt2img.
-    #[error("Error running txt2img.")]
+    #[error("Error running img2img.")]
     Img2Img(#[from] anyhow::Error),
     /// Error parsing response.
     #[error("Error parsing response.")]
@@ -382,7 +382,10 @@ impl Img2ImgApi for StableDiffusionWebUiApi {
     ) -> Result<Response, Img2ImgApiError> {
         let config = Img2ImgParams::from(config);
         let img2img = self.client.img2img()?;
-        let resp = img2img.send(&config.user_params).await?;
+        let resp = img2img
+            .send(&config.user_params)
+            .await
+            .context("Failed to send request")?;
         let params = Box::new(resp.info().map_err(Img2ImgApiError::ParseResponse)?);
         Ok(Response {
             images: resp.images().map_err(Img2ImgApiError::ParseResponse)?,
