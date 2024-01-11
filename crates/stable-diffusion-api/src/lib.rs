@@ -1,12 +1,29 @@
-mod txt2img;
-use anyhow::Context;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+
+mod txt2img;
 pub use txt2img::*;
 
 mod img2img;
 pub use img2img::*;
+
+/// Errors that can occur when interacting with the Stable Diffusion API.
+#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
+pub enum ApiError {
+    /// Error parsing endpoint URL
+    #[error("Failed to parse endpoint URL")]
+    ParseError(#[from] url::ParseError),
+    /// Error parsing info from response
+    #[error("Failed to info from response")]
+    InvalidInfo(#[from] serde_json::Error),
+    /// Error decoding image from response
+    #[error("Failed to decode image from response")]
+    DecodeError(#[from] base64::DecodeError),
+}
+
+type Result<T> = std::result::Result<T, ApiError>;
 
 /// Struct representing a connection to a Stable Diffusion WebUI API.
 #[derive(Clone, Debug)]
@@ -39,12 +56,12 @@ impl Api {
     /// # Errors
     ///
     /// If the URL fails to parse, an error will be returned.
-    pub fn new_with_url<S>(url: S) -> anyhow::Result<Self>
+    pub fn new_with_url<S>(url: S) -> Result<Self>
     where
         S: AsRef<str>,
     {
         Ok(Self {
-            url: Url::parse(url.as_ref()).context("Failed to parse URL")?,
+            url: Url::parse(url.as_ref())?,
             ..Default::default()
         })
     }
@@ -59,13 +76,13 @@ impl Api {
     /// # Errors
     ///
     /// If the URL fails to parse, an error will be returned.
-    pub fn new_with_client_and_url<S>(client: reqwest::Client, url: S) -> anyhow::Result<Self>
+    pub fn new_with_client_and_url<S>(client: reqwest::Client, url: S) -> Result<Self>
     where
         S: AsRef<str>,
     {
         Ok(Self {
             client,
-            url: Url::parse(url.as_ref()).context("Failed to parse URL")?,
+            url: Url::parse(url.as_ref())?,
         })
     }
 
@@ -74,12 +91,10 @@ impl Api {
     /// # Errors
     ///
     /// If the URL fails to parse, an error will be returned.
-    pub fn txt2img(&self) -> anyhow::Result<Txt2Img> {
+    pub fn txt2img(&self) -> Result<Txt2Img> {
         Ok(Txt2Img::new_with_url(
             self.client.clone(),
-            self.url
-                .join("sdapi/v1/txt2img")
-                .context("Failed to parse txt2img endpoint")?,
+            self.url.join("sdapi/v1/txt2img")?,
         ))
     }
 
@@ -88,12 +103,10 @@ impl Api {
     /// # Errors
     ///
     /// If the URL fails to parse, an error will be returned.
-    pub fn img2img(&self) -> anyhow::Result<Img2Img> {
+    pub fn img2img(&self) -> Result<Img2Img> {
         Ok(Img2Img::new_with_url(
             self.client.clone(),
-            self.url
-                .join("sdapi/v1/img2img")
-                .context("Failed to parse img2img endpoint")?,
+            self.url.join("sdapi/v1/img2img")?,
         ))
     }
 }
@@ -116,8 +129,8 @@ impl<T: Clone> ImgResponse<T> {
     /// # Errors
     ///
     /// If the `info` field fails to parse, an error will be returned.
-    pub fn info(&self) -> anyhow::Result<ImgInfo> {
-        serde_json::from_str(&self.info).context("failed to parse info")
+    pub fn info(&self) -> Result<ImgInfo> {
+        Ok(serde_json::from_str(&self.info)?)
     }
 
     /// Decodes and returns a vector of images from the `images` field of the `ImgResponse`.
@@ -125,16 +138,16 @@ impl<T: Clone> ImgResponse<T> {
     /// # Errors
     ///
     /// If any of the images fail to decode, an error will be returned.
-    pub fn images(&self) -> anyhow::Result<Vec<Vec<u8>>> {
+    pub fn images(&self) -> Result<Vec<Vec<u8>>> {
         use base64::{engine::general_purpose, Engine as _};
         self.images
             .iter()
             .map(|img| {
                 general_purpose::STANDARD
                     .decode(img)
-                    .context("failed to decode image")
+                    .map_err(ApiError::DecodeError)
             })
-            .collect::<anyhow::Result<Vec<_>>>()
+            .collect::<Result<Vec<_>>>()
     }
 }
 

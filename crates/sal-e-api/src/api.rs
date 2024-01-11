@@ -343,14 +343,24 @@ impl Txt2ImgApi for StableDiffusionWebUiApi {
         config: &dyn crate::gen_params::GenParams,
     ) -> Result<Response, Txt2ImgApiError> {
         let config = Txt2ImgParams::from(config);
-        let txt2img = self.client.txt2img()?;
+        let txt2img = self
+            .client
+            .txt2img()
+            .context("Failed to open txt2img API")?;
         let resp = txt2img
             .send(&config.user_params)
             .await
             .context("Failed to send request")?;
-        let params = Box::new(resp.info().map_err(Txt2ImgApiError::ParseResponse)?);
+        let params = Box::new(
+            resp.info()
+                .context("Failed to parse info from response")
+                .map_err(Txt2ImgApiError::ParseResponse)?,
+        );
         Ok(Response {
-            images: resp.images().map_err(Txt2ImgApiError::ParseResponse)?,
+            images: resp
+                .images()
+                .context("Failed to parse image from response")
+                .map_err(Txt2ImgApiError::ParseResponse)?,
             params: params.clone(),
             gen_params: Box::new(Txt2ImgParams {
                 user_params: resp.parameters.clone(),
@@ -384,14 +394,24 @@ impl Img2ImgApi for StableDiffusionWebUiApi {
         config: &dyn crate::gen_params::GenParams,
     ) -> Result<Response, Img2ImgApiError> {
         let config = Img2ImgParams::from(config);
-        let img2img = self.client.img2img()?;
+        let img2img = self
+            .client
+            .img2img()
+            .context("Failed to open img2img API")?;
         let resp = img2img
             .send(&config.user_params)
             .await
             .context("Failed to send request")?;
-        let params = Box::new(resp.info().map_err(Img2ImgApiError::ParseResponse)?);
+        let params = Box::new(
+            resp.info()
+                .context("Failed to parse info from response")
+                .map_err(Img2ImgApiError::ParseResponse)?,
+        );
         Ok(Response {
-            images: resp.images().map_err(Img2ImgApiError::ParseResponse)?,
+            images: resp
+                .images()
+                .context("Failed to parse image from response")
+                .map_err(Img2ImgApiError::ParseResponse)?,
             params: params.clone(),
             gen_params: Box::new(Img2ImgParams {
                 user_params: resp.parameters.clone(),
