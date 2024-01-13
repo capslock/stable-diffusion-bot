@@ -97,9 +97,11 @@ async fn main() -> anyhow::Result<()> {
     .img2img_defaults(config.img2img.unwrap_or_default())
     .comfyui_config(config.comfyui.unwrap_or_default())
     .build()
-    .await?
+    .await
+    .context("Failed to build Stable Diffusion Bot")?
     .run()
-    .await?;
+    .await
+    .context("Stable Diffusion Bot exited with error")?;
 
     Ok(())
 }

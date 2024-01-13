@@ -197,7 +197,8 @@ impl StableDiffusionBot {
         commands.extend(GenCommands::bot_commands());
         bot.set_my_commands(commands)
             .scope(teloxide::types::BotCommandScope::Default)
-            .await?;
+            .await
+            .context("Failed to set bot commands")?;
 
         Dispatcher::builder(bot, Self::schema())
             .dependencies(dptree::deps![config, storage])
@@ -431,10 +432,10 @@ impl StableDiffusionBotBuilder {
 
                 File::open(
                     self.comfyui_txt2img_prompt_file
-                        .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
+                        .ok_or_else(|| anyhow!("No ComfyUI txt2img prompt file provided."))?,
                 )
                 .await
-                .context("Failed to open comfyui prompt file")?
+                .context("Failed to open comfyui txt2img prompt file")?
                 .read_to_string(&mut txt2img_prompt)
                 .await?;
 
@@ -442,10 +443,10 @@ impl StableDiffusionBotBuilder {
 
                 File::open(
                     self.comfyui_img2img_prompt_file
-                        .ok_or_else(|| anyhow!("No ComfyUI prompt file provided."))?,
+                        .ok_or_else(|| anyhow!("No ComfyUI img2img prompt file provided."))?,
                 )
                 .await
-                .context("Failed to open comfyui prompt file")?
+                .context("Failed to open comfyui img2img prompt file")?
                 .read_to_string(&mut img2img_prompt)
                 .await?;
 
@@ -484,7 +485,8 @@ impl StableDiffusionBotBuilder {
                     client,
                     self.sd_api_url,
                     img2img_prompt,
-                )?;
+                )
+                .context("Failed to create ComfyUI client")?;
                 (Box::new(txt2img_api), Box::new(img2img_api))
             }
             ApiType::StableDiffusionWebUi => {
