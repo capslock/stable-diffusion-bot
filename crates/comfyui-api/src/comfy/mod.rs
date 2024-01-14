@@ -210,7 +210,7 @@ impl Comfy {
 
     async fn prompt_impl<'a>(
         &'a self,
-        prompt: &'a Prompt,
+        prompt: &Prompt,
     ) -> Result<impl Stream<Item = Result<State>> + 'a> {
         let client_id = Uuid::new_v4();
         let prompt_api = self.api.prompt_with_client(client_id)?;
@@ -245,11 +245,11 @@ impl Comfy {
     /// The `String` value is the output node name, and the `Vec<u8>` value is the image data.
     pub async fn stream_prompt<'a>(
         &'a self,
-        prompt: &'a Prompt,
+        prompt: &Prompt,
     ) -> Result<impl FusedStream<Item = Result<NodeOutput>> + 'a> {
+        let stream = self.prompt_impl(prompt).await?;
         Ok(stream! {
             let mut executed = HashSet::new();
-            let stream = self.prompt_impl(prompt).await?;
             for await msg in stream {
                 match msg {
                     Ok(State::Executing(node, images)) => {
@@ -303,6 +303,15 @@ impl Comfy {
         Ok(images)
     }
 
+    /// Uploads a file to the ComfyUI API and returns information about the uploaded image.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - A `Vec<u8>` containing the file data to upload.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an `ImageUpload` on success, or an error if the request failed.
     pub async fn upload_file(&self, file: Vec<u8>) -> Result<ImageUpload> {
         Ok(self.upload.image(file).await?)
     }
