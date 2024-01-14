@@ -241,8 +241,7 @@ impl Comfy {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a `Stream` of `Result<(String, Vec<u8>)>` values on success, or an error if the request failed.
-    /// The `String` value is the output node name, and the `Vec<u8>` value is the image data.
+    /// A `Result` containing a `Stream` of `Result<NodeOutput>` values on success, or an error if the request failed.
     pub async fn stream_prompt<'a>(
         &'a self,
         prompt: &Prompt,
@@ -289,8 +288,7 @@ impl Comfy {
     ///
     /// # Returns
     ///
-    /// A `Result` containing a pair of `String` and `Vec<u8>` values on success, or an error if the request failed.
-    /// The `String` value is the output node name, and the `Vec<u8>` value is the image data.
+    /// A `Result` containing a `Vec<NodeOutput>` on success, or an error if the request failed.
     pub async fn execute_prompt(&self, prompt: &Prompt) -> Result<Vec<NodeOutput>> {
         let mut images = vec![];
         let mut stream = pin!(self.stream_prompt(prompt).await?);
