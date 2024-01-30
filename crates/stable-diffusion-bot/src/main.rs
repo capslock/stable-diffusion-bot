@@ -70,12 +70,21 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::WARN.into())
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
         .from_env()
         .context("Failed to parse filter from env")?;
 
-    registry.with(filter).with(layer).init();
+    let target_filter = tracing_subscriber::filter::Targets::new()
+        .with_target("hyper", tracing::Level::WARN)
+        .with_target("reqwest", tracing::Level::WARN)
+        .with_target("sqlx", tracing::Level::WARN)
+        .with_default(LevelFilter::TRACE);
+
+    registry
+        .with(target_filter.and_then(env_filter))
+        .with(layer)
+        .init();
 
     let config: Config = args
         .config
