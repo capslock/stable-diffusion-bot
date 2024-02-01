@@ -98,7 +98,7 @@ Then simply configure and enable the service in your `configuration.nix`:
 ```nix
 services.stableDiffusionBot = {
   enable = true;
-  telegram_api_key_file = "/path/to/your/api/key/file.toml";
+  telegramApiKeyFile = "/path/to/your/api/key/file.toml";
   settings = {
     # All other settings, as described below
     allowed_users = [ list of telegram ids ];
