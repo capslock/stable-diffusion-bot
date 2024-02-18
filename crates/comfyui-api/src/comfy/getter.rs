@@ -8,6 +8,20 @@ use crate::{comfy::visitor::FindNode, comfy::Visitor};
 use super::accessors;
 
 /// A trait for getting values from nodes.
+///
+/// This trait is used to get values from nodes in a `Prompt`. Implementations of this trait
+/// should override `get_value` and `get_value_mut` to get the value of interest from a node.
+/// Implementations may also override `find_node` to find the node to get the value from.
+/// Other methods are used to get values from nodes using heuristics and may not need to be
+/// overridden.
+///
+/// # Type Parameters
+/// * `T` - The type of the value to get.
+/// * `N` - The type of the node to get the value from.
+///
+/// # Examples
+///
+/// See the `Getter` implementations for `Prompt` for an example of how to implement this trait.
 pub trait Getter<T, N>
 where
     N: Node + 'static,

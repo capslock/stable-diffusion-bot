@@ -127,6 +127,10 @@ impl<N: Node + 'static> SetExt<N> for crate::models::Prompt {
 }
 
 /// A trait for setting values on nodes.
+///
+/// This trait is implemented for types that can be used to set values on nodes.
+/// Usually, this trait does not need to be implemented directly, as it is implemented
+/// for all types that implement `Getter`.
 pub trait Setter<T, N>
 where
     N: Node + 'static,
