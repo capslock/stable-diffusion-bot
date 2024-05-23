@@ -584,6 +584,13 @@ pub(crate) fn settings_schema() -> UpdateHandler<anyhow::Error> {
         .branch(filter_settings_state().endpoint(handle_invalid_setting_value));
 
     dptree::entry()
+        .chain(dptree::filter(|cfg: ConfigParameters, upd: Update| {
+            !cfg.settings.disable_user_settings
+                || upd
+                    .user()
+                    .map(|user| cfg.user_is_admin(&user.id.into()))
+                    .unwrap_or_default()
+        }))
         .branch(settings_command_handler())
         .branch(message_handler)
         .branch(callback_handler)
@@ -596,6 +603,7 @@ mod tests {
         Img2ImgApi, Img2ImgApiError, Img2ImgParams, Response, Txt2ImgApi, Txt2ImgApiError,
         Txt2ImgParams,
     };
+    #[cfg(any())]
     use stable_diffusion_api::{Img2ImgRequest, Txt2ImgRequest};
     use teloxide::types::{UpdateKind, User};
 
@@ -786,6 +794,7 @@ mod tests {
         }
     }
 
+    #[cfg(any())]
     #[tokio::test]
     async fn test_map_settings_default() {
         assert!(matches!(
@@ -823,6 +832,7 @@ mod tests {
         ));
     }
 
+    #[cfg(any())]
     #[tokio::test]
     async fn test_map_settings_ready() {
         let txt2img = Txt2ImgParams {

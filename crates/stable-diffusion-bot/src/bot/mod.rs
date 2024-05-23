@@ -107,6 +107,7 @@ impl StableDiffusionBot {
     /// Creates an UpdateHandler for the bot
     fn schema() -> UpdateHandler<anyhow::Error> {
         Self::enter::<Update, ErasedStorage<State>, _>()
+            .chain(dptree::filter_async(Self::set_my_commands))
             .branch(unauth_command_handler())
             .branch(authenticated_command_handler())
     }
@@ -184,6 +185,32 @@ impl StableDiffusionBot {
         )
     }
 
+    async fn set_my_commands(bot: Bot, cfg: ConfigParameters, upd: Update) -> bool {
+        let (chat, user) = match (upd.chat(), upd.user()) {
+            (Some(c), Some(u)) => (c, u),
+            _ => return true,
+        };
+        let mut commands = UnauthenticatedCommands::bot_commands();
+        if !cfg.settings.disable_user_settings || cfg.user_is_admin(&user.id.into()) {
+            commands.extend(SettingsCommands::bot_commands());
+        }
+        commands.extend(GenCommands::bot_commands());
+        let scope = if chat.id == user.id.into() {
+            teloxide::types::BotCommandScope::Chat {
+                chat_id: teloxide::types::Recipient::Id(chat.id),
+            }
+        } else {
+            teloxide::types::BotCommandScope::ChatMember {
+                chat_id: teloxide::types::Recipient::Id(chat.id),
+                user_id: user.id,
+            }
+        };
+        if let Err(e) = bot.set_my_commands(commands).scope(scope).await {
+            error!("Failed to set commands: {e:?}");
+        }
+        true
+    }
+
     /// Runs the StableDiffusionBot
     pub async fn run(self) -> anyhow::Result<()> {
         let StableDiffusionBot {
@@ -193,7 +220,6 @@ impl StableDiffusionBot {
         } = self;
 
         let mut commands = UnauthenticatedCommands::bot_commands();
-        commands.extend(SettingsCommands::bot_commands());
         commands.extend(GenCommands::bot_commands());
         bot.set_my_commands(commands)
             .scope(teloxide::types::BotCommandScope::Default)
@@ -217,18 +243,45 @@ impl StableDiffusionBot {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct SettingsParameters {
+    pub disable_user_settings: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct UiParameters {
+    pub hide_rerun_button: bool,
+    pub hide_reuse_button: bool,
+    pub hide_settings_button: bool,
+    pub hide_all_buttons: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct MessageParameters {
+    pub hide_generation_info: bool,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ConfigParameters {
     allowed_users: HashSet<ChatId>,
     txt2img_api: Box<dyn sal_e_api::Txt2ImgApi>,
     img2img_api: Box<dyn sal_e_api::Img2ImgApi>,
     allow_all_users: bool,
+    administrator_users: HashSet<ChatId>,
+    settings: SettingsParameters,
+    ui: UiParameters,
+    messages: MessageParameters,
 }
 
 impl ConfigParameters {
     /// Checks whether a chat is allowed by the config.
     pub fn chat_is_allowed(&self, chat_id: &ChatId) -> bool {
         self.allow_all_users || self.allowed_users.contains(chat_id)
+    }
+
+    /// Checks whether a user is an admin by the config.
+    pub fn user_is_admin(&self, chat_id: &ChatId) -> bool {
+        self.administrator_users.contains(chat_id)
     }
 }
 
@@ -263,6 +316,10 @@ pub struct StableDiffusionBotBuilder {
     comfyui_img2img_prompt_file: Option<PathBuf>,
     comfyui_txt2img_prompt_file: Option<PathBuf>,
     allow_all_users: bool,
+    administrator_users: Vec<i64>,
+    settings: SettingsParameters,
+    ui: UiParameters,
+    messages: MessageParameters,
 }
 
 impl StableDiffusionBotBuilder {
@@ -285,6 +342,10 @@ impl StableDiffusionBotBuilder {
             api_type,
             comfyui_txt2img_prompt_file: None,
             comfyui_img2img_prompt_file: None,
+            administrator_users: Vec::new(),
+            settings: SettingsParameters::default(),
+            ui: UiParameters::default(),
+            messages: MessageParameters::default(),
         }
     }
 
@@ -303,7 +364,7 @@ impl StableDiffusionBotBuilder {
     /// # let sd_api_url = "http://localhost:7860".to_string();
     /// # let allow_all_users = false;
     /// # tokio_test::block_on(async {
-    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url, allow_all_users);
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
     ///
     /// let bot = builder.db_path(Some("database.sqlite".to_string())).build().await.unwrap();
     /// # });
@@ -391,6 +452,118 @@ impl StableDiffusionBotBuilder {
         self
     }
 
+    /// Builder function that sets whether all users are allowed to use the bot.
+    pub fn allow_all_users(mut self, allow_all_users: bool) -> Self {
+        self.allow_all_users = allow_all_users;
+        self
+    }
+
+    /// Builder function that sets the settings configuration for the bot.
+    ///
+    /// # Arguments
+    ///
+    /// * `settings` - A `SettingsParameters` struct representing the settings configuration for the bot.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// # use stable_diffusion_bot::SettingsParameters;
+    /// #
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.configure_settings(SettingsParameters::default()).build().await.unwrap();
+    /// # });
+    /// ```
+    pub fn configure_settings(mut self, settings: SettingsParameters) -> Self {
+        self.settings = settings;
+        self
+    }
+
+    /// Builder function that sets the UI configuration for the bot.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - A `UiParameters` struct representing the UI configuration for the bot.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// # use stable_diffusion_bot::UiParameters;
+    /// #
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.configure_ui(UiParameters::default()).build().await.unwrap();
+    /// # });
+    /// ```
+    pub fn configure_ui(mut self, ui: UiParameters) -> Self {
+        self.ui = ui;
+        self
+    }
+
+    /// Builder function that sets the messages configuration for the bot.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - A `MessageParameters` struct representing the messages configuration for the bot.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// # use stable_diffusion_bot::MessageParameters;
+    /// #
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.configure_messages(MessageParameters::default()).build().await.unwrap();
+    /// # });
+    /// ```
+    pub fn configure_messages(mut self, messages: MessageParameters) -> Self {
+        self.messages = messages;
+        self
+    }
+
+    /// Builder function that sets the administrator users for the bot.
+    ///
+    /// # Arguments
+    ///
+    /// * `administrator_users` - A `Vec<i64>` representing the administrator users for the bot.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use stable_diffusion_bot::StableDiffusionBotBuilder;
+    /// #
+    /// # let api_key = "api_key".to_string();
+    /// # let allowed_users = vec![1, 2, 3];
+    /// # let sd_api_url = "http://localhost:7860".to_string();
+    /// # let allow_all_users = false;
+    /// # tokio_test::block_on(async {
+    /// let builder = StableDiffusionBotBuilder::new(api_key, allowed_users, sd_api_url);
+    ///
+    /// let bot = builder.administrator_users(vec![1, 2, 3]).build().await.unwrap();
+    /// # });
+    pub fn administrator_users(mut self, administrator_users: Vec<i64>) -> Self {
+        self.administrator_users = administrator_users;
+        self
+    }
+
     /// Consumes the builder and builds a `StableDiffusionBot` instance.
     ///
     /// # Examples
@@ -421,6 +594,7 @@ impl StableDiffusionBotBuilder {
         let bot = Bot::new(self.api_key.clone());
 
         let allowed_users = self.allowed_users.into_iter().map(ChatId).collect();
+        let administrator_users = self.administrator_users.into_iter().map(ChatId).collect();
 
         let client = reqwest::Client::new();
 
@@ -517,6 +691,10 @@ impl StableDiffusionBotBuilder {
             txt2img_api,
             img2img_api,
             allow_all_users: self.allow_all_users,
+            administrator_users,
+            settings: self.settings,
+            ui: self.ui,
+            messages: self.messages,
         };
 
         Ok(StableDiffusionBot {
@@ -581,7 +759,7 @@ mod tests {
             bot.config.allowed_users,
             allowed_users.into_iter().map(ChatId).collect()
         );
-        assert_eq!(bot.config.allow_all_users, allow_all_users);
+        assert!(!bot.config.allow_all_users);
         assert_eq!(
             bot.config
                 .txt2img_api
@@ -640,7 +818,7 @@ mod tests {
             bot.config.allowed_users,
             allowed_users.into_iter().map(ChatId).collect()
         );
-        assert_eq!(bot.config.allow_all_users, allow_all_users);
+        assert!(!bot.config.allow_all_users);
         assert_eq!(
             bot.config
                 .txt2img_api

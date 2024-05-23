@@ -62,11 +62,32 @@ impl Photo {
     }
 }
 
+struct ReplyConfig {
+    disable_user_settings: bool,
+    hide_all_buttons: bool,
+    hide_settings_button: bool,
+    hide_reuse_button: bool,
+    hide_rerun_button: bool,
+}
+
+impl From<ConfigParameters> for ReplyConfig {
+    fn from(config: ConfigParameters) -> Self {
+        Self {
+            disable_user_settings: config.settings.disable_user_settings,
+            hide_all_buttons: config.ui.hide_all_buttons,
+            hide_settings_button: config.ui.hide_settings_button,
+            hide_reuse_button: config.ui.hide_reuse_button,
+            hide_rerun_button: config.ui.hide_rerun_button,
+        }
+    }
+}
+
 struct Reply {
     caption: String,
     images: Photo,
     source: MessageId,
     seed: i64,
+    config: ReplyConfig,
 }
 
 impl Reply {
@@ -75,6 +96,7 @@ impl Reply {
         images: Vec<Vec<u8>>,
         seed: i64,
         source: MessageId,
+        config: ReplyConfig,
     ) -> anyhow::Result<Self> {
         let images = Photo::album(images)?;
         Ok(Self {
@@ -82,18 +104,22 @@ impl Reply {
             images,
             source,
             seed,
+            config,
         })
     }
 
     pub async fn send(self, bot: &Bot, chat_id: ChatId) -> anyhow::Result<()> {
         match self.images {
             Photo::Single(image) => {
-                bot.send_photo(chat_id, InputFile::memory(image))
+                let mut message = bot
+                    .send_photo(chat_id, InputFile::memory(image))
                     .parse_mode(teloxide::types::ParseMode::MarkdownV2)
                     .caption(self.caption)
-                    .reply_markup(keyboard(self.seed))
-                    .reply_to_message_id(self.source)
-                    .await?;
+                    .reply_to_message_id(self.source);
+                if !self.config.hide_all_buttons {
+                    message = message.reply_markup(keyboard(self.seed, self.config.into()))
+                }
+                message.await?;
             }
             Photo::Album(images) => {
                 let mut caption = Some(self.caption);
@@ -107,13 +133,15 @@ impl Reply {
                 bot.send_media_group(chat_id, input_media)
                     .reply_to_message_id(self.source)
                     .await?;
-                bot.send_message(
-                    chat_id,
-                    "What would you like to do? Select below, or enter a new prompt.",
-                )
-                .reply_markup(keyboard(self.seed))
-                .reply_to_message_id(self.source)
-                .await?;
+                if !self.config.hide_all_buttons {
+                    bot.send_message(
+                        chat_id,
+                        "What would you like to do? Select below, or enter a new prompt.",
+                    )
+                    .reply_markup(keyboard(self.seed, self.config.into()))
+                    .reply_to_message_id(self.source)
+                    .await?;
+                }
             }
         }
 
@@ -124,6 +152,11 @@ impl Reply {
 struct MessageText(String);
 
 impl MessageText {
+    pub fn new(prompt: &str) -> Self {
+        use teloxide::utils::markdown::escape;
+        Self(format!("`{}`", escape(prompt)))
+    }
+
     pub fn new_with_image_params(prompt: &str, infotxt: &dyn ImageParams) -> Self {
         use teloxide::utils::markdown::escape;
 
@@ -240,10 +273,14 @@ async fn handle_image(
         resp.params.seed().unwrap_or(-1)
     };
 
-    let caption = MessageText::try_from(resp.params.as_ref())
-        .context("Failed to build caption from response")?;
+    let caption = if cfg.messages.hide_generation_info {
+        MessageText::new(&resp.params.prompt().unwrap_or_default())
+    } else {
+        MessageText::try_from(resp.params.as_ref())
+            .context("Failed to build caption from response")?
+    };
 
-    Reply::new(caption.0, resp.images, seed, msg.id)
+    Reply::new(caption.0, resp.images, seed, msg.id, cfg.into())
         .context("Failed to create response!")?
         .send(&bot, msg.chat.id)
         .await?;
@@ -298,10 +335,14 @@ async fn handle_prompt(
         resp.params.seed().unwrap_or(-1)
     };
 
-    let caption = MessageText::try_from(resp.params.as_ref())
-        .context("Failed to build caption from response")?;
+    let caption = if cfg.messages.hide_generation_info {
+        MessageText::new(&resp.params.prompt().unwrap_or_default())
+    } else {
+        MessageText::try_from(resp.params.as_ref())
+            .context("Failed to build caption from response")?
+    };
 
-    Reply::new(caption.0, resp.images, seed, msg.id)
+    Reply::new(caption.0, resp.images, seed, msg.id, cfg.into())
         .context("Failed to create response!")?
         .send(&bot, msg.chat.id)
         .await?;
@@ -318,17 +359,57 @@ async fn handle_prompt(
     Ok(())
 }
 
-fn keyboard(seed: i64) -> InlineKeyboardMarkup {
-    let seed_button = if seed == -1 {
-        InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")
+struct KeyboardConfig {
+    disable_user_settings: bool,
+    hide_settings_button: bool,
+    hide_reuse_button: bool,
+    hide_rerun_button: bool,
+}
+
+impl From<ReplyConfig> for KeyboardConfig {
+    fn from(config: ReplyConfig) -> Self {
+        Self {
+            disable_user_settings: config.disable_user_settings,
+            hide_settings_button: config.hide_settings_button,
+            hide_reuse_button: config.hide_reuse_button,
+            hide_rerun_button: config.hide_rerun_button,
+        }
+    }
+}
+
+impl From<ConfigParameters> for KeyboardConfig {
+    fn from(config: ConfigParameters) -> Self {
+        Self {
+            disable_user_settings: config.settings.disable_user_settings,
+            hide_settings_button: config.ui.hide_settings_button,
+            hide_reuse_button: config.ui.hide_reuse_button,
+            hide_rerun_button: config.ui.hide_rerun_button,
+        }
+    }
+}
+
+fn keyboard(seed: i64, cfg: KeyboardConfig) -> InlineKeyboardMarkup {
+    let settings_button = if (!cfg.disable_user_settings) && !cfg.hide_settings_button {
+        vec![InlineKeyboardButton::callback("⚙️ Settings", "settings")]
     } else {
-        InlineKeyboardButton::callback("♻️ Seed", format!("reuse/{seed}"))
+        vec![]
     };
-    InlineKeyboardMarkup::new([[
-        InlineKeyboardButton::callback("🔄 Rerun", "rerun"),
-        seed_button,
-        InlineKeyboardButton::callback("⚙️ Settings", "settings"),
-    ]])
+    let seed_button = if cfg.hide_reuse_button {
+        vec![]
+    } else if seed == -1 {
+        vec![InlineKeyboardButton::callback("🎲 Seed", "reuse/-1")]
+    } else {
+        vec![InlineKeyboardButton::callback(
+            "♻️ Seed",
+            format!("reuse/{seed}"),
+        )]
+    };
+    let rerun_button = if cfg.hide_rerun_button {
+        vec![]
+    } else {
+        vec![InlineKeyboardButton::callback("🔄 Rerun", "rerun")]
+    };
+    InlineKeyboardMarkup::new([[rerun_button, seed_button, settings_button].concat()])
 }
 
 #[instrument(skip_all)]
@@ -437,6 +518,7 @@ async fn handle_reuse(
     (mut txt2img, mut img2img): (Box<dyn GenParams>, Box<dyn GenParams>),
     q: CallbackQuery,
     seed: i64,
+    cfg: ConfigParameters,
 ) -> anyhow::Result<()> {
     let message = if let Some(message) = q.message {
         message
@@ -505,7 +587,7 @@ async fn handle_reuse(
             warn!("Failed to answer set seed callback query: {}", e)
         }
         bot.edit_message_reply_markup(chat_id, id)
-            .reply_markup(keyboard(-1))
+            .reply_markup(keyboard(-1, cfg.into()))
             .send()
             .await?;
     }
