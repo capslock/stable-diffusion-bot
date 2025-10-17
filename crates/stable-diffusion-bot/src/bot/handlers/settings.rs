@@ -388,13 +388,12 @@ pub(crate) async fn handle_txt2img_settings_value(
     text: String,
     (selection, mut txt2img, img2img): (Option<String>, Box<dyn GenParams>, Box<dyn GenParams>),
 ) -> anyhow::Result<()> {
-    if let Some(ref setting) = selection {
-        if let Err(e) = update_txt2img_setting(txt2img.as_mut(), setting, text) {
+    if let Some(ref setting) = selection
+        && let Err(e) = update_txt2img_setting(txt2img.as_mut(), setting, text) {
             bot.send_message(msg.chat.id, format!("Please enter a valid value: {e:?}."))
                 .await?;
             return Ok(());
         }
-    }
 
     let bot_state = BotState::SettingsTxt2Img { selection: None };
 
@@ -419,13 +418,12 @@ pub(crate) async fn handle_img2img_settings_value(
     text: String,
     (selection, txt2img, mut img2img): (Option<String>, Box<dyn GenParams>, Box<dyn GenParams>),
 ) -> anyhow::Result<()> {
-    if let Some(ref setting) = selection {
-        if let Err(e) = update_img2img_setting(img2img.as_mut(), setting, text) {
+    if let Some(ref setting) = selection
+        && let Err(e) = update_img2img_setting(img2img.as_mut(), setting, text) {
             bot.send_message(msg.chat.id, format!("Please enter a valid value: {e:?}."))
                 .await?;
             return Ok(());
         }
-    }
 
     let bot_state = BotState::SettingsImg2Img { selection: None };
 
