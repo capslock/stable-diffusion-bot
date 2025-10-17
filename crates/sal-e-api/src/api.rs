@@ -22,7 +22,7 @@ pub struct Response {
 pub enum ComfyPromptApiError {
     /// Error creating a ComfyUI Client
     #[error("Error creating a ComfyUI Client")]
-    CreateClient(#[from] comfyui_api::comfy::ComfyApiError),
+    CreateClient(#[from] Box<comfyui_api::comfy::ComfyApiError>),
 }
 
 /// Struct wrapping a connection to the ComfyUI API.
@@ -50,7 +50,7 @@ impl ComfyPromptApi {
     /// A new `ComfyPromptApi` instance on success, or an error if there was a failure in the ComfyUI API client.
     pub fn new(prompt: comfyui_api::models::Prompt) -> Result<Self, ComfyPromptApiError> {
         Ok(Self {
-            client: comfyui_api::comfy::Comfy::new()?,
+            client: comfyui_api::comfy::Comfy::new().map_err(Box::new)?,
             params: crate::gen_params::ComfyParams {
                 prompt: Some(prompt),
                 count: 1,
@@ -79,7 +79,7 @@ impl ComfyPromptApi {
         S: AsRef<str>,
     {
         Ok(Self {
-            client: comfyui_api::comfy::Comfy::new_with_url(url)?,
+            client: comfyui_api::comfy::Comfy::new_with_url(url).map_err(Box::new)?,
             params: crate::gen_params::ComfyParams {
                 prompt: Some(prompt),
                 count: 1,

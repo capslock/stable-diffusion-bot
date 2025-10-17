@@ -49,7 +49,9 @@ pub enum ComfyApiError {
     CreateApiFailed(#[from] api::ApiError),
     /// Execution was interrupted
     #[error("Execution was interrupted: node {} ({})", response.node_id, response.node_type)]
-    ExecutionInterrupted { response: ExecutionInterrupted },
+    ExecutionInterrupted {
+        response: Box<ExecutionInterrupted>,
+    },
     /// Error occurred during execution
     #[error("Error occurred during execution: {exception_type}: {exception_message}")]
     ExecutionError {
@@ -82,15 +84,20 @@ pub struct Comfy {
     history: HistoryApi,
     upload: UploadApi,
     view: ViewApi,
+    websocket: WebsocketApi,
 }
 
 impl Default for Comfy {
     fn default() -> Self {
+        let client_id = Uuid::new_v4();
         let api = Api::default();
         Self {
             history: api.history().expect("failed to create history api"),
             upload: api.upload().expect("failed to create upload api"),
             view: api.view().expect("failed to create view api"),
+            websocket: api
+                .websocket_with_client(client_id)
+                .expect("failed to create websocket api"),
             api,
         }
     }
@@ -99,11 +106,13 @@ impl Default for Comfy {
 impl Comfy {
     /// Returns a new `Comfy` instance with default settings.
     pub fn new() -> Result<Self> {
+        let client_id = Uuid::new_v4();
         let api = Api::default();
         Ok(Self {
             history: api.history()?,
             upload: api.upload()?,
             view: api.view()?,
+            websocket: api.websocket_with_client(client_id)?,
             api,
         })
     }
@@ -121,11 +130,13 @@ impl Comfy {
     where
         S: AsRef<str>,
     {
+        let client_id = Uuid::new_v4();
         let api = Api::new_with_url(url.as_ref())?;
         Ok(Self {
             history: api.history()?,
             upload: api.upload()?,
             view: api.view()?,
+            websocket: api.websocket_with_client(client_id)?,
             api,
         })
     }
@@ -144,11 +155,13 @@ impl Comfy {
     where
         S: AsRef<str>,
     {
+        let client_id = Uuid::new_v4();
         let api = Api::new_with_client_and_url(client, url.as_ref())?;
         Ok(Self {
             history: api.history()?,
             upload: api.upload()?,
             view: api.view()?,
+            websocket: api.websocket_with_client(client_id)?,
             api,
         })
     }
@@ -193,7 +206,9 @@ impl Comfy {
                 if data.prompt_id != target_prompt_id {
                     return Ok(None);
                 }
-                Err(ComfyApiError::ExecutionInterrupted { response: data })
+                Err(ComfyApiError::ExecutionInterrupted {
+                    response: Box::new(data),
+                })
             }
             Update::ExecutionError(data) => {
                 if data.execution_status.prompt_id != target_prompt_id {
@@ -212,25 +227,24 @@ impl Comfy {
         &'a self,
         prompt: &Prompt,
     ) -> Result<impl Stream<Item = Result<State>> + 'a> {
-        let client_id = Uuid::new_v4();
-        let prompt_api = self.api.prompt_with_client(client_id)?;
-        let websocket_api = self.api.websocket_with_client(client_id)?;
-        let stream = websocket_api
-            .updates()
-            .await
-            .map_err(ComfyApiError::ReceiveUpdateFailure)?;
+        let prompt_api = self.api.prompt_with_client(self.api.client_id())?;
         let response = prompt_api.send(prompt).await?;
         let prompt_id = response.prompt_id;
-        Ok(stream.filter_map(move |msg| async move {
-            match msg {
-                Ok(msg) => match self.filter_update(msg, prompt_id).await {
-                    Ok(Some(images)) => Some(Ok(images)),
-                    Ok(None) => None,
-                    Err(e) => Some(Err(e)),
-                },
-                Err(e) => Some(Err(ComfyApiError::ReceiveUpdateFailure(e))),
-            }
-        }))
+        Ok(self
+            .websocket
+            .updates()
+            .await
+            .map_err(ComfyApiError::ReceiveUpdateFailure)?
+            .filter_map(move |msg| async move {
+                match msg {
+                    Ok(msg) => match self.filter_update(msg, prompt_id).await {
+                        Ok(Some(images)) => Some(Ok(images)),
+                        Ok(None) => None,
+                        Err(e) => Some(Err(e)),
+                    },
+                    Err(e) => Some(Err(ComfyApiError::ReceiveUpdateFailure(e))),
+                }
+            }))
     }
 
     /// Executes a prompt and returns a stream of generated images.

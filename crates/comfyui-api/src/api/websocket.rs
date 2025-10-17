@@ -14,13 +14,13 @@ pub enum WebSocketApiError {
     ParseError(#[from] url::ParseError),
     /// Error parsing endpoint URL
     #[error("Failed to parse endpoint URL")]
-    ConnectFailed(#[from] tokio_tungstenite::tungstenite::Error),
+    ConnectFailed(#[from] Box<tokio_tungstenite::tungstenite::Error>),
     /// An error occurred while parsing the response from the API.
     #[error("Parsing response failed")]
     InvalidResponse(#[from] serde_json::Error),
     /// An error occurred while reading websocket message.
     #[error("Error occurred while reading websocket message")]
-    ReadFailed(#[source] tokio_tungstenite::tungstenite::Error),
+    ReadFailed(#[source] Box<tokio_tungstenite::tungstenite::Error>),
 }
 
 type Result<T> = std::result::Result<T, WebSocketApiError>;
@@ -65,7 +65,7 @@ impl WebsocketApi {
         &self,
         endpoint: &Url,
     ) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
-        let (connection, _) = connect_async(endpoint).await?;
+        let (connection, _) = connect_async(endpoint).await.map_err(Box::new)?;
         Ok(connection.filter_map(|m| async {
             match m {
                 Ok(m) => match m {
@@ -82,7 +82,7 @@ impl WebsocketApi {
                         None
                     }
                 },
-                Err(e) => Some(Err(WebSocketApiError::ReadFailed(e))),
+                Err(e) => Some(Err(WebSocketApiError::ReadFailed(Box::new(e)))),
             }
         }))
     }
@@ -106,7 +106,7 @@ impl WebsocketApi {
     /// # Returns
     ///
     /// A `Stream` of `Update` values. These contain progress updates for a task.
-    pub async fn updates(&self) -> Result<impl FusedStream<Item = Result<Update>>> {
+    pub async fn updates(&self) -> Result<impl FusedStream<Item = Result<Update>> + use<'_>> {
         Ok(self.connect_impl().await?.filter_map(|m| async {
             match m {
                 Ok(PreviewOrUpdate::Update(u)) => Some(Ok(u)),

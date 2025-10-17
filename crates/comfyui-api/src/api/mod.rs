@@ -84,6 +84,11 @@ impl Api {
         })
     }
 
+    /// Returns the client id.
+    pub fn client_id(&self) -> uuid::Uuid {
+        self.client_id
+    }
+
     /// Returns a new `Api` instance with the given `reqwest::Client` and URL as a string value.
     ///
     /// # Arguments

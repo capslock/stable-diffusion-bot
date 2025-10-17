@@ -156,7 +156,7 @@ impl Txt2ImgRequest {
     /// # Arguments
     ///
     /// * `seed` - An i64 value representing the seed for random number generation.
-    ///            Set to `-1` to randomize.
+    ///          Set to `-1` to randomize.
     ///
     /// # Example
     ///
@@ -174,7 +174,7 @@ impl Txt2ImgRequest {
     /// # Arguments
     ///
     /// * `subseed` - An i64 value representing the subseed for random number generation.
-    ///               Set to `-1` to randomize.
+    ///             Set to `-1` to randomize.
     ///
     /// # Example
     ///
