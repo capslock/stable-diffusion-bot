@@ -2,3 +2,6 @@
 resolver = "2"
 members = ["crates/*"]
 default-members = ["crates/stable-diffusion-bot"]
+
+[workspace.package]
+rust-version = "1.90"

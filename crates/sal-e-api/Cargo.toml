@@ -2,6 +2,7 @@
 name = "sal-e-api"
 version = "0.2.1"
 edition = "2021"
+rust-version.workspace = true
 description = "Stable-Diffusion Abstraction Layer"
 readme = "README.md"
 license = "MIT"

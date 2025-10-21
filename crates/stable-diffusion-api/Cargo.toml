@@ -2,6 +2,7 @@
 name = "stable-diffusion-api"
 version = "0.1.2"
 edition = "2021"
+rust-version.workspace = true
 description = "Stable Diffusion WebUI API wrapper"
 readme = "README.md"
 license = "MIT"
