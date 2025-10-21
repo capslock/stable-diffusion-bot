@@ -1,7 +1,7 @@
 [package]
 name = "stable-diffusion-bot"
 version = "0.2.1"
-edition = "2021"
+edition = "2024"
 description = "Stable Diffusion Telegram Bot"
 readme = "README.md"
 license = "MIT"

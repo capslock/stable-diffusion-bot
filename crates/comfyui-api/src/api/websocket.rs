@@ -62,10 +62,9 @@ impl WebsocketApi {
     }
 
     async fn connect_to_endpoint(
-        &self,
-        endpoint: &Url,
+        endpoint: Url,
     ) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
-        let (connection, _) = connect_async(endpoint).await?;
+        let (connection, _) = connect_async(&endpoint).await?;
         Ok(connection.filter_map(|m| async {
             match m {
                 Ok(m) => match m {
@@ -87,8 +86,8 @@ impl WebsocketApi {
         }))
     }
 
-    async fn connect_impl(&self) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
-        self.connect_to_endpoint(&self.endpoint).await
+    async fn connect_impl(self) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
+        Self::connect_to_endpoint(self.endpoint).await
     }
 
     /// Connects to the websocket endpoint and returns a stream of `PreviewOrUpdate` values.
@@ -97,7 +96,7 @@ impl WebsocketApi {
     ///
     /// A `Stream` of `PreviewOrUpdate` values. These are either `Update` values, which contain
     /// progress updates for a task, or `Preview` values, which contain a preview image.
-    pub async fn connect(&self) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
+    pub async fn connect(self) -> Result<impl FusedStream<Item = Result<PreviewOrUpdate>>> {
         self.connect_impl().await
     }
 
@@ -106,7 +105,7 @@ impl WebsocketApi {
     /// # Returns
     ///
     /// A `Stream` of `Update` values. These contain progress updates for a task.
-    pub async fn updates(&self) -> Result<impl FusedStream<Item = Result<Update>>> {
+    pub async fn updates(self) -> Result<impl FusedStream<Item = Result<Update>>> {
         Ok(self.connect_impl().await?.filter_map(|m| async {
             match m {
                 Ok(PreviewOrUpdate::Update(u)) => Some(Ok(u)),
@@ -121,7 +120,7 @@ impl WebsocketApi {
     /// # Returns
     ///
     /// A `Stream` of `Preview` values. These contain preview images.
-    pub async fn previews(&self) -> Result<impl FusedStream<Item = Result<Preview>>> {
+    pub async fn previews(self) -> Result<impl FusedStream<Item = Result<Preview>>> {
         Ok(self.connect_impl().await?.filter_map(|m| async {
             match m {
                 Ok(PreviewOrUpdate::Update(_)) => None,
